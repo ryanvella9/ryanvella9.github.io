@@ -41,4 +41,9 @@ My main research interests include:
 
 ## The Rest
 
-In Malta, I co-founded and managed the environmental NGO Għaqda Siġar Maltin. I am involved in projects aimed at raising awareness about light pollution and the importance of preserving the remaining Dark Sky Heritage Areas (DSHAs) in Malta. I enjoy biking, hiking and taking photographs.
+In Malta, I co-founded and managed the environmental NGO Għaqda Siġar Maltin. I am involved in projects aimed at raising awareness about light pollution and the importance of preserving the remaining Dark Sky Heritage Areas (DSHAs) in Malta. I enjoy biking, hiking and taking photographs.  
+
+
+<div style="text-align: right; font-style: italic;">
+Last updated on 12.07.2025
+</div>
