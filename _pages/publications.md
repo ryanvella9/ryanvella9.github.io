@@ -1,0 +1,49 @@
+---
+layout: archive
+title: "Publications"
+permalink: /publications/
+author_profile: true
+---
+
+<sup>*</sup> indicates first author(s); otherwise, authors are listed alphabetically.  
+
+## 2024
+
+- *Insights into climate variability of the meteorological records from a background monitoring station: The Giordan Lighthouse, Gozo*  
+  Ciarlo, J. M., **Vella, R.**, Saliba, M., Ellul, R., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.  
+  *Submitted to Environmental Research: Climate*
+
+- *Impacts of convection, chemistry, and clearing on biogenic volatile organic compounds over the Amazon*  
+  Tripathi, N., Edtbauer, A., Ringsdorf, A., Wang, N., Krumm, B., Kohl, M., **Vella, R.**, Pozzer, A., Lelieveld, J., Williams, J.  
+  *Nature Communications*, in review
+
+- *Land use change influence on atmospheric organic gases, aerosols, and radiative effects*<sup>*</sup>  
+  **Vella, R.**, Forrest, M., Pozzer, A., Tsimpidi, A. P., Hickler, T., Lelieveld, J., Tost, H.  
+  *EGUsphere*, accepted, 2024, 1–24
+
+## 2023
+
+- *Changes in biogenic volatile organic compound emissions in response to the El Niño–Southern Oscillation*<sup>*</sup>  
+  **Vella, R.**, Pozzer, A., Forrest, M., Lelieveld, J., Hickler, T., Tost, H.  
+  *Biogeosciences*, 20(20), 4391–4412
+
+- *Isoprene and monoterpene simulations using the chemistry–climate model EMAC (v2.55) with interactive vegetation from LPJ-GUESS (v4.0)*<sup>*</sup>  
+  **Vella, R.**, Forrest, M., Lelieveld, J., Tost, H.  
+  *Geoscientific Model Development*, 16(3), 885–906
+
+## 2021
+
+- *COVID-19-related changes in NO₂ and O₃ concentrations and associated health effects in Malta*<sup>*</sup>  
+  Fenech, S., Aquilina, N. J., **Vella, R.**  
+  *Frontiers in Sustainable Cities*, 3, 631280
+
+## 2020
+
+- *A photometric mapping of the night sky brightness of the Maltese islands*<sup>*</sup>  
+  Caruana, J., **Vella, R.**, Spiteri, D., Nolle, M., Fenech, S., Aquilina, N. J.  
+  *Journal of Environmental Management*, 261, 110196
+
+---
+
+You can also find my articles on  
+[Google Scholar](https://scholar.google.com/citations?user=T3QXwYwAAAAJ&hl=en).
