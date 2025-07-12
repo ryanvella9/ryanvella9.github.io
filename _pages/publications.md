@@ -5,7 +5,6 @@ permalink: /publications/
 author_profile: true
 ---
 
-<sup>*</sup> indicates first author(s); otherwise, authors are listed alphabetically.
 
 #### 2025
 
