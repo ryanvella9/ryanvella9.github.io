@@ -1,4 +1,13 @@
-## About Me
+---
+permalink: /
+title: "About Me"
+author_profile: true
+redirect_from: 
+  - /about/
+  - /about.html
+---
+
+
 
 I am a postdoctoral scientist in the [Atmospheric Physics group]([https://iac.ethz.ch/group/atmospheric-physics.html](https://iac.ethz.ch/group/atmospheric-physics.html)) led by Prof. Ulrike Lohmann at ETH Zurich, where I investigate ice-nucleating particles in mixed-phase clouds using global climate models.
 
