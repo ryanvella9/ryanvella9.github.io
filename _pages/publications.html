@@ -5,32 +5,35 @@ permalink: /publications/
 author_profile: true
 ---
 
-{% if site.author.googlescholar %}
-  <div class="wordwrap">You can also find my articles on <a href="{{site.author.googlescholar}}">my Google Scholar profile</a>.</div>
-{% endif %}
+<div class="wordwrap">
+  You can also find my articles on
+  <a href="https://scholar.google.com/citations?user=T3QXwYwAAAAJ&hl=en" target="_blank">my Google Scholar profile</a>.
+</div>
 
-{% include base_path %}
+<br/>
 
-<!-- New style rendering if publication categories are defined -->
-{% if site.publication_category %}
-  {% for category in site.publication_category  %}
-    {% assign title_shown = false %}
-    {% for post in site.publications reversed %}
-      {% if post.category != category[0] %}
-        {% continue %}
-      {% endif %}
-      {% unless title_shown %}
-        <h2>{{ category[1].title }}</h2><hr />
-        {% assign title_shown = true %}
-      {% endunless %}
-      {% include archive-single.html %}
-    {% endfor %}
-  {% endfor %}
-{% else %}
-  {% for post in site.publications reversed %}
-    {% include archive-single.html %}
-  {% endfor %}
-{% endif %}
+## Selected Publications
+
+1. **Influence of land cover change on atmospheric organic gases, aerosols, and radiative effects**  
+   *Atmospheric Chemistry and Physics*, 2025  
+   [https://doi.org/10.5194/acp-25-243-2025](https://doi.org/10.5194/acp-25-243-2025)
+
+2. **Changes in biogenic volatile organic compound emissions in response to the El Niño–Southern Oscillation**  
+   *Biogeosciences*, 2023  
+   [https://doi.org/10.5194/bg-20-4391-2023](https://doi.org/10.5194/bg-20-4391-2023)
+
+3. **Isoprene and monoterpene simulations using the chemistry–climate model EMAC (v2.55) with interactive vegetation from LPJ-GUESS (v4.0)**  
+   *Geoscientific Model Development*, 2023  
+   [https://gmd.copernicus.org/articles/16/885/2023/](https://gmd.copernicus.org/articles/16/885/2023/)
+
+4. **COVID-19-Related Changes in NO₂ and O₃ Concentrations and Associated Health Effects in Malta**  
+   *Frontiers in Sustainable Cities*, 2021  
+   [https://doi.org/10.3389/frsc.2021.631280](https://doi.org/10.3389/frsc.2021.631280)
+
+5. **A photometric mapping of the night sky brightness of the Maltese islands**  
+   *Journal of Environmental Management*, 2020  
+   [https://doi.org/10.1016/j.jenvman.2020.110196](https://doi.org/10.1016/j.jenvman.2020.110196)
+
 
 
 
