@@ -7,7 +7,7 @@ redirect_from:
   - /about.html
 ---
 
-
+**Email:** _ryan.vella@env.ethz.ch_
 
 I am a postdoctoral scientist in the [Atmospheric Physics group](https://iac.ethz.ch/group/atmospheric-physics.html) led by Prof. Ulrike Lohmann at ETH Zurich, where I am investigating the role of ice-nucleating particles in mixed-phase clouds using global climate models.
 
