@@ -9,4 +9,4 @@ redirect_from:
 
 {% include base_path %}
 
-Download my CV [here](https://github.com/ryanvella9/ryanvella9.github.io/blob/master/rv_cv.pdf).
+Download my CV [here](https://ryanvella9.github.io/files/rv_cv.pdf).
