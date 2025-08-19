@@ -1,8 +1,8 @@
 
 ---
 layout: archive
-title: "Malta from Space"
-permalink: /malta-from-space/
+title: "Hobby Projects"
+permalink: /hobby-projects/
 author_profile: true
 ---
 
