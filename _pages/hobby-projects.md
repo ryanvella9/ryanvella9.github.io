@@ -9,7 +9,6 @@ author_profile: true
 Malta from Space
 
 
-**Measurement stations 
-**
+**Measurement stations**
 
 **Malta Watch**
