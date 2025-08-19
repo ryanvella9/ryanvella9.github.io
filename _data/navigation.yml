@@ -17,11 +17,11 @@ main:
   - title: "Research"
     url: /research/
 
-  - title: "Hobby Projects"
-    url: /hobby-projects/
-
   - title: "Photography"
     url: /photography/
 
   - title: "Nature"
     url: /nature/
+
+    - title: "Malta Watch"
+    url: /malta-watch/
