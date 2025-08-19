@@ -17,9 +17,5 @@ main:
   - title: "Research"
     url: /research/
 
-  - title: "Malta from Space"
-    url: /malta-from-space/
-
-  - title: "Measurement Stations"
-    url: /measurement-stations/
-
+  - title: "Hobby Projects"
+    url: /hobby-projects/
