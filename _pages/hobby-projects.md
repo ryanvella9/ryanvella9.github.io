@@ -5,4 +5,11 @@ permalink: /hobby-projects/
 author_profile: true
 ---
 
-_Coming soon_
+
+Malta from Space
+
+
+**Measurement stations 
+**
+
+**Malta Watch**
