@@ -6,9 +6,9 @@ author_profile: true
 ---
 
 
-Over the past few years, I’ve been processing satellite images of the Maltese Islands. In this space, I share some of my favourite true-colour images along with other insights extracted from satellite data.
+I enjoy processing satellite images of the Maltese Islands. In this space, I share some of my favourite images along with other interesting insights extracted from freely available satellite products.
 
-I also operate several sensors across Malta to monitor atmospheric conditions, such as weather, air quality, and night sky brightness, among other environmental parameters.
+I also operate several sensors in Malta to monitor atmospheric conditions, such as weather, air quality, and night sky brightness, among other environmental parameters.
 
 <div style="display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 2rem;">
   <div style="flex: 1; min-width: 300px;">
