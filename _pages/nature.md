@@ -6,20 +6,22 @@ author_profile: true
 ---
 
 
-I am very passtionate about trees, especailly mediterranean species that grow in Malta. Here I compile a list of trees and some interesitng facts about them. While I always liked birds, I am only starting to lear more about them now. I want to use this space to learn as share info about birds. 
+I am passionate about trees, especially Mediterranean species native to Malta. Here, I want to compile a list of trees along with some interesting facts about them. 
+
+While I have always appreciated birds, I am only now beginning to learn more about them. I will use this space both to broaden my own understanding and to share a list of bird species along with interesting information about them.
 
 <div style="display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 2rem;">
   <div style="flex: 1; min-width: 300px;">
     <h2>Trees</h2>
     <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px;">
-      <img src="/images/" alt="Malta from Space" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+      <img src="/images/" alt="trees" style="width: 100%; height: 100%; object-fit: cover; display: block;">
     </div>
   </div>
   
   <div style="flex: 1; min-width: 300px;">
     <h2>Birds</h2>
     <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px;">
-      <img src="/images/" alt="Environmental Monitoring" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+      <img src="/images/" alt="birds" style="width: 100%; height: 100%; object-fit: cover; display: block;">
     </div>
   </div>
 </div>
