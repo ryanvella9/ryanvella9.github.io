@@ -6,9 +6,7 @@ author_profile: true
 ---
 
 
-I am passionate about trees, especially Mediterranean species native to Malta. Here, I want to compile a list of trees along with some interesting facts about them. 
-
-While I have always appreciated birds, I am only now beginning to learn more about them. I will use this space both to broaden my own understanding and to share a list of bird species along with interesting information about them.
+I am passionate about nature and love exploring the rich flora and fauna around us. Over time, I have learned a lot about trees, particularly Mediterranean species native to Malta, and I am now diving deeper into learning about birds. In this space, I share curated lists of trees and birds, along with interesting facts about them.
 
 <div style="display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 2rem;">
   <div style="flex: 1; min-width: 300px;">
