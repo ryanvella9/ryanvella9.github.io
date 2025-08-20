@@ -13,11 +13,11 @@ I also operate several sensors across Malta to monitor atmospheric conditions, s
 <div style="display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 2rem;">
   <div style="flex: 1; min-width: 300px;">
     <h2>Malta from Space</h2>
-    <img src="/images/20221123_TCI.png" alt="Malta from Space" style="width: 100%; height: auto; border-radius: 8px;">
+    <img src="/images/malta-s2.png" alt="Malta from Space" style="width: 100%; height: auto; border-radius: 8px;">
   </div>
   
   <div style="flex: 1; min-width: 300px;">
     <h2>Environmental Monitoring</h2>
-    <img src="images/mqb-ws" alt="Environmental Monitoring" style="width: 100%; height: auto; border-radius: 8px;">
+    <img src="images/mqb-ws.png" alt="Environmental Monitoring" style="width: 100%; height: auto; border-radius: 8px;">
   </div>
 </div>
