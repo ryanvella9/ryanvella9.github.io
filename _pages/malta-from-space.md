@@ -15,6 +15,4 @@ _Gallery coming soon_
 
 _Technical details coming soon_
 
-## Data Sources
 
-_Information about satellite data sources coming soon_
