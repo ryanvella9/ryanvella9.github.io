@@ -26,4 +26,4 @@ I also operate several sensors in Malta to monitor atmospheric conditions, such 
   </div>
 </div>
 
-_more soon_
+
