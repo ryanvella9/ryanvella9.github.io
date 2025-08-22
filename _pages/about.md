@@ -29,6 +29,7 @@ My main research interests include:
 - Aerosol-climate interactions
 - Land-biosphere-atmosphere interactions
 - Biogenic secondary organic aerosols
+- Convection
 - Climate dynamics
 
   Other research interests:
@@ -41,7 +42,8 @@ My main research interests include:
 
 ## The Rest
 
-In Malta, I co-founded and managed the environmental NGO Għaqda Siġar Maltin. I am involved in projects aimed at raising awareness about light pollution and the importance of preserving the remaining Dark Sky Heritage Areas (DSHAs) in Malta. I enjoy biking, hiking and taking photographs.  
+I co-founded and managed the environmental NGO Għaqda Siġar Maltin in Malta, dedicating several years to promoting ecological sustainability. I am passionate about trees, birds, and the natural environment. I enjoy working with satellite data and also operate several personal environmental sensors in Malta. As part of my conservation work, I help to raise awareness about light pollution and advocate for the preservation of Malta’s remaining Dark Sky Heritage Areas. Beyond these projects, I enjoy biking, hiking, and capturing the beauty of nature through photography.
+
 
 
 <div style="text-align: right; font-style: italic;">
