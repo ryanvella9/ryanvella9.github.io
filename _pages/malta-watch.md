@@ -19,7 +19,7 @@ I also operate several sensors in Malta to monitor atmospheric conditions, such 
   </div>
   
   <div style="flex: 1; min-width: 300px;">
-    <h2>Environmental Monitoring</h2>
+    <h2><a href="/environmental-monitoring/">Environmental Monitoring</a></h2>
     <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px;">
       <img src="/images/mqb-ws.png" alt="Environmental Monitoring" style="width: 100%; height: 100%; object-fit: cover; display: block;">
     </div>
