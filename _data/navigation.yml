@@ -17,9 +17,11 @@ main:
   - title: "Research"
     url: /research/
 
-  - title: "Nature"
-    url: /nature/
-
-  - title: "Malta Watch"
-    url: /malta-watch/
+  - title: "The Rest"
+    url: /the-rest/
+    children:
+      - title: "Nature"
+        url: /nature/
+      - title: "Malta Watch"
+        url: /malta-watch/
 
