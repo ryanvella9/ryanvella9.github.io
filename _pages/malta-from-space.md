@@ -62,7 +62,7 @@ Over the past few years, I’ve been processing satellite imagery of the Maltese
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
   <div>
     <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px; margin-bottom: 1rem;">
-      <img src="/images/SS2-ndvi.png" alt="NDVI vegetation analysis of Malta" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+      <img src="/images/S2-ndvi.png" alt="NDVI vegetation analysis of Malta" style="width: 100%; height: 100%; object-fit: cover; display: block;">
     </div>
     <p><em>The Normalized Difference Vegetation Index (NDVI) is a numerical indicator obtained from satellites used to assess the vegetation in a specific area. Values approaching 1 indicate dense and healthy vegetation. This image captured on September 19, 2023, provides a visual representation of vegetation distribution across the Maltese Islands. By applying an NDVI threshold of 0.25, we can identify areas with substantial vegetation cover, such as woodlands, agricultural land, and urban parks. These areas collectively account for only 13.78% of the total land area.</em></p>
   </div>
