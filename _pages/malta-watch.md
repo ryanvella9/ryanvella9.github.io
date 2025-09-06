@@ -14,7 +14,7 @@ I also operate several sensors in Malta to monitor atmospheric conditions, such 
   <div style="flex: 1; min-width: 300px;">
     <h2><a href="/malta-from-space/">Malta from Space</a></h2>
     <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px;">
-      <img src="/images/malta-s2.png" alt="Malta from Space" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+      <img src="/images/s2-malta-landing-page.png" alt="Malta from Space" style="width: 100%; height: 100%; object-fit: cover; display: block;">
     </div>
   </div>
   
