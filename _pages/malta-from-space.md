@@ -56,6 +56,21 @@ Over the past few years, I’ve been processing satellite imagery of the Maltese
 
 ## Other products
 
-_Technical details coming soon_
 
 
+
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+  <div>
+    <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px; margin-bottom: 1rem;">
+      <img src="/images/SS2-ndvi.png" alt="NDVI vegetation analysis of Malta" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+    </div>
+    <p><em>The Normalized Difference Vegetation Index (NDVI) is a numerical indicator obtained from satellites used to assess the vegetation in a specific area. Values approaching 1 indicate dense and healthy vegetation. This image captured on September 19, 2023, provides a visual representation of vegetation distribution across the Maltese Islands. By applying an NDVI threshold of 0.25, we can identify areas with substantial vegetation cover, such as woodlands, agricultural land, and urban parks. These areas collectively account for only 13.78% of the total land area.</em></p>
+  </div>
+  
+  <div>
+    <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px; margin-bottom: 1rem;">
+      <img src="/images/LS8-temp.png" alt="Land surface temperature from Landsat 8" style="width: 100%; height: 100%; object-fit: cover; display: block;">
+    </div>
+    <p><em>This thermal infrared image was derived from Landsat 8 TIRS (Thermal Infrared Sensor) Band 10 data captured on July 10th, 2023. Land surface temperatures (LST) were calculated using the radiative transfer equation with atmospheric correction parameters. The analysis reveals extreme thermal conditions with LST values exceeding 50°C in urban and exposed rocky areas. Temperature variations correlate with land cover types, with vegetated areas showing cooler temperatures due to evapotranspiration processes.</em></p>
+  </div>
+</div>
