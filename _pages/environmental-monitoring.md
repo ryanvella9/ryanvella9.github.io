@@ -11,17 +11,14 @@ I operate a network of sensors across Malta to monitor various atmospheric and e
 Mqabba Weather Station  
 *Approximate coordinates: 35.84°N, 14.47°E*
 
-
-<div style="display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 2rem;">
-  <div style="flex: 1; min-width: 300px;">
-    <h2><a href="/weather-data/">Weather Data</a></h2>
-    <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px; background-color: #f5f5f5; display: flex; align-items: center; justify-content: center;">
-      <img src="/assets/images/weather-data.png" alt="Mqabba Weather Station Data" style="width: 100%; height: 100%; object-fit: cover; display: block;" onerror="this.style.display='none'; this.parentNode.innerHTML='<p style=\'text-align: center; color: #666; font-style: italic;\'>Weather data visualization<br>coming soon</p>';">
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
+  <div>
+    <div style="width: 100%; aspect-ratio: 1 / 1; overflow: hidden; border-radius: 8px; margin-bottom: 1rem;">
+      <img src="/images/meteo-test1.png" alt="Met data" style="width: 100%; height: 100%; object-fit: cover; display: block;">
     </div>
-    <p style="margin-top: 1rem; text-align: center; font-size: 0.9em; color: #666;">
-      Real-time weather data from Mqabba Station
-    </p>
+    <p><em>Real-time meteorological data from Mqabba Weather Station.</em></p>
   </div>
+</div>
 
 
 
