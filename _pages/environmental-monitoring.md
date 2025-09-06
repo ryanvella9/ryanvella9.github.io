@@ -4,12 +4,19 @@ title: "Environmental Monitoring"
 permalink: /environmental-monitoring/
 author_profile: true
 ---
-
-I operate several sensors across Malta to monitor atmospheric conditions, such as weather, air quality, and night sky brightness, among other environmental parameters.
+I operate a network of sensors across Malta to monitor various atmospheric and environmental parameters, including weather conditions, air quality, and night sky brightness.
 
 ## Weather Monitoring
 
-_Weather station data and analysis coming soon_
+**Mqabba Weather Station**  
+*Approximate coordinates: 35.84°N, 14.47°E*
+
+Below are some key meteorological variables recorded over the past 10 days:
+
+<figure>
+    <img src="/assets/images/meteo-test1.png" alt="Mqabba Weather Station - Meteorological Data (Last 10 Days)" style="max-width:100%;">
+    <figcaption>Meteorological data from Mqabba Weather Station (last 10 days).</figcaption>
+</figure>
 
 ## Air Quality
 
