@@ -8,7 +8,7 @@ author_profile: true
 
 I enjoy processing satellite images of the Maltese Islands. In this space, I share some of my favourite images along with other interesting insights extracted from freely available satellite products.
 
-I also operate several sensors in Malta to monitor atmospheric conditions, such as weather, air quality, and night sky brightness, among other environmental parameters.
+I also operate several sensors in Malta to monitor atmospheric conditions, such as weather, air quality, and night sky brightness.
 
 <div style="display: flex; flex-wrap: wrap; gap: 2rem; margin-top: 2rem;">
   <div style="flex: 1; min-width: 300px;">

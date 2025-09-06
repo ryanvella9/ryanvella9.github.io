@@ -5,7 +5,7 @@ permalink: /malta-from-space/
 author_profile: true
 ---
 
-Over the past few years, I’ve been processing satellite imagery of the Maltese Islands. This collection features true-colour images along with additional data derived from satellite products.
+Over the past few years, I’ve been processing satellite imagery of the Maltese Islands. This collection features true-colour images along with additional derived products from satellite data.
 
 ## True-Colour Images
 
