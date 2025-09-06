@@ -15,8 +15,7 @@ I completed my PhD at the [Max Planck Institute for Chemistry](https://www.mpic.
 
 Before my PhD, I completed a fellowship in Earth Observation at the [European Space Agency (ESA)](https://www.esa.int/) in Frascati, Italy. I hold a BSc in Physics & Mathematics and an MSc in Geosciences from the [University of Malta](https://www.um.edu.mt/).
 
-My research sits at the intersection of atmospheric chemistry, climate science, and Earth system modelling, with a strong interest in the processes that shape cloud formation and their role in the climate system.
-
+c
 
 
 ## Research

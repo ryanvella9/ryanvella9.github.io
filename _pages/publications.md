@@ -8,15 +8,17 @@ author_profile: true
 
 #### 2025
 
+- *Changes in global atmospheric oxidant chemistry from land cover conversion*  
+ **Vella, R.**, Gromov, S., Nussbaumer, C. M., Stecher, L., Kohl, M., Ruhl, S., Tost, H., Lelieveld, J., Pozzer, A.  
+  *Atmospheric Chemistry and Physics*.  
+  [Full](https://acp.copernicus.org/articles/25/9885/2025//)
+
+
 - *Insights into climate variability of the meteorological records from a background monitoring station: The Giordan Lighthouse, Gozo*  
   Ciarlo, J. M., **Vella, R.**, Saliba, M., Ellul, R., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.  
-  *Open Research Europe*, in review.  
-  [Full](https://open-research-europe.ec.europa.eu/articles/5-37/v1?src=rss)
+  *Open Research Europe*.  
+  [Full](https://open-research-europe.ec.europa.eu/articles/5-37)
 
-- *Shifts in global atmospheric oxidant chemistry from land cover change*  
- **Vella, R.**., Gromov, S., Nussbaumer, C. M., Stecher, L., Kohl, M., Ruhl, S., Tost, H., Lelieveld, J., Pozzer, A.  
-  *Atmospheric Chemistry and Physics*, accepted.  
-  [Full](https://egusphere.copernicus.org/preprints/2025/egusphere-2025-1800/)
 
 - *Impacts of convection, chemistry, and clearing on biogenic volatile organic compounds over the Amazon*  
   Tripathi, N., Edtbauer, A., Ringsdorf, A., Wang, N., Krumm, B., Kohl, M., **Vella, R.**, Pozzer, A., Lelieveld, J., Williams, J.  
