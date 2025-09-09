@@ -6,10 +6,10 @@ author_profile: true
 ---
 I operate a network of sensors across Malta to monitor various atmospheric and environmental parameters, including weather conditions, air quality, and night sky brightness.
 
-## Weather Monitoring
+*Approximate coordinates of monitoring station: 35.844°N, 14.469°E*
 
-Mqabba Weather Station  
-*Approximate coordinates: 35.844°N, 14.469°E*
+## Weather Monitoring
+ 
 
 <div style="width: 100%; margin-top: 2rem;">
     <img src="/images/weather_data_plot.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
@@ -20,8 +20,10 @@ Mqabba Weather Station
 ## Air Quality
 
 <div style="width: 100%; margin-top: 2rem;">
-    <img src="/images/pm25_data_plot.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
+    <img src="/images/pm_data_plot.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
 </div>
+
+
 
 ## Night Sky Brightness
 
