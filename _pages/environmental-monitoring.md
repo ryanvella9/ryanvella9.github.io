@@ -12,7 +12,7 @@ Mqabba Weather Station
 *Approximate coordinates: 35.84°N, 14.47°E*
 
 <div style="width: 100%; margin-top: 2rem;">
-    <img src="/images/meteo_test1.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
+    <img src="/images/weather_data_plot.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
 </div>
 
 
