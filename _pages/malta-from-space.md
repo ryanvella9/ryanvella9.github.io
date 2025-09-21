@@ -7,6 +7,17 @@ author_profile: true
 
 Over the past few years, I’ve been processing satellite imagery of the Maltese Islands. This collection features true-colour images along with additional derived products from satellite data.
 
+## Weather Overview
+
+<div style="width: 100%; margin: 2rem 0;">
+  <div style="width: 100%; border-radius: 8px; overflow: hidden;">
+    <img src="/assets/images/Europe_N_Africa_15min_07_15.gif" alt="15-minute interval satellite imagery of Europe and Northern Africa" style="width: 100%; height: auto; display: block;">
+  </div>
+  <p style="margin-top: 1rem; text-align: center; font-style: italic; color: #666;">
+    15-minute interval images of Europe and Northern Africa from SEVIRI instrument - Meteosat Second Generation (MSG), EUMETSAT.
+  </p>
+</div>
+
 ## True-Colour Images
 
 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem;">
