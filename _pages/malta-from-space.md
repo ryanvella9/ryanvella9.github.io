@@ -7,7 +7,7 @@ author_profile: true
 
 Over the past few years, I’ve been processing satellite imagery of the Maltese Islands. This collection features true-colour images along with additional derived products from satellite data.
 
-## Weather Overview
+## Weather Overview from Yesterday
 
 <div style="width: 100%; margin: 2rem 0;">
   <div style="width: 100%; border-radius: 8px; overflow: hidden;">
