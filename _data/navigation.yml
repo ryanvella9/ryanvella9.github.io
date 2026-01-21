@@ -20,7 +20,7 @@ main:
   - title: "CV"
     url: /cv/
 
-  - title: "The Rest"
+  - title: "Personal Projects"
     url: /the-rest/
     children:
       - title: "Nature"

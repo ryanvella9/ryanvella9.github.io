@@ -1,6 +1,6 @@
 ---
 layout: archive
-title: "The Rest"
+title: "Personal Projects"
 permalink: /the-rest/
 author_profile: true
 ---
