@@ -45,5 +45,5 @@ I co-founded and managed the environmental NGO Għaqda Siġar Maltin in Malta, d
 
 
 <div style="text-align: right; font-style: italic;">
-Last updated on 12.07.2025
+Last updated on {{ site.time | date: "%d.%m.%Y" }}
 </div>
