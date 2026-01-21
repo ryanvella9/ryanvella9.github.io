@@ -20,9 +20,6 @@ main:
   - title: "CV"
     url: /cv/
 
-  - title: "Research"
-    url: /research/
-
   - title: "The Rest"
     url: /the-rest/
     children:
