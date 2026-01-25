@@ -7,7 +7,7 @@ author_profile: true
 
 ## Research Overview
 
-My research sits at the intersection of atmospheric chemistry, climate science, and Earth system modelling, with a strong interest in the processes that shape cloud formation and their role in the climate system.
+My research sits at the intersection of atmospheric physics & chemistry, climate science, and Earth system modelling, with a strong interest in the processes that shape cloud formation and their role in the climate system.
 
 ## Current Research
 
@@ -19,7 +19,7 @@ As a postdoctoral scientist at ETH Zurich, I am investigating the role of ice-nu
 
 ### Vegetation-Climate Interactions
 
-During my PhD at the Max Planck Institute for Chemistry and Johannes Gutenberg University Mainz, my research focused on vegetation–climate interactions, specifically examining the role of biogenic volatile organic compound (BVOC) emissions in the Earth system. This work explored how vegetation influences atmospheric chemistry and climate through the emission of these compounds.
+During my PhD at the Max Planck Institute for Chemistry and JGU Mainz, my research focused on vegetation–climate interactions, specifically examining the role of biogenic volatile organic compound (BVOC) emissions in the Earth system. This work explored how vegetation influences atmospheric chemistry and climate through the emission of these compounds.
 
 ### Earth Observation
 

@@ -9,7 +9,7 @@ redirect_from:
 
 **Email:** _ryan.vella@env.ethz.ch_
 
-I am a postdoctoral scientist in the [Atmospheric Physics group](https://iac.ethz.ch/group/atmospheric-physics.html) led by Prof. Ulrike Lohmann at ETH Zurich, where I am investigating the role of ice-nucleating particles in mixed-phase clouds using global climate models.
+I am a postdoctoral scientist in the [Atmospheric Physics group](https://iac.ethz.ch/group/atmospheric-physics.html) of Prof. Ulrike Lohmann at ETH Zurich, where I am investigating the role of ice-nucleating particles in mixed-phase clouds using global climate models.
 
 I completed my PhD at the [Max Planck Institute for Chemistry](https://www.mpic.de/2285/en) and the [Institute for Atmospheric Physics](https://www.blogs.uni-mainz.de/fb08-ipa-en/), Johannes Gutenberg University Mainz. Under the supervision of Prof. Jos Lelieveld and Prof. Holger Tost, my doctoral research focused on vegetation–climate interactions, specifically the role of biogenic volatile organic compound emissions in the Earth system.
 
@@ -26,11 +26,9 @@ My main research interests include:
 - Cloud physics
 - Aerosol-climate interactions
 - Land-biosphere-atmosphere interactions
-- Biogenic secondary organic aerosols
 - Convection
-- Climate dynamics
 
-  Other research interests:
+Other research interests:
 
 - Earth Observation
 - Satellite remote sensing
