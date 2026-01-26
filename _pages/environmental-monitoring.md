@@ -16,6 +16,14 @@ I operate some sensors across Malta to monitor various atmospheric and environme
 </div>
 
 
+## Clouds & Night Sky Birghtness
+ 
+
+<div style="width: 100%; margin-top: 2rem;">
+    <img src="/images/nsb_sky.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
+</div>
+
+
 
 ## Air Quality
 
