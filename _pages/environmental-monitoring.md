@@ -25,6 +25,7 @@ Instrument: TESS-W
     <img src="/images/nsb_sky.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
 </div>
 
+The sensor is located in a village/urban environment. NSB values below 18 mag arcsec⁻² correspond to Bortle scale classes 8–9, characteristic of city or inner-city skies. Variations in NSB measurements are strongly influenced by cloud cover and moonlight. 
 
 
 ## Air Quality
