@@ -6,6 +6,28 @@ author_profile: true
 ---
 
 
+#### 2026
+
+- *Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown*  
+  **Vella, R.**, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.  
+  *Geophysical Research Letters*.  
+  [Full](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL121309)
+
+- *Aerosol–cloud interactions influence the climate response to AMOC weakening*  
+  **Vella, R.**, Lohmann, U.  
+  *EGUsphere [preprint]*, under review.  
+  [Preprint](https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2961/)
+
+- *Global atmospheric aerosol distributions and composition from the Earth's surface to the stratosphere*  
+  Kohl, M., Brühl, C., Tost, H., Xenofontos, C., Christoudias, T., Gromov, S., Appel, O., Borrmann, S., Bourassa, A., Campuzano-Jost, P., Cheng, Y., Eppers, O., Froyd, K. D., Holanda, B. A., Jimenez, J. L., Jöckel, P., Joppe, P., Kaiser, K., Katich, J. M., Klingmüller, K., Köllner, F., Kupc, A., Martin, A., Pöhlker, C., Pöhlker, M. L., Pöschl, U., Rieger, L., Ruhl, S., Schill, G. P., Schneider, J., Schulz, C., Schwarz, J. P., Tsimpidi, A. P., **Vella, R.**, Williamson, C. J., Yang, Y., Zawada, D., Lelieveld, J., Pozzer, A.  
+  *EGUsphere [preprint]*, under review for Atmospheric Chemistry and Physics.  
+  [Preprint](https://egusphere.copernicus.org/preprints/2026/egusphere-2026-3649/)
+
+- *The Geoengineering Model Intercomparison Project (GeoMIP) contribution to CMIP7 – description of new experimental protocols and preliminary results*  
+  Visioni, D., Robock, A., Duffey, A., Henry, M., Hirasawa, H., Lee, W. R., Wang, C., Roberts, K., Watanabe, S., Reboita, M. S., Sugiyama, M., Kravitz, B., Haywood, J., Tilmes, S., Bonou, F., Chen, J., Sukhodolov, T., Vattioni, S., Jörimann, A., Villanueva, D., **Vella, R.**, Farron, P., Bednarz, E. M., Niemeier, U., Golja, C., Anel, J. A.  
+  *EGUsphere [preprint]*, under review for Geoscientific Model Development.  
+  [Preprint](https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2417/)
+
 #### 2025
 
 - *Changes in global atmospheric oxidant chemistry from land cover conversion*  
