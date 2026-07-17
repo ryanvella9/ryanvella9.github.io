@@ -8,21 +8,23 @@ I operate some sensors across Malta to monitor various atmospheric and environme
 
 *Approximate coordinates of monitoring station: 35.844°N, 14.469°E*
 
+*The plots below are regenerated automatically every night from the live instruments.*
+
 ## Weather Monitoring
  
  Instrument: Froggit WH3000
 
 <div style="width: 100%; margin-top: 2rem;">
-    <img src="/images/weather_data_plot.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
+    <img src="/images/weather_data_plot.png" loading="lazy" alt="Weather-station data from Malta — temperature, humidity, wind and rainfall, updated nightly" style="width: 100%; height: auto; border-radius: 8px; display: block;">
 </div>
 
 
-## Clouds & Night Sky Birghtness
+## Clouds & Night Sky Brightness
  
 Instrument: TESS-W
 
 <div style="width: 100%; margin-top: 2rem;">
-    <img src="/images/nsb_sky.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
+    <img src="/images/nsb_sky.png" loading="lazy" alt="Night-sky-brightness measurements from Malta, updated nightly" style="width: 100%; height: auto; border-radius: 8px; display: block;">
 </div>
 
 The sensor is located in a village/urban environment. NSB values below 18 mag arcsec⁻² correspond to Bortle scale classes 8–9, characteristic of city or inner-city skies. Variations in NSB measurements are strongly influenced by cloud cover and moonlight. 
@@ -33,7 +35,7 @@ The sensor is located in a village/urban environment. NSB values below 18 mag ar
 Instrument: SDS011
 
 <div style="width: 100%; margin-top: 2rem;">
-    <img src="/images/pm_data_plot.png" alt="Met data" style="width: 100%; height: auto; border-radius: 8px; display: block;">
+    <img src="/images/pm_data_plot.png" loading="lazy" alt="Particulate-matter (PM2.5 and PM10) air-quality data from Malta, updated nightly" style="width: 100%; height: auto; border-radius: 8px; display: block;">
 </div>
 
 

@@ -17,6 +17,18 @@ Before my PhD, I completed a fellowship in Earth Observation at the [European Sp
 
 
 
+## News
+
+- **2026** — New first-author paper in *Geophysical Research Letters*: [*Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown*](https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL121309).
+- **Jan 2026** — Featured on [Maltese national TV](/outreach/) discussing Storm Harry and the increasing frequency of extreme-weather events.
+- **2025** — Several new manuscripts under review — on aerosol–cloud interactions & AMOC, the GeoMIP/CMIP7 protocols, and global aerosol distributions (see [Publications](/publications/)).
+
+## Awards & Honours
+
+- **2025** — Selected participant, [Lindau Nobel Laureate Meeting](https://www.um.edu.mt/newspoint/news/2025/07/ryan-vella-lindau-nobel-laureate-meeting) (representing the University of Malta).
+- Fellowship in Earth Observation, **European Space Agency (ESA)**, Frascati, Italy.
+- **ERCA** — European Research Course on Atmospheres (2023).
+
 ## Research
 
 My main research interests include:
