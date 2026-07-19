@@ -114,52 +114,52 @@ html[data-theme="dark"] .pub-list {
 </a>
 <a class="pub" href="https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL121309">
 <div class="pub-meta"><span class="pub-y">2026</span>Geophys. Res. Lett.</div>
-<div class="pub-main"><div class="pub-title">Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown<span class="pub-badge is-pub">Published</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
+<div class="pub-main"><div class="pub-title">Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown</div><div class="pub-auth"><strong>Vella, R.</strong>, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://acp.copernicus.org/articles/25/9885/2025/">
 <div class="pub-meta"><span class="pub-y">2025</span>Atmos. Chem. Phys.</div>
-<div class="pub-main"><div class="pub-title">Changes in global atmospheric oxidant chemistry from land cover conversion<span class="pub-badge is-pub">Published</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Gromov, S., Nussbaumer, C. M., Stecher, L., Kohl, M., Ruhl, S., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
+<div class="pub-main"><div class="pub-title">Changes in global atmospheric oxidant chemistry from land cover conversion</div><div class="pub-auth"><strong>Vella, R.</strong>, Gromov, S., Nussbaumer, C. M., Stecher, L., Kohl, M., Ruhl, S., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub" href="https://open-research-europe.ec.europa.eu/articles/5-37">
 <div class="pub-meta"><span class="pub-y">2025</span>Open Res. Europe</div>
-<div class="pub-main"><div class="pub-title">Insights into climate variability of the meteorological records from a background monitoring station: The Giordan Lighthouse, Gozo<span class="pub-badge is-pub">Published</span></div><div class="pub-auth">Ciarlo, J. M., <strong>Vella, R.</strong>, Saliba, M., Ellul, R., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.</div></div>
+<div class="pub-main"><div class="pub-title">Insights into climate variability of the meteorological records from a background monitoring station: The Giordan Lighthouse, Gozo</div><div class="pub-auth">Ciarlo, J. M., <strong>Vella, R.</strong>, Saliba, M., Ellul, R., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub" href="https://www.nature.com/articles/s41467-025-59953-2">
 <div class="pub-meta"><span class="pub-y">2025</span>Nature Commun.</div>
-<div class="pub-main"><div class="pub-title">Impacts of convection, chemistry, and clearing on biogenic volatile organic compounds over the Amazon<span class="pub-badge is-pub">Published</span></div><div class="pub-auth">Tripathi, N., Edtbauer, A., Ringsdorf, A., Wang, N., Krumm, B., Kohl, M., <strong>Vella, R.</strong>, Pozzer, A., Lelieveld, J., Williams, J.</div></div>
+<div class="pub-main"><div class="pub-title">Impacts of convection, chemistry, and clearing on biogenic volatile organic compounds over the Amazon</div><div class="pub-auth">Tripathi, N., Edtbauer, A., Ringsdorf, A., Wang, N., Krumm, B., Kohl, M., <strong>Vella, R.</strong>, Pozzer, A., Lelieveld, J., Williams, J.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub" href="https://acp.copernicus.org/articles/25/243/2025/">
 <div class="pub-meta"><span class="pub-y">2025</span>Atmos. Chem. Phys.</div>
-<div class="pub-main"><div class="pub-title">Influence of land cover change on atmospheric organic gases, aerosols, and radiative effects<span class="pub-badge is-pub">Published</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Forrest, M., Pozzer, A., Tsimpidi, A. P., Hickler, T., Lelieveld, J., Tost, H.</div></div>
+<div class="pub-main"><div class="pub-title">Influence of land cover change on atmospheric organic gases, aerosols, and radiative effects</div><div class="pub-auth"><strong>Vella, R.</strong>, Forrest, M., Pozzer, A., Tsimpidi, A. P., Hickler, T., Lelieveld, J., Tost, H.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://pure.mpg.de/pubman/faces/ViewItemOverviewPage.jsp?itemId=item_3624847">
 <div class="pub-meta"><span class="pub-y">2024</span>PhD thesis &middot; MPI-C</div>
-<div class="pub-main"><div class="pub-title">Bi-directional feedbacks of interactive vegetation dynamics and the atmospheric aerosol burden in the Earth system<span class="pub-badge is-thesis">Thesis</span></div><div class="pub-auth"><strong>Vella, R.</strong> &mdash; Johannes Gutenberg University Mainz.</div></div>
+<div class="pub-main"><div class="pub-title">Bi-directional feedbacks of interactive vegetation dynamics and the atmospheric aerosol burden in the Earth system</div><div class="pub-auth"><strong>Vella, R.</strong> &mdash; Johannes Gutenberg University Mainz.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://bg.copernicus.org/articles/20/4391/2023/bg-20-4391-2023.html">
 <div class="pub-meta"><span class="pub-y">2023</span>Biogeosciences</div>
-<div class="pub-main"><div class="pub-title">Changes in biogenic volatile organic compound emissions in response to the El Ni&ntilde;o&ndash;Southern Oscillation<span class="pub-badge is-pub">Published</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Pozzer, A., Forrest, M., Lelieveld, J., Hickler, T., Tost, H.</div></div>
+<div class="pub-main"><div class="pub-title">Changes in biogenic volatile organic compound emissions in response to the El Ni&ntilde;o&ndash;Southern Oscillation</div><div class="pub-auth"><strong>Vella, R.</strong>, Pozzer, A., Forrest, M., Lelieveld, J., Hickler, T., Tost, H.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub" href="https://gmd.copernicus.org/articles/16/885/2023/gmd-16-885-2023.html">
 <div class="pub-meta"><span class="pub-y">2023</span>Geosci. Model Dev.</div>
-<div class="pub-main"><div class="pub-title">Isoprene and monoterpene simulations using the chemistry&ndash;climate model EMAC (v2.55) with interactive vegetation from LPJ-GUESS (v4.0)<span class="pub-badge is-pub">Published</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Forrest, M., Lelieveld, J., Tost, H.</div></div>
+<div class="pub-main"><div class="pub-title">Isoprene and monoterpene simulations using the chemistry&ndash;climate model EMAC (v2.55) with interactive vegetation from LPJ-GUESS (v4.0)</div><div class="pub-auth"><strong>Vella, R.</strong>, Forrest, M., Lelieveld, J., Tost, H.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://www.frontiersin.org/journals/sustainable-cities/articles/10.3389/frsc.2021.631280/full">
 <div class="pub-meta"><span class="pub-y">2021</span>Front. Sustain. Cities</div>
-<div class="pub-main"><div class="pub-title">COVID-19-related changes in NO&#8322; and O&#8323; concentrations and associated health effects in Malta<span class="pub-badge is-pub">Published</span></div><div class="pub-auth">Fenech, S., Aquilina, N. J., <strong>Vella, R.</strong></div></div>
+<div class="pub-main"><div class="pub-title">COVID-19-related changes in NO&#8322; and O&#8323; concentrations and associated health effects in Malta</div><div class="pub-auth">Fenech, S., Aquilina, N. J., <strong>Vella, R.</strong></div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://www.sciencedirect.com/science/article/abs/pii/S0301479720301298">
 <div class="pub-meta"><span class="pub-y">2020</span>J. Environ. Manag.</div>
-<div class="pub-main"><div class="pub-title">A photometric mapping of the night sky brightness of the Maltese islands<span class="pub-badge is-pub">Published</span></div><div class="pub-auth">Caruana, J., <strong>Vella, R.</strong>, Spiteri, D., Nolle, M., Fenech, S., Aquilina, N. J.</div></div>
+<div class="pub-main"><div class="pub-title">A photometric mapping of the night sky brightness of the Maltese islands</div><div class="pub-auth">Caruana, J., <strong>Vella, R.</strong>, Spiteri, D., Nolle, M., Fenech, S., Aquilina, N. J.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 </div>
