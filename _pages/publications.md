@@ -139,7 +139,7 @@ html[data-theme="dark"] .pub-list {
 </a>
 <a class="pub yb" href="https://pure.mpg.de/pubman/faces/ViewItemOverviewPage.jsp?itemId=item_3624847">
 <div class="pub-meta"><span class="pub-y">2024</span>PhD thesis &middot; MPI-C</div>
-<div class="pub-main"><div class="pub-title">Bi-directional feedbacks of interactive vegetation dynamics and the atmospheric aerosol burden in the Earth system</div><div class="pub-auth"><strong>Vella, R.</strong> &mdash; Johannes Gutenberg University Mainz.</div></div>
+<div class="pub-main"><div class="pub-title">Bi-directional feedbacks of interactive vegetation dynamics and the atmospheric aerosol burden in the Earth system</div><div class="pub-auth"><strong>Vella, R.</strong></div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://bg.copernicus.org/articles/20/4391/2023/bg-20-4391-2023.html">
