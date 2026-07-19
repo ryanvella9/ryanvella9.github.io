@@ -97,11 +97,6 @@ html[data-theme="dark"] .pub-list {
 </style>
 
 <div class="pub-list">
-<a class="pub" href="https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL121309">
-<div class="pub-meta"><span class="pub-y">2026</span>Geophys. Res. Lett.</div>
-<div class="pub-main"><div class="pub-title">Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown<span class="pub-badge is-pub">Published</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
-<span class="pub-arrow" aria-hidden="true">&rarr;</span>
-</a>
 <a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2961/">
 <div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Aerosol&ndash;cloud interactions influence the climate response to AMOC weakening<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Lohmann, U.</div></div>
@@ -115,6 +110,11 @@ html[data-theme="dark"] .pub-list {
 <a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2417/">
 <div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">The Geoengineering Model Intercomparison Project (GeoMIP) contribution to CMIP7 &ndash; description of new experimental protocols and preliminary results<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Visioni, D., Robock, A., Duffey, A., Henry, M., Hirasawa, H., Lee, W. R., Wang, C., Roberts, K., Watanabe, S., Reboita, M. S., Sugiyama, M., Kravitz, B., Haywood, J., Tilmes, S., Bonou, F., Chen, J., Sukhodolov, T., Vattioni, S., J&ouml;rimann, A., Villanueva, D., <strong>Vella, R.</strong>, Farron, P., Bednarz, E. M., Niemeier, U., Golja, C., Anel, J. A.</div></div>
+<span class="pub-arrow" aria-hidden="true">&rarr;</span>
+</a>
+<a class="pub" href="https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL121309">
+<div class="pub-meta"><span class="pub-y">2026</span>Geophys. Res. Lett.</div>
+<div class="pub-main"><div class="pub-title">Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown<span class="pub-badge is-pub">Published</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://acp.copernicus.org/articles/25/9885/2025/">
