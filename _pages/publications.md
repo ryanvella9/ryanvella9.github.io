@@ -112,6 +112,11 @@ html[data-theme="dark"] .pub-list {
 <div class="pub-main"><div class="pub-title">The Geoengineering Model Intercomparison Project (GeoMIP) contribution to CMIP7 &ndash; description of new experimental protocols and preliminary results<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Visioni, D., Robock, A., Duffey, A., Henry, M., Hirasawa, H., Lee, W. R., Wang, C., Roberts, K., Watanabe, S., Reboita, M. S., Sugiyama, M., Kravitz, B., Haywood, J., Tilmes, S., Bonou, F., Chen, J., Sukhodolov, T., Vattioni, S., J&ouml;rimann, A., Villanueva, D., <strong>Vella, R.</strong>, Farron, P., Bednarz, E. M., Niemeier, U., Golja, C., Anel, J. A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
+<a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-4020/">
+<div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
+<div class="pub-main"><div class="pub-title">Oxidation mechanisms for volatile methylated sulfur compounds and the major contribution of methanesulfonic acid to Southern Ocean aerosol particles<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Ruhl, S., Kohl, M., Baalbaki, R., Xenofontos, C., <strong>Vella, R.</strong>, Gromov, S., He, X.-C., Shen, J., Alfaouri, D., Atabakhsh, S., Dada, L., DeVivo, J., Duplissy, J., El Haddad, I., Harder, H., Jokinen, T., Junninen, H., Kanawade, V. P., Sebastian, M. K., Klebach, H., Kulmala, M., Kunkler, F., Lelieveld, J., Lehtipalo, K., Lietzke, C. J., Liu, L., Mauldin, R., Mentler, B., M&ouml;hler, O., Pet&auml;j&auml;, T., Russell, D. M., Simon, M., Thakur, R. C., Yu, W., Zhang, J., Zheng, Z., Kirkby, J., Tost, H., Christoudias, T., Sander, R., Pozzer, A.</div></div>
+<span class="pub-arrow" aria-hidden="true">&rarr;</span>
+</a>
 <a class="pub" href="https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL121309">
 <div class="pub-meta"><span class="pub-y">2026</span>Geophys. Res. Lett.</div>
 <div class="pub-main"><div class="pub-title">Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown</div><div class="pub-auth"><strong>Vella, R.</strong>, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
