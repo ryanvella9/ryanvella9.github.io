@@ -17,6 +17,9 @@ main:
   - title: "Live Sensors"
     url: /environmental-monitoring/
 
+  - title: "Forecast"
+    url: /forecast/
+
   - title: "Outreach"
     url: /outreach/
 
