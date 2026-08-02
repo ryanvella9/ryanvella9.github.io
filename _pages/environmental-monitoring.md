@@ -8,6 +8,12 @@ I operate some sensors across Malta to monitor various atmospheric and environme
 
 *Approximate coordinates of monitoring station: 35.844°N, 14.469°E*
 
+<div style="margin:2rem 0;padding:1.25rem 1.4rem;border:1px solid #e3e5ea;border-radius:12px;background:#fafbfc;">
+  <div style="font-size:0.78rem;letter-spacing:0.08em;text-transform:uppercase;color:#8a91a0;margin-bottom:0.35rem;">Live sensors</div>
+  <p style="margin:0 0 0.9rem;">An interactive dashboard of the three instruments: current conditions and air quality refresh every 10&nbsp;minutes, with the last seven days at hourly resolution.</p>
+  <a href="/dashboard.html" style="display:inline-block;padding:0.55rem 1.1rem;border-radius:8px;background:#005b96;color:#fff;text-decoration:none;font-weight:600;">Open the live dashboard →</a>
+</div>
+
 *The plots below are regenerated automatically every night from the live instruments.*
 
 ## Weather Monitoring
