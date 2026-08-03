@@ -122,8 +122,16 @@ title: "Forecast Charts"
 
   .stage img {
     display: block;
-    width: 100%;
+    /* Bounded on both axes and sized to the image, so a chart is always
+       visible whole at 100% zoom without scrolling. Height is usually what
+       binds on a laptop; width takes over on a narrow window.
+       Deliberately not width:100% — that would upscale a 660 px-tall PNG on a
+       wide monitor and make the contour labels soft. */
+    max-width: 100%;
+    max-height: calc(100vh - 210px);
+    width: auto;
     height: auto;
+    margin: 0 auto;
   }
 
   .stage.loading::after {
