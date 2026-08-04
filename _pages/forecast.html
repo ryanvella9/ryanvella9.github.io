@@ -16,15 +16,90 @@ title: "Forecast Charts"
 <title>Malta &amp; Europe Forecast Charts</title>
 <meta name="description" content="Operational forecast charts for Malta and Europe from the ECMWF IFS and DWD ICON-EU models." />
 <style>
+  /* Tokens, not literals, because the meteogram is drawn in JavaScript: the
+     SVG reads these same custom properties at draw time, so switching theme is
+     a redraw rather than a second palette to keep in step.
+     Structure matches _pages/environmental-monitoring.html deliberately — the
+     two pages sit next to each other on the site and should behave alike. */
   :root {
     --bg: #f4f6f8;
     --panel: #ffffff;
     --border: #cfd8dc;
     --text: #102027;
     --muted: #546e7a;
+    --faint: #8b9ba5;
     --accent: #0d47a1;
     --accent-soft: #e3ecf7;
+    --grid: #eceef2;
+    --axis: #c6cad4;
+    --veil: rgba(255, 255, 255, .9);
+    --shadow: 0 1px 2px rgba(16, 32, 39, .06), 0 6px 20px rgba(16, 32, 39, .06);
+    --err-bg: #fff3f3;
+    --err-border: #ffcdd2;
+    --err-text: #b71c1c;
+    /* Meteogram series. Warm for temperature, cold for its daily minimum,
+       green for wind, deep blue for rain — the same assignments the rendered
+       PNG uses, so the two versions of this chart read identically. */
+    --c-temp: #d84315;
+    --c-cold: #0277bd;
+    --c-wind: #00695c;
+    --c-rain: #1565c0;
+    --night: rgba(55, 71, 79, .055);
   }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1216;
+      --panel: #171b21;
+      --border: #262c35;
+      --text: #e8eaee;
+      --muted: #a2aab8;
+      --faint: #78818f;
+      --accent: #6fb1f0;
+      --accent-soft: #1b2b3d;
+      --grid: #222831;
+      --axis: #3a424e;
+      --veil: rgba(23, 27, 33, .9);
+      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .28);
+      --err-bg: #2a1618;
+      --err-border: #5c2a2e;
+      --err-text: #f0a3a3;
+      --c-temp: #f08a4b;
+      --c-cold: #5b9fe0;
+      --c-wind: #48b98a;
+      --c-rain: #5b9fe0;
+      --night: rgba(150, 175, 190, .05);
+    }
+  }
+
+  /* The toggle stamps data-theme on the root, which has to beat the media
+     query in both directions — a viewer who picks light on a dark OS must get
+     light, not the media query's dark. */
+  :root[data-theme="dark"] {
+    --bg: #0f1216;
+    --panel: #171b21;
+    --border: #262c35;
+    --text: #e8eaee;
+    --muted: #a2aab8;
+    --faint: #78818f;
+    --accent: #6fb1f0;
+    --accent-soft: #1b2b3d;
+    --grid: #222831;
+    --axis: #3a424e;
+    --veil: rgba(23, 27, 33, .9);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .28);
+    --err-bg: #2a1618;
+    --err-border: #5c2a2e;
+    --err-text: #f0a3a3;
+    --c-temp: #f08a4b;
+    --c-cold: #5b9fe0;
+    --c-wind: #48b98a;
+    --c-rain: #5b9fe0;
+    --night: rgba(150, 175, 190, .05);
+  }
+
+  :root[data-theme="light"] { color-scheme: light; }
+  :root[data-theme="dark"] { color-scheme: dark; }
 
   * { box-sizing: border-box; }
 
@@ -89,7 +164,7 @@ title: "Forecast Charts"
     font-size: 12px;
     padding: 6px 12px;
     border: 1px solid var(--border);
-    background: #fff;
+    background: var(--panel);
     color: var(--text);
     border-radius: 4px;
     cursor: pointer;
@@ -117,7 +192,7 @@ title: "Forecast Charts"
     min-height: 420px;
     display: grid;
     place-items: center;
-    background: #fff;
+    background: var(--panel);
     /* pan-y hands vertical gestures back to the page so the chart can still be
        scrolled past on a phone, while horizontal ones come to us for scrubbing.
        Without this the browser claims the whole gesture and the swipe never
@@ -139,6 +214,8 @@ title: "Forecast Charts"
   /* Events land on the stage rather than the image, which also stops the
      browser's native image-drag from hijacking the gesture. */
   .stage img { pointer-events: none; -webkit-user-drag: none; }
+
+  .stage img[hidden], .mgram[hidden] { display: none; }
 
   .stage img {
     display: block;
@@ -163,7 +240,7 @@ title: "Forecast Charts"
     right: 12px;
     font-size: 11px;
     color: var(--muted);
-    background: rgba(255,255,255,.9);
+    background: var(--veil);
     padding: 2px 8px;
     border-radius: 3px;
   }
@@ -209,29 +286,119 @@ title: "Forecast Charts"
   }
 
   .error {
-    background: #fff3f3;
-    border: 1px solid #ffcdd2;
-    color: #b71c1c;
+    background: var(--err-bg);
+    border: 1px solid var(--err-border);
+    color: var(--err-text);
     padding: 14px 16px;
     border-radius: 6px;
     line-height: 1.6;
   }
 
   kbd {
-    background: #eceff1; border: 1px solid var(--border); border-bottom-width: 2px;
+    background: var(--accent-soft); border: 1px solid var(--border); border-bottom-width: 2px;
     border-radius: 3px; padding: 1px 5px; font-size: 11px; font-family: inherit;
   }
+
+  /* ------------------------------------------------------ theme toggle -- */
+
+  .bar { display: flex; align-items: center; gap: 12px; }
+
+  #theme {
+    padding: 5px 8px;
+    line-height: 0;
+    border-radius: 5px;
+  }
+  #theme svg { width: 16px; height: 16px; display: block; }
+
+  /* --------------------------------------------------- interactive plot -- */
+  /*
+     The meteogram is the one product that is a time series rather than a map,
+     so it is the one that gains from being drawn in the browser: a reader can
+     put a crosshair on 15:00 on Thursday and read the number, which a PNG can
+     never offer. Maps stay images — reprojecting cartography client-side would
+     be a different project entirely.
+  */
+
+  .mgram { width: 100%; padding: 16px 18px 12px; }
+
+  .mgram-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+    align-items: baseline;
+    margin-bottom: 6px;
+  }
+  .mgram-head h2 { margin: 0; font-size: 16px; letter-spacing: -.01em; }
+  .mgram-when {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .mgram-meta {
+    margin-left: auto;
+    display: flex;
+    gap: 14px;
+    font-size: 11.5px;
+    color: var(--muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* position: relative anchors the absolutely-placed tooltip to its own panel,
+     so a tip near the right edge is clamped against that panel and not the
+     page. */
+  .plot { position: relative; width: 100%; }
+  .plot svg { display: block; width: 100%; }
+
+  .mgram-note {
+    margin: 4px 0 0;
+    font-size: 11.5px;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .tip {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .09s;
+    top: 6px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    box-shadow: var(--shadow);
+    padding: 7px 10px;
+    font-size: 12px;
+    white-space: nowrap;
+    z-index: 20;
+  }
+  .tip .t-when {
+    color: var(--muted);
+    font-size: 10.5px;
+    margin-bottom: 3px;
+    font-variant-numeric: tabular-nums;
+  }
+  .tip .t-row { display: flex; align-items: center; gap: 7px; line-height: 1.45; }
+  .tip .t-row i { width: 8px; height: 8px; border-radius: 2px; flex: none; }
+  .tip .t-row b { margin-left: auto; font-variant-numeric: tabular-nums; }
 
   @media (max-width: 700px) {
     .controls { gap: 12px; }
     main { padding: 12px; }
+    .mgram { padding: 12px 10px 10px; }
+    .mgram-meta { margin-left: 0; width: 100%; }
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Forecast Charts <small id="cycles">loading…</small></h1>
+  <div class="bar">
+    <h1>Forecast Charts <small id="cycles">loading…</small></h1>
+    <span class="spacer"></span>
+    <button id="theme" title="Toggle light / dark" aria-label="Toggle light / dark"></button>
+  </div>
 </header>
 
 <main>
@@ -270,6 +437,22 @@ title: "Forecast Charts"
   <figure>
     <div class="stage" id="stage">
       <img id="chart" alt="Forecast chart" />
+      <div class="mgram" id="mgram" hidden>
+        <div class="mgram-head">
+          <div>
+            <h2 id="mg-place">Point forecast</h2>
+            <p class="mgram-when" id="mg-when">—</p>
+          </div>
+          <div class="mgram-meta">
+            <span id="mg-model"></span>
+            <span id="mg-init"></span>
+          </div>
+        </div>
+        <div class="plot" id="mg-temp"></div>
+        <div class="plot" id="mg-wind"></div>
+        <div class="plot" id="mg-precip"></div>
+        <p class="mgram-note" id="mg-note"></p>
+      </div>
     </div>
     <figcaption>
       <span class="lead" id="lead">F000</span>
@@ -428,14 +611,35 @@ function show() {
   const stage = $('stage');
   const url = `${CHART_BASE}/${state.product}/${state.domain}/${f.file}`;
 
-  stage.classList.add('loading');
-  img.onload = () => stage.classList.remove('loading');
-  img.onerror = () => {
+  // The meteogram is drawn here from the numbers the manifest carries; every
+  // other product is a pre-rendered image. The pipeline still publishes the
+  // meteogram PNG, so if the series is missing from an older manifest — or
+  // anything in the drawing code throws — this falls through to the image
+  // rather than leaving the panel blank.
+  let drawn = false;
+  if (state.product === 'meteogram') {
+    try {
+      drawn = drawMeteogram();
+    } catch (err) {
+      console.error('meteogram draw failed; falling back to the image', err);
+      drawn = false;
+    }
+  }
+  $('mgram').hidden = !drawn;
+  img.hidden = drawn;
+
+  if (drawn) {
     stage.classList.remove('loading');
-    showError(`Chart image missing: ${url}`);
-  };
-  img.src = url;
-  img.alt = `${state.manifest.products[state.product].label}, ${state.manifest.domainLabels[state.domain]}, forecast hour ${f.step}`;
+  } else {
+    stage.classList.add('loading');
+    img.onload = () => stage.classList.remove('loading');
+    img.onerror = () => {
+      stage.classList.remove('loading');
+      showError(`Chart image missing: ${url}`);
+    };
+    img.src = url;
+    img.alt = `${state.manifest.products[state.product].label}, ${state.manifest.domainLabels[state.domain]}, forecast hour ${f.step}`;
+  }
 
   const still = list.length < 2;
   $('lead').textContent = still ? '' : `F${String(f.step).padStart(3, '0')}`;
@@ -593,7 +797,9 @@ window.addEventListener('keydown', (e) => {
 
   stage.addEventListener('pointerdown', (e) => {
     if (e.button) return;                 // ignore right/middle click
-    if (!frames().length) return;
+    // A still (the meteogram) has nothing to scrub, and it handles its own
+    // pointer events for the crosshair — starting a drag here would fight it.
+    if (frames().length < 2) return;
     drag = { x: e.clientX, from: state.index };
     stage.classList.add('dragging');
     // Capture keeps the gesture alive when the finger leaves the image, which
@@ -630,6 +836,460 @@ window.addEventListener('keydown', (e) => {
   stage.addEventListener('pointercancel', release);
   stage.addEventListener('lostpointercapture', release);
 })();
+
+/* ================================================================ meteogram
+   The only product drawn in the browser rather than fetched as a PNG.
+
+   Every other chart here is a map, and a map is worth pre-rendering: the
+   cartography, the projection and the contouring all belong in the Python
+   pipeline. The meteogram is a time series, and a time series is worth drawing
+   live, because the question people bring to it — "what exactly at 15:00 on
+   Thursday" — is one a picture cannot answer and a crosshair can.
+
+   Inline SVG, no charting library, colours read from CSS custom properties at
+   draw time so switching theme is just a redraw. Same approach, and largely the
+   same code, as /environmental-monitoring/ on this site.
+
+   The pipeline still renders meteogram/malta/f000.png and it is still what the
+   manifest lists. It is the fallback here: if the series is missing from the
+   manifest, or anything below throws, the image is shown instead.
+   ===================================================================== */
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const el = (name, attrs) => {
+  const node = document.createElementNS(SVGNS, name);
+  for (const k in (attrs || {})) node.setAttribute(k, attrs[k]);
+  return node;
+};
+const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+const isNum = (v) => typeof v === 'number' && isFinite(v);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+
+/* Malta wall-clock arithmetic on unix seconds. The chart is about Malta, so day
+   boundaries and night shading must fall on Malta's midnights whoever is
+   reading it — computing them from the browser's own zone would put the day
+   separators in the wrong place for anyone outside CET. */
+let MG_TZ = 'Europe/Malta';
+let _tzFmt = null;
+function tzParts(ts) {
+  if (!_tzFmt) {
+    _tzFmt = new Intl.DateTimeFormat('en-GB', {
+      timeZone: MG_TZ, hour12: false, year: 'numeric', month: '2-digit',
+      day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
+    });
+  }
+  const p = {};
+  for (const part of _tzFmt.formatToParts(new Date(ts * 1000))) p[part.type] = part.value;
+  return p;
+}
+function tzOffset(ts) {
+  const p = tzParts(ts);
+  return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) / 1000 - ts;
+}
+const mod = (a, n) => ((a % n) + n) % n;
+const localMidnight = (ts) => ts - mod(ts + tzOffset(ts), 86400);
+/* Seconds past local midnight — what the night bands and the noon anchors are
+   expressed in. */
+const secondsIntoDay = (ts) => mod(ts + tzOffset(ts), 86400);
+
+const fmtIn = (opts) => new Intl.DateTimeFormat('en-GB', Object.assign({ timeZone: MG_TZ }, opts));
+const fmtHM = (ts) => fmtIn({ hour: '2-digit', minute: '2-digit', hour12: false })
+  .format(new Date(ts * 1000));
+const fmtDayLabel = (ts) => fmtIn({ weekday: 'short', day: '2-digit', month: 'short' })
+  .format(new Date(ts * 1000));
+const fmtWhen = (ts) => `${fmtDayLabel(ts)}  ${fmtHM(ts)}`;
+
+const CARDINALS = ['N','NNE','NE','ENE','E','ESE','SE','SSE','S','SSW','SW','WSW','W','WNW','NW','NNW'];
+const cardinal = (deg) => CARDINALS[Math.floor(mod(deg + 11.25, 360) / 22.5)];
+
+const MG_PAD = { l: 52, r: 16, t: 20, b: 16 };
+
+function niceTicks(lo, hi, n) {
+  const span = hi - lo;
+  if (!(span > 0)) return [lo];
+  const raw = span / n;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const norm = raw / mag;
+  const stepSize = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+  const out = [];
+  for (let v = Math.ceil(lo / stepSize) * stepSize; v <= hi + 1e-9; v += stepSize) {
+    out.push(+v.toFixed(6));
+  }
+  return out;
+}
+const fmtTick = (v) => (Number.isInteger(v) ? v.toFixed(0) : v.toFixed(1));
+
+function makePlot(host, opts) {
+  const o = Object.assign({ height: 190, yLabel: '', yMin: null, yMax: null,
+                            topPad: 0.12, dayLabels: false, pad: {} }, opts);
+  const pad = Object.assign({}, MG_PAD, o.pad);
+  host.innerHTML = '';
+
+  const W = Math.max(320, host.clientWidth || 720);
+  const H = o.height;
+  const svg = el('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H,
+                          preserveAspectRatio: 'none', role: 'img' });
+  host.appendChild(svg);
+
+  const iw = W - pad.l - pad.r;
+  const ih = H - pad.t - pad.b;
+  const [t0, t1] = o.domain;
+
+  let lo = o.yMin, hi = o.yMax;
+  if (lo === null || hi === null) {
+    const vals = (o.extent || []).filter(isNum);
+    let a = vals.length ? Math.min(...vals) : 0;
+    let b = vals.length ? Math.max(...vals) : 1;
+    if (a === b) { a -= 1; b += 1; }
+    const m = (b - a) * o.topPad;
+    if (lo === null) lo = a - m;
+    if (hi === null) hi = b + m;
+  }
+
+  const X = (t) => pad.l + (t - t0) / (t1 - t0) * iw;
+  const Y = (v) => pad.t + ih - (v - lo) / (hi - lo) * ih;
+
+  /* Night shading goes down first so everything else sits on top of it. The
+     bands are fixed 20:00-06:00 rather than true civil twilight — within about
+     an hour of Malta's sunset year-round, which is all this needs to be, and
+     the same approximation the rendered PNG makes. */
+  const gNight = el('g');
+  svg.appendChild(gNight);
+  for (let day = localMidnight(t0) - 86400; day <= t1; day += 86400) {
+    const a = Math.max(t0, day + 20 * 3600);
+    const b = Math.min(t1, day + 30 * 3600);
+    if (b <= a) continue;
+    gNight.appendChild(el('rect', { x: X(a), y: pad.t, width: X(b) - X(a),
+      height: ih, fill: css('--night') }));
+  }
+
+  const gGrid = el('g');
+  svg.appendChild(gGrid);
+  for (const v of niceTicks(lo, hi, 4)) {
+    const y = Y(v);
+    gGrid.appendChild(el('line', { x1: pad.l, x2: W - pad.r, y1: y, y2: y,
+      stroke: css('--grid'), 'stroke-width': 1 }));
+    const label = el('text', { x: pad.l - 8, y: y + 3.5, 'text-anchor': 'end',
+      fill: css('--muted'), 'font-size': 10.5 });
+    label.textContent = fmtTick(v);
+    gGrid.appendChild(label);
+  }
+
+  /* Frame, so each panel reads as its own box the way the stacked panels of the
+     rendered meteogram do. */
+  svg.appendChild(el('rect', { x: pad.l, y: pad.t, width: iw, height: ih,
+    fill: 'none', stroke: css('--border'), 'stroke-width': 1 }));
+
+  if (o.yLabel) {
+    const t = el('text', { x: 13, y: pad.t + ih / 2, fill: css('--muted'),
+      'font-size': 10.5, 'text-anchor': 'middle',
+      transform: `rotate(-90 13 ${pad.t + ih / 2})` });
+    t.textContent = o.yLabel;
+    svg.appendChild(t);
+  }
+
+  /* Midnight rules tie the three panels together and give the eye somewhere to
+     count days from. */
+  const gDay = el('g');
+  svg.appendChild(gDay);
+  for (let day = localMidnight(t0); day <= t1; day += 86400) {
+    if (day <= t0) continue;
+    gDay.appendChild(el('line', { x1: X(day), x2: X(day), y1: pad.t, y2: pad.t + ih,
+      stroke: css('--axis'), 'stroke-width': 1, 'stroke-dasharray': '4 3', opacity: .7 }));
+  }
+
+  const api = { svg, host, W, H, pad, iw, ih, X, Y, lo, hi, t0, t1,
+                add: (n) => (svg.appendChild(n), n) };
+
+  api.area = (pts, colour) => {
+    const usable = pts.filter((p) => isNum(p[1]));
+    if (usable.length < 2) return;
+    let d = `M ${X(usable[0][0])} ${Y(lo)}`;
+    for (const [t, v] of usable) d += ` L ${X(t)} ${Y(v)}`;
+    d += ` L ${X(usable[usable.length - 1][0])} ${Y(lo)} Z`;
+    api.add(el('path', { d, fill: colour, opacity: .12 }));
+  };
+  api.line = (pts, colour, w) => {
+    const usable = pts.filter((p) => isNum(p[1]));
+    if (usable.length < 2) return;
+    let d = '';
+    usable.forEach(([t, v], i) => { d += (i ? ' L ' : 'M ') + X(t) + ' ' + Y(v); });
+    api.add(el('path', { d, fill: 'none', stroke: colour, 'stroke-width': w || 1.8,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+  };
+  api.bars = (pts, colour, widthSec) => {
+    const bw = Math.max(1.5, (widthSec / (t1 - t0)) * iw * 0.8);
+    for (const [t, v] of pts) {
+      if (!isNum(v) || v <= 0) continue;
+      api.add(el('rect', { x: X(t) - bw / 2, y: Y(v), width: bw,
+        height: Math.max(1, Y(lo) - Y(v)), fill: colour, rx: 1 }));
+    }
+  };
+  api.marker = (t, v, colour, label, below) => {
+    if (!isNum(v)) return;
+    api.add(el('circle', { cx: X(t), cy: Y(v), r: 3, fill: colour,
+      stroke: css('--panel'), 'stroke-width': 1.2 }));
+    const tx = el('text', { x: clamp(X(t), pad.l + 16, W - pad.r - 16),
+      y: Y(v) + (below ? 14 : -8), 'text-anchor': 'middle', fill: colour,
+      'font-size': 10, 'font-weight': 600 });
+    tx.textContent = label;
+    api.add(tx);
+  };
+  /* Anchored on each day's midday, which is also where the day names sit under
+     the bottom panel, so a figure lines up in a column with its own date. */
+  api.dayLabel = (t, text, colour) => {
+    const tx = el('text', { x: X(t), y: pad.t + 13, 'text-anchor': 'middle',
+      fill: colour || css('--muted'), 'font-size': 10.5, 'font-weight': 600 });
+    tx.textContent = text;
+    api.add(tx);
+  };
+  /* Arrows fly with the wind, i.e. they point where the air is going, which is
+     180 degrees from the direction it comes from. The rendered PNG uses barbs,
+     which point the other way — the tooltip names the compass point in words so
+     the two can never be read against each other. */
+  api.arrow = (t, y, fromDeg, colour) => {
+    const g = el('g', { transform: `translate(${X(t)} ${y}) rotate(${fromDeg + 180})` });
+    g.appendChild(el('path', { d: 'M 0 -5 L 0 5 M 0 5 L -2.6 1.4 M 0 5 L 2.6 1.4',
+      stroke: colour, 'stroke-width': 1.3, fill: 'none',
+      'stroke-linecap': 'round', 'stroke-linejoin': 'round' }));
+    api.add(g);
+  };
+  api.axisDays = () => {
+    for (let day = localMidnight(t0); day <= t1; day += 86400) {
+      const noon = day + 12 * 3600;
+      if (noon < t0 || noon > t1) continue;
+      const tx = el('text', { x: X(noon), y: H - 3, 'text-anchor': 'middle',
+        fill: css('--text'), 'font-size': 11, 'font-weight': 600 });
+      tx.textContent = fmtDayLabel(noon);
+      api.add(tx);
+    }
+  };
+  api.axisHours = () => {
+    for (let day = localMidnight(t0) - 86400; day <= t1; day += 86400) {
+      for (const h of [0, 6, 12, 18]) {
+        const t = day + h * 3600;
+        if (t < t0 || t > t1) continue;
+        const tx = el('text', { x: X(t), y: pad.t + ih + 12, 'text-anchor': 'middle',
+          fill: css('--muted'), 'font-size': 10 });
+        tx.textContent = String(h).padStart(2, '0');
+        api.add(tx);
+      }
+    }
+  };
+  return api;
+}
+
+/* One crosshair across all three panels at once, and one tooltip carrying every
+   series. Hovering the temperature panel and being told only the temperature
+   would make the reader chase the same instant through three separate hovers —
+   the whole point of stacking the panels on a shared axis is that they are read
+   together. */
+function attachLinkedHover(panels) {
+  const tip = document.createElement('div');
+  tip.className = 'tip';
+  panels[0].plot.host.appendChild(tip);
+
+  for (const p of panels) {
+    p.cross = el('line', { y1: p.plot.pad.t, y2: p.plot.pad.t + p.plot.ih,
+      stroke: css('--axis'), 'stroke-width': 1, opacity: 0 });
+    p.plot.svg.appendChild(p.cross);
+    p.dots = p.series.map((s) => {
+      const c = el('circle', { r: 3.4, fill: s.colour, stroke: css('--panel'),
+        'stroke-width': 1.4, opacity: 0 });
+      p.plot.svg.appendChild(c);
+      return c;
+    });
+  }
+
+  function hide() {
+    tip.style.opacity = 0;
+    for (const p of panels) {
+      p.cross.setAttribute('opacity', 0);
+      p.dots.forEach((d) => d.setAttribute('opacity', 0));
+    }
+  }
+
+  function move(ev) {
+    const owner = panels.find((p) => p.plot.svg === ev.currentTarget) || panels[0];
+    const plot = owner.plot;
+    const rect = plot.svg.getBoundingClientRect();
+    const clientX = ev.touches ? ev.touches[0].clientX : ev.clientX;
+    const sx = (clientX - rect.left) / rect.width * plot.W;
+    if (sx < plot.pad.l || sx > plot.W - plot.pad.r) return hide();
+
+    const t = plot.t0 + (sx - plot.pad.l) / plot.iw * (plot.t1 - plot.t0);
+    const at = nearestTime(owner.series[0].pts, t);
+    if (at === null) return hide();
+
+    const rows = [];
+    for (const p of panels) {
+      p.cross.setAttribute('x1', p.plot.X(at));
+      p.cross.setAttribute('x2', p.plot.X(at));
+      p.cross.setAttribute('opacity', .85);
+      p.series.forEach((s, i) => {
+        const v = s.at(at);
+        if (!isNum(v)) { p.dots[i].setAttribute('opacity', 0); return; }
+        p.dots[i].setAttribute('cx', p.plot.X(at));
+        p.dots[i].setAttribute('cy', p.plot.Y(v));
+        p.dots[i].setAttribute('opacity', 1);
+        rows.push(`<div class="t-row"><i style="background:${s.colour}"></i>` +
+                  `<span>${s.name}</span><b>${s.fmt(v, at)}</b></div>`);
+      });
+    }
+
+    /* The tooltip lives in whichever panel is being hovered, so it never has to
+       escape a panel's box to stay next to the pointer. */
+    if (tip.parentNode !== owner.plot.host) owner.plot.host.appendChild(tip);
+    tip.innerHTML = `<div class="t-when">${fmtWhen(at)}</div>` + rows.join('');
+    tip.style.opacity = 1;
+    const hostW = owner.plot.host.clientWidth;
+    const px = owner.plot.X(at) / owner.plot.W * hostW;
+    tip.style.left = clamp(px + 14, 4, Math.max(4, hostW - tip.offsetWidth - 4)) + 'px';
+  }
+
+  for (const p of panels) {
+    p.plot.svg.addEventListener('mousemove', move);
+    p.plot.svg.addEventListener('mouseleave', hide);
+    p.plot.svg.addEventListener('touchstart', move, { passive: true });
+    p.plot.svg.addEventListener('touchmove', move, { passive: true });
+    p.plot.svg.addEventListener('touchend', hide);
+  }
+}
+
+/* Snapped to a real data point rather than interpolated: every value here is a
+   model output at a 3-hourly step, and inventing a number between two of them
+   would be reporting something the forecast never said. */
+function nearestTime(pts, t) {
+  let best = null, bd = Infinity;
+  for (const [ts] of pts) {
+    const d = Math.abs(ts - t);
+    if (d < bd) { bd = d; best = ts; }
+  }
+  return bd <= 3 * 3600 ? best : null;
+}
+
+/* Local-day grouping, shared by the temperature extremes and the rain totals.
+   `shift` moves a sample back before its date is taken: rainfall is accumulated
+   over the three hours *ending* at its timestamp, so the midnight bar belongs
+   to the evening before it, not to the morning after. */
+function groupByDay(times, values, shift) {
+  const days = new Map();
+  times.forEach((ts, i) => {
+    if (!isNum(values[i])) return;
+    const key = localMidnight(ts - (shift || 0));
+    if (!days.has(key)) days.set(key, []);
+    days.get(key).push({ t: ts, v: values[i] });
+  });
+  return days;
+}
+
+function drawMeteogram() {
+  const pf = state.manifest && state.manifest.pointForecast;
+  if (!pf || !pf.steps || pf.steps.length < 2) return false;
+
+  MG_TZ = pf.tz || 'Europe/Malta';
+  _tzFmt = null;
+
+  const init = Date.parse(pf.init) / 1000;
+  if (!isFinite(init)) return false;
+  const times = pf.steps.map((s) => init + s * 3600);
+  const t0 = times[0], t1 = times[times.length - 1];
+  const domain = [t0, t1];
+
+  const zip = (vals) => times.map((t, i) => [t, vals[i]]);
+  const lookup = (vals) => {
+    const byTime = new Map(times.map((t, i) => [t, vals[i]]));
+    return (t) => byTime.get(t);
+  };
+
+  const tempPts = zip(pf.temp);
+  const windPts = zip(pf.wind);
+  const rainPts = zip(pf.precip);
+
+  /* ---- header ---- */
+  $('mg-place').textContent = `Forecast for ${pf.place || 'Malta'}`;
+  $('mg-when').textContent =
+    `${fmtDayLabel(t0)} ${fmtHM(t0)} – ${fmtDayLabel(t1)} ${fmtHM(t1)} ` +
+    fmtIn({ timeZoneName: 'short' }).format(new Date(t1 * 1000)).split(', ').pop();
+  $('mg-model').textContent = pf.model || '';
+  $('mg-init').textContent = state.manifest.icon_cycle ? `init ${state.manifest.icon_cycle}` : '';
+
+  /* ---- temperature ---- */
+  const pTemp = makePlot($('mg-temp'), { domain, yLabel: '2 m temp (°C)',
+    extent: pf.temp, height: 210 });
+  pTemp.area(tempPts, css('--c-temp'));
+  pTemp.line(tempPts, css('--c-temp'));
+  /* Daily extremes are what a reader takes away from a temperature trace, so
+     they are called out rather than left to be eyeballed off the axis. A
+     part-day at either end of the run has no meaningful maximum yet. */
+  for (const [, pts] of groupByDay(times, pf.temp, 0)) {
+    if (pts.length < 3) continue;
+    const hot = pts.reduce((a, b) => (b.v > a.v ? b : a));
+    const cold = pts.reduce((a, b) => (b.v < a.v ? b : a));
+    pTemp.marker(hot.t, hot.v, css('--c-temp'), `${Math.round(hot.v)}°`);
+    pTemp.marker(cold.t, cold.v, css('--c-cold'), `${Math.round(cold.v)}°`, true);
+  }
+
+  /* ---- wind ---- */
+  const windMax = Math.max(...pf.wind.filter(isNum), 4);
+  const pWind = makePlot($('mg-wind'), { domain, yLabel: '10 m wind (m s⁻¹)',
+    yMin: 0, yMax: windMax * 1.4, height: 180 });
+  pWind.area(windPts, css('--c-wind'));
+  pWind.line(windPts, css('--c-wind'), 1.7);
+  /* Direction rides along the top: speed is already in the line, so the arrows
+     are carrying the one thing a line cannot show at all. Strided to about 24
+     across the panel so they stay legible on a narrow window. */
+  const stride = Math.max(1, Math.round(times.length / 24));
+  const arrowY = pWind.pad.t + pWind.ih * 0.12;
+  times.forEach((t, i) => {
+    if (i % stride) return;
+    if (!isNum(pf.dir[i]) || pf.wind[i] < 0.5) return;
+    pWind.arrow(t, arrowY, pf.dir[i], css('--c-wind'));
+  });
+
+  /* ---- precipitation ---- */
+  const rainMax = Math.max(...pf.precip.filter(isNum), 1.6);
+  const pRain = makePlot($('mg-precip'), { domain, yLabel: 'precip (mm/3h)',
+    yMin: 0, yMax: rainMax * 1.45, height: 190, pad: { b: 46 } });
+  /* Bars, not a line: rainfall is a quantity accumulated over each interval,
+     and a line between two 3-hourly totals implies a continuity it does not
+     have. */
+  pRain.bars(rainPts, css('--c-rain'), 3 * 3600);
+  const stepSec = times.length > 1 ? times[1] - times[0] : 3 * 3600;
+  for (const [day, pts] of groupByDay(times, pf.precip, stepSec / 2)) {
+    const noon = day + 12 * 3600;
+    if (noon < t0 || noon > t1) continue;
+    const total = pts.reduce((a, b) => a + b.v, 0);
+    /* A dash rather than "0.0 mm": five zeroes across a dry week is noise, and
+       the absence still has to be legible as an answer. */
+    pRain.dayLabel(noon, total >= 0.05 ? `${total.toFixed(1)} mm` : '—', css('--c-rain'));
+  }
+  pRain.axisHours();
+  pRain.axisDays();
+
+  $('mg-note').textContent =
+    `Times are local (${fmtIn({ timeZoneName: 'short' }).format(new Date(t1 * 1000)).split(', ').pop()}); ` +
+    'shaded columns are night, arrows fly with the wind. ' +
+    `Period total ${pf.precip.reduce((a, b) => a + b, 0).toFixed(1)} mm.`;
+
+  attachLinkedHover([
+    { plot: pTemp, series: [{ name: 'Temperature', colour: css('--c-temp'),
+        pts: tempPts, at: lookup(pf.temp), fmt: (v) => `${v.toFixed(1)} °C` }] },
+    { plot: pWind, series: [{ name: 'Wind', colour: css('--c-wind'),
+        pts: windPts, at: lookup(pf.wind),
+        fmt: (v, t) => {
+          const i = times.indexOf(t);
+          const d = i >= 0 ? pf.dir[i] : null;
+          return v < 0.5 || !isNum(d)
+            ? `${v.toFixed(1)} m/s`
+            : `${v.toFixed(1)} m/s from ${cardinal(d)}`;
+        } }] },
+    { plot: pRain, series: [{ name: 'Rain (3 h)', colour: css('--c-rain'),
+        pts: rainPts, at: lookup(pf.precip), fmt: (v) => `${v.toFixed(1)} mm` }] },
+  ]);
+
+  return true;
+}
 
 /* ------------------------------------------------------------------ boot */
 
