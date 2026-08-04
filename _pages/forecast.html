@@ -118,7 +118,27 @@ title: "Forecast Charts"
     display: grid;
     place-items: center;
     background: #fff;
+    /* pan-y hands vertical gestures back to the page so the chart can still be
+       scrolled past on a phone, while horizontal ones come to us for scrubbing.
+       Without this the browser claims the whole gesture and the swipe never
+       fires. */
+    touch-action: pan-y;
+    cursor: grab;
+    user-select: none;
+    -webkit-user-select: none;
   }
+
+  .stage.dragging { cursor: grabbing; }
+
+  /* A single-frame product (the meteogram) has nothing to scrub through, so
+     the timeline is removed rather than left present but inert. */
+  main.still #scrub,
+  main.still .ticks { display: none; }
+  main.still .stage { cursor: default; }
+
+  /* Events land on the stage rather than the image, which also stops the
+     browser's native image-drag from hijacking the gesture. */
+  .stage img { pointer-events: none; -webkit-user-drag: none; }
 
   .stage img {
     display: block;
@@ -268,7 +288,8 @@ title: "Forecast Charts"
     against the NCEP/NCAR 1981–2010 daily climatology (NOAA PSL).
     All times UTC. Charts are regenerated automatically each model cycle.<br />
     Keyboard: <kbd>←</kbd> <kbd>→</kbd> step, <kbd>space</kbd> play/pause,
-    <kbd>Home</kbd>/<kbd>End</kbd> jump.
+    <kbd>Home</kbd>/<kbd>End</kbd> jump. On a touchscreen, swipe across the
+    chart to scrub through the forecast.
   </footer>
 </main>
 
@@ -378,7 +399,16 @@ function refresh() {
   const scrub = $('scrub');
   scrub.max = Math.max(0, list.length - 1);
   scrub.value = state.index;
-  scrub.disabled = list.length === 0;
+  scrub.disabled = list.length < 2;
+
+  // The meteogram is one chart covering the whole cycle, not a loop. Leaving
+  // Play and the scrubber live would offer an animation that cannot happen.
+  const still = list.length < 2;
+  if (still) setPlaying(false);
+  ['play', 'next', 'prev', 'first', 'last'].forEach((id) => {
+    $(id).disabled = still;
+  });
+  document.querySelector('main').classList.toggle('still', still);
 
   $('desc').textContent = state.manifest.products[state.product]?.description ?? '';
 
@@ -405,10 +435,54 @@ function show() {
   img.src = url;
   img.alt = `${state.manifest.products[state.product].label}, ${state.manifest.domainLabels[state.domain]}, forecast hour ${f.step}`;
 
-  $('lead').textContent = `F${String(f.step).padStart(3, '0')}`;
-  $('valid').textContent = formatValid(f.valid);
-  $('counter').textContent = `${state.index + 1} / ${list.length}`;
+  const still = list.length < 2;
+  $('lead').textContent = still ? '' : `F${String(f.step).padStart(3, '0')}`;
+  $('valid').textContent = still ? state.manifest.products[state.product].label
+                                 : formatValid(f.valid);
+  $('counter').textContent = still ? '' : `${state.index + 1} / ${list.length}`;
   $('scrub').value = state.index;
+  syncHash();
+}
+
+/* ----------------------------------------------------------- deep links */
+/*
+   The address bar tracks product, domain and forecast hour so a particular
+   chart can be sent to someone. Without it every link lands on the first frame
+   of the first product, which makes "look at Thursday's wind" unshareable.
+
+   replaceState, not location.hash: scrubbing walks through dozens of frames and
+   each one would otherwise become a history entry, turning the back button into
+   a frame-by-frame rewind of wherever the user had dragged.
+*/
+function syncHash() {
+  const f = frames()[state.index];
+  if (!f) return;
+  const hash = `#${state.product}/${state.domain}/f${String(f.step).padStart(3, '0')}`;
+  if (location.hash !== hash) {
+    history.replaceState(null, '', hash);
+  }
+}
+
+function applyHash() {
+  const m = /^#([\w-]+)\/([\w-]+)(?:\/f?(\d+))?$/.exec(location.hash);
+  if (!m) return false;
+
+  const [, product, domain, stepText] = m;
+  const products = state.manifest.products;
+  // Validated against the manifest rather than trusted: a link can outlive the
+  // cycle it pointed at, and a product or forecast hour that no longer exists
+  // must fall back rather than leave the viewer on a blank frame.
+  if (!products[product] || !products[product].domains[domain]) return false;
+
+  state.product = product;
+  state.domain = domain;
+
+  if (stepText !== undefined) {
+    const step = Number(stepText);
+    const at = products[product].domains[domain].findIndex((f) => f.step === step);
+    if (at >= 0) state.index = at;
+  }
+  return true;
 }
 
 function formatValid(iso) {
@@ -417,7 +491,23 @@ function formatValid(iso) {
   const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
   const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const p = (n) => String(n).padStart(2, '0');
-  return `Valid ${days[d.getUTCDay()]} ${d.getUTCDate()} ${mon[d.getUTCMonth()]} ${p(d.getUTCHours())}:00 UTC`;
+  const utc = `${days[d.getUTCDay()]} ${d.getUTCDate()} ${mon[d.getUTCMonth()]} ${p(d.getUTCHours())}:00 UTC`;
+  return `Valid ${utc}  ·  ${maltaTime(d)} local`;
+}
+
+/* Malta wall-clock, resolved by the browser rather than by adding a fixed
+   offset: CET and CEST differ by an hour and the switch lands mid-forecast
+   twice a year, which a hard-coded +2 would silently get wrong for days.
+   Pinned to Europe/Malta rather than the viewer's own zone, because the chart
+   is about Malta no matter where it is being read. */
+function maltaTime(date) {
+  try {
+    return new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Malta', hour: '2-digit', minute: '2-digit', hour12: false,
+    }).format(date);
+  } catch (err) {
+    return '—';
+  }
 }
 
 function renderTicks(list) {
@@ -480,6 +570,65 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'End') { setPlaying(false); state.index = frames().length - 1; show(); }
 });
 
+/* --------------------------------------------------------- swipe / drag */
+/*
+   Dragging across the chart scrubs the loop. This is the phone equivalent of
+   the arrow keys, which are unreachable there, and the range slider under the
+   figure is a poor substitute on a small screen — its thumb is a few pixels
+   wide next to a finger.
+
+   Deliberately proportional rather than one-frame-per-swipe: a loop is up to 41
+   frames, and flicking forty times to reach the end of the forecast would be
+   miserable. One full sweep of the stage covers the whole loop, so a short drag
+   nudges a frame or two and a long one crosses five days.
+
+   Pointer events rather than touch events, so the same code gives desktop
+   click-drag for free.
+*/
+(function enableSwipeScrub() {
+  const stage = $('stage');
+  let drag = null;
+
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.button) return;                 // ignore right/middle click
+    if (!frames().length) return;
+    drag = { x: e.clientX, from: state.index };
+    stage.classList.add('dragging');
+    // Capture keeps the gesture alive when the finger leaves the image, which
+    // it routinely does on a phone where the chart is most of the screen.
+    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* not fatal */ }
+  });
+
+  stage.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const list = frames();
+    if (!list.length) return;
+
+    // Floor the sensitivity so a 4-frame product does not jump a quarter of its
+    // loop under a stray twitch.
+    const perFrame = Math.max(14, stage.clientWidth / list.length);
+    // Drag left to go forward: the frames behave like a filmstrip being hauled
+    // leftward, which is also the direction a phone user swipes for "next".
+    const shift = Math.round((drag.x - e.clientX) / perFrame);
+    const next = Math.min(list.length - 1, Math.max(0, drag.from + shift));
+
+    if (next !== state.index) {
+      setPlaying(false);
+      state.index = next;
+      show();
+    }
+  });
+
+  const release = () => {
+    if (!drag) return;
+    drag = null;
+    stage.classList.remove('dragging');
+  };
+  stage.addEventListener('pointerup', release);
+  stage.addEventListener('pointercancel', release);
+  stage.addEventListener('lostpointercapture', release);
+})();
+
 /* ------------------------------------------------------------------ boot */
 
 (async function init() {
@@ -494,6 +643,7 @@ window.addEventListener('keydown', (e) => {
 
     state.product = Object.keys(m.products)[0];
     state.domain = pairsFor(state.product)[0];
+    applyHash();   // a shared link overrides the default landing frame
 
     const bits = [];
     if (m.ifs_cycle) bits.push(`IFS ${m.ifs_cycle}`);
