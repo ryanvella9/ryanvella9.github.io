@@ -232,7 +232,16 @@ footer a{color:var(--ink-2)}
         <span><i style="background:var(--band-over)"></i>Overcast</span>
       </div>
     </div>
-    <div class="card board"><h3>Daily clear-sky fraction</h3><p class="cap">Share of each day in each sky category.</p><div class="donuts" id="p-donuts"></div></div>
+    <div class="card board"><h3>Daily clear-sky fraction</h3><p class="cap">Share of each completed day in each sky category. Today is excluded until it ends.</p>
+      <div class="donuts" id="p-donuts"></div>
+      <!-- Swatches are painted from the same --band-* variables the donut arcs
+           use, so the two cannot drift apart when the palette changes. -->
+      <div class="legend">
+        <span><i style="background:var(--band-clear)"></i>Clear sky</span>
+        <span><i style="background:var(--band-mid)"></i>Patchy / cirrus / haze</span>
+        <span><i style="background:var(--band-over)"></i>Overcast</span>
+      </div>
+    </div>
     <div class="card board"><h3>Night sky brightness</h3><p class="cap">Night-time readings per day: median, interquartile range and full range. Dashed line marks the Bortle 8 threshold at 18 mag/arcsec².</p><div class="plot" id="p-nsb"></div></div>
   </section>
 
@@ -301,6 +310,15 @@ const fmtTime = ts => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, hour: "2-
   minute: "2-digit", hour12: false }).format(new Date(ts * 1000));
 const fmtDay = ts => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, day: "2-digit",
   month: "short" }).format(new Date(ts * 1000));
+/* Today's YYYY-MM-DD in Malta, to compare against the daily rows' date keys.
+   Built from parts rather than a locale that happens to print ISO, so it cannot
+   silently reorder on a different browser. */
+const todayKey = (now = new Date()) => {
+  const p = new Intl.DateTimeFormat("en-GB", { timeZone: TZ, year: "numeric",
+    month: "2-digit", day: "2-digit" })
+    .formatToParts(now).reduce((o, x) => (o[x.type] = x.value, o), {});
+  return `${p.year}-${p.month}-${p.day}`;
+};
 const fmtDow = ts => new Intl.DateTimeFormat("en-GB", { timeZone: TZ, weekday: "short" })
   .format(new Date(ts * 1000));
 const fmtFull = ts => fmtDay(ts) + " " + fmtTime(ts);
@@ -889,7 +907,11 @@ function drawSky(){
   /* ---- daily clear-sky donuts ---- */
   const dh = $("#p-donuts");
   dh.innerHTML = "";
-  const withFrac = (s.daily || []).filter(d => d.frac);
+  // Completed days only. Today is still accumulating, so its split would drift
+  // all evening while looking like a settled fact — and at the window edge a
+  // handful of readings stamped with today's local date rendered a full donut
+  // claiming 100% patchy for a day barely an hour old.
+  const withFrac = (s.daily || []).filter(d => d.frac && d.date < todayKey());
   if (!withFrac.length) dh.innerHTML = `<div class="nodata" style="flex:1">No sky-category data</div>`;
   for (const d of withFrac){
     const f = d.frac;
@@ -900,17 +922,21 @@ function drawSky(){
     let off = 0, arcs = "";
     for (const [, v, col] of segs){
       const len = (v || 0) * circ;
+      // Drawn at full opacity so an arc is exactly the colour the legend
+      // swatch shows. The old .85 meant every segment rendered slightly
+      // lighter than its own key.
       if (len > 0) arcs += `<circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="${col}"
         stroke-width="11" stroke-dasharray="${len} ${circ - len}"
-        stroke-dashoffset="${-off}" transform="rotate(-90 ${C} ${C})" opacity=".85"/>`;
+        stroke-dashoffset="${-off}" transform="rotate(-90 ${C} ${C})"/>`;
       off += len;
     }
+    const ts = dayKeyTs(d.date) + 43200;
     const div = document.createElement("div");
     div.className = "donut";
     div.innerHTML = `<svg viewBox="0 0 64 64" role="img"
-        aria-label="${fmtDow(dayKeyTs(d.date) + 43200)} clear ${Math.round((f.clear||0)*100)}%">${arcs}</svg>
+        aria-label="${fmtDow(ts)} ${fmtDay(ts)} clear ${Math.round((f.clear||0)*100)}%">${arcs}</svg>
       <div class="d-pct mono">${Math.round((f.clear || 0) * 100)}%</div>
-      <div class="d-lab mono">${fmtDow(dayKeyTs(d.date) + 43200)}</div>`;
+      <div class="d-lab mono">${fmtDow(ts)}<br>${fmtDay(ts)}</div>`;
     div.title = `${niceDate(d.date)} — clear ${Math.round((f.clear||0)*100)}%, ` +
                 `patchy ${Math.round((f.mid||0)*100)}%, overcast ${Math.round((f.overcast||0)*100)}%`;
     dh.appendChild(div);
