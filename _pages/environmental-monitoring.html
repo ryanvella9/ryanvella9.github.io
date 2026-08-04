@@ -20,7 +20,10 @@ title: "Environmental Monitoring"
   --grid:#eceef2; --axis:#c6cad4;
   --c-temp:#e8743b; --c-cold:#3b82c4; --c-rh:#3b82c4; --c-wind:#2f9e6e;
   --c-rain:#005b96; --c-pm25:#3b6fd4; --c-pm10:#d1443f; --c-cloud:#4c4fbe;
-  --band-clear:#1e90ff; --band-mid:#e8c33a; --band-over:#9aa0aa;
+  /* Gold=clear, pale blue-grey=patchy/cirrus, slate=overcast. Yellow marked the
+     middle category before, which read as "sunny" and inverted the whole scale
+     at a glance. */
+  --band-clear:#f5b301; --band-mid:#b7cbda; --band-over:#8a9198;
   --good:#2f9e6e; --moderate:#d9a520; --poor:#d1443f;
   --pill:#eef0f4; --nsb-dark:#3a4a7a; --nsb-bright:#c9922e;
   --sun:#e8a33b; --moon:#7f8aa8;
@@ -33,7 +36,7 @@ title: "Environmental Monitoring"
     --grid:#222831; --axis:#3a424e;
     --c-temp:#f08a4b; --c-cold:#5b9fe0; --c-rh:#5b9fe0; --c-wind:#48b98a;
     --c-rain:#3d8fd0; --c-pm25:#6b95e8; --c-pm10:#e56b66; --c-cloud:#7d7fe0;
-    --band-clear:#2b6fbf; --band-mid:#b39a33; --band-over:#5d646f;
+    --band-clear:#d9a017; --band-mid:#7d94a6; --band-over:#5d646f;
     --good:#48b98a; --moderate:#e0b53c; --poor:#e56b66;
     --pill:#222831; --nsb-dark:#5b6ea8; --nsb-bright:#d9a94a;
     --sun:#f0b64b; --moon:#9aa6c4;
@@ -46,7 +49,7 @@ title: "Environmental Monitoring"
   --grid:#222831; --axis:#3a424e;
   --c-temp:#f08a4b; --c-cold:#5b9fe0; --c-rh:#5b9fe0; --c-wind:#48b98a;
   --c-rain:#3d8fd0; --c-pm25:#6b95e8; --c-pm10:#e56b66; --c-cloud:#7d7fe0;
-  --band-clear:#2b6fbf; --band-mid:#b39a33; --band-over:#5d646f;
+  --band-clear:#d9a017; --band-mid:#7d94a6; --band-over:#5d646f;
   --good:#48b98a; --moderate:#e0b53c; --poor:#e56b66;
   --pill:#222831; --nsb-dark:#5b6ea8; --nsb-bright:#d9a94a;
   --sun:#f0b64b; --moon:#9aa6c4;
@@ -601,16 +604,33 @@ function iconFor(cloudIdx, day, th){
   }
   return { svg: `<svg class="icon" viewBox="0 0 64 64" aria-hidden="true">${svg}</svg>`, desc };
 }
+/* Wind vane. The arrow points the way a real vane does — into the wind, toward
+   where it is blowing FROM — which matches the cardinal label beside it, so
+   "W" and the arrow both indicate a westerly.
+
+   Drawn as a shaft plus a solid triangular head rather than the old disc: a
+   ball on the end reads as a pin or a marker, not a direction, and at 44 px it
+   was ambiguous which end of the needle was the pointer. */
 function compassSvg(deg){
   const a = (deg - 90) * Math.PI / 180;
-  const x = 22 + Math.cos(a) * 13, y = 22 + Math.sin(a) * 13;
-  const bx = 22 - Math.cos(a) * 9, by = 22 - Math.sin(a) * 9;
+  const ux = Math.cos(a), uy = Math.sin(a);
+  const px = -uy, py = ux;                     // perpendicular, for the barbs
+  const R = 14, HEAD = 6.5, HALF = 4.2, TAIL = 12;
+  const n = v => v.toFixed(2);
+
+  const tipX = 22 + ux * R,            tipY = 22 + uy * R;
+  const baseX = 22 + ux * (R - HEAD),  baseY = 22 + uy * (R - HEAD);
+  const tailX = 22 - ux * TAIL,        tailY = 22 - uy * TAIL;
+  const head = `${n(tipX)},${n(tipY)} `
+             + `${n(baseX + px * HALF)},${n(baseY + py * HALF)} `
+             + `${n(baseX - px * HALF)},${n(baseY - py * HALF)}`;
+
   return `<svg class="compass" viewBox="0 0 44 44" aria-hidden="true">
     <circle cx="22" cy="22" r="17" fill="none" stroke="var(--hairline)" stroke-width="2"/>
     <text x="22" y="9" text-anchor="middle" font-size="7" fill="var(--ink-3)">N</text>
-    ${isNum(deg) ? `<line x1="${bx}" y1="${by}" x2="${x}" y2="${y}" stroke="var(--c-wind)"
-        stroke-width="2.6" stroke-linecap="round"/>
-      <circle cx="${x}" cy="${y}" r="3" fill="var(--c-wind)"/>` : ""}
+    ${isNum(deg) ? `<line x1="${n(tailX)}" y1="${n(tailY)}" x2="${n(baseX)}" y2="${n(baseY)}"
+        stroke="var(--c-wind)" stroke-width="2.4" stroke-linecap="round"/>
+      <polygon points="${head}" fill="var(--c-wind)"/>` : ""}
   </svg>`;
 }
 const themeIcon = dark => dark
