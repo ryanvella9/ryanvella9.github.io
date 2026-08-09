@@ -223,7 +223,7 @@ footer a{color:var(--ink-2)}
     <div class="shead"><h2>Weather · Froggit WH3000</h2><span class="meta" id="meta-weather"></span></div>
     <div class="card board"><h3>Temperature</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-temp"></div></div>
     <div class="card board"><h3>Relative humidity</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-rh"></div></div>
-    <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked with its Beaufort force. Dashed lines are Beaufort boundaries. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
+    <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked with its Beaufort force. Labels on the right mark where each Beaufort band begins. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
     <div class="card board"><h3>Rainfall</h3><p class="cap">Hourly totals.</p><div class="plot" id="p-rain"></div><p class="accum" id="cap-rain"></p></div>
   </section>
 
@@ -540,17 +540,14 @@ function makePlot(host, opts){
     tx.textContent = label;
     api.add(tx);
   };
-  /* A horizontal reference line with a label at the right margin. Skipped
-     silently when the value falls outside the visible range, so a caller can
-     offer a whole scale and only the part that applies gets drawn. */
-  api.threshold = (v, text) => {
-    if (!isNum(v) || v <= lo || v >= hi) return;
-    const y = Y(v);
-    api.add(el("line", { x1: pad.l, y1: y, x2: pad.l + iw, y2: y,
-      stroke: css("--axis"), "stroke-width": 1, "stroke-dasharray": "2 4",
-      opacity: .75 }));
-    if (!text) return;
-    const tx = el("text", { x: pad.l + iw - 3, y: y - 3, "text-anchor": "end",
+  /* Marks a value on the right margin with a label and no rule. Ruled lines
+     across the plot competed with the data for attention; the height of the
+     label alone is enough to read the trace against. Skipped silently when the
+     value is outside the visible range, so a caller can offer a whole scale and
+     only the part that applies gets drawn. */
+  api.levelLabel = (v, text) => {
+    if (!isNum(v) || v <= lo || v >= hi || !text) return;
+    const tx = el("text", { x: pad.l + iw - 3, y: Y(v) - 3, "text-anchor": "end",
       fill: css("--ink-3"), "font-size": 9.5 });
     tx.setAttribute("class", "mono");
     tx.textContent = text;
@@ -986,13 +983,13 @@ function drawWeather(){
     name: "Wind", unit: "km/h", yLabel: "km/h", yMin: 0, pad: { t: 26 },
     yMax: isNum(nextBft) ? nextBft * 1.06 : null,
     after: p => {
-      /* Beaufort boundaries as reference lines. The whole scale is offered and
-         threshold() draws only what falls inside the plot, so a calm week shows
-         forces 1-2 and a gale week extends itself without any code change.
-         Each line sits at the force's lower bound and is named for the band
-         above it, which is how the scale is defined. */
+      /* Beaufort boundaries, labelled on the right margin. The whole scale is
+         offered and levelLabel() draws only what falls inside the plot, so a
+         calm week shows forces 1-2 and a gale week extends itself without any
+         code change. Each label sits at the force's lower bound and is named
+         for the band above it, which is how the scale is defined. */
       for (let f = 1; f < BEAUFORT.length; f++)
-        p.threshold(BEAUFORT[f - 1][0], `Bft ${f} ${BEAUFORT[f][1]}`);
+        p.levelLabel(BEAUFORT[f - 1][0], `Bft ${f} ${BEAUFORT[f][1]}`);
 
       for (const d of w.daily){
         if (isNum(d.wmax)){
