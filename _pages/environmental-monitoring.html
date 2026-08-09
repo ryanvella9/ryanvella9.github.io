@@ -223,7 +223,7 @@ footer a{color:var(--ink-2)}
     <div class="shead"><h2>Weather · Froggit WH3000</h2><span class="meta" id="meta-weather"></span></div>
     <div class="card board"><h3>Temperature</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-temp"></div></div>
     <div class="card board"><h3>Relative humidity</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-rh"></div></div>
-    <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked with its Beaufort force. Labels on the right mark where each Beaufort band begins. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
+    <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked with its Beaufort force. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
     <div class="card board"><h3>Rainfall</h3><p class="cap">Hourly totals.</p><div class="plot" id="p-rain"></div><p class="accum" id="cap-rain"></p></div>
   </section>
 
@@ -538,19 +538,6 @@ function makePlot(host, opts){
       "font-size": 9.5 });
     tx.setAttribute("class", "mono");
     tx.textContent = label;
-    api.add(tx);
-  };
-  /* Marks a value on the right margin with a label and no rule. Ruled lines
-     across the plot competed with the data for attention; the height of the
-     label alone is enough to read the trace against. Skipped silently when the
-     value is outside the visible range, so a caller can offer a whole scale and
-     only the part that applies gets drawn. */
-  api.levelLabel = (v, text) => {
-    if (!isNum(v) || v <= lo || v >= hi || !text) return;
-    const tx = el("text", { x: pad.l + iw - 3, y: Y(v) - 3, "text-anchor": "end",
-      fill: css("--ink-3"), "font-size": 9.5 });
-    tx.setAttribute("class", "mono");
-    tx.textContent = text;
     api.add(tx);
   };
   api.topLabel = (t, text) => {
@@ -969,28 +956,12 @@ function drawWeather(){
       if (isNum(d.rhmin)) p.marker(d.rhmin_t, d.rhmin, css("--c-cold"), Math.round(d.rhmin) + "%", true);
     }}});
 
-  /* wind + dominant direction, against the Beaufort scale */
-  //
-  // The y-axis is stretched to the first Beaufort boundary above the week's
-  // peak. Two reasons: there is then always a band edge visible to read the
-  // trace against, and a calm week stops being autoscaled until a 5 km/h
-  // breeze fills the panel and looks like weather. Where the wind does get up,
-  // this changes nothing — the boundary is already inside the range.
-  const windMax = Math.max(0, ...zip(h.t, h.wind).map(x => x[1]).filter(isNum),
-                           ...w.daily.map(d => d.wmax).filter(isNum));
-  const nextBft = (BEAUFORT.find(b => b[0] > windMax) || [])[0];
+  /* wind + dominant direction. Beaufort appears only on the daily maxima —
+     margin labels and boundary rules both crowded a chart whose whole range
+     usually sits inside one or two forces. */
   chartSimple("#p-wind", { src: zip(h.t, h.wind), colour: css("--c-wind"),
     name: "Wind", unit: "km/h", yLabel: "km/h", yMin: 0, pad: { t: 26 },
-    yMax: isNum(nextBft) ? nextBft * 1.06 : null,
     after: p => {
-      /* Beaufort boundaries, labelled on the right margin. The whole scale is
-         offered and levelLabel() draws only what falls inside the plot, so a
-         calm week shows forces 1-2 and a gale week extends itself without any
-         code change. Each label sits at the force's lower bound and is named
-         for the band above it, which is how the scale is defined. */
-      for (let f = 1; f < BEAUFORT.length; f++)
-        p.levelLabel(BEAUFORT[f - 1][0], `Bft ${f} ${BEAUFORT[f][1]}`);
-
       for (const d of w.daily){
         if (isNum(d.wmax)){
           const bf = beaufort(d.wmax);
