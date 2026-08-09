@@ -223,7 +223,7 @@ footer a{color:var(--ink-2)}
     <div class="shead"><h2>Weather · Froggit WH3000</h2><span class="meta" id="meta-weather"></span></div>
     <div class="card board"><h3>Temperature</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-temp"></div></div>
     <div class="card board"><h3>Relative humidity</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-rh"></div></div>
-    <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
+    <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked with its Beaufort force. Dashed lines are Beaufort boundaries. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
     <div class="card board"><h3>Rainfall</h3><p class="cap">Hourly totals.</p><div class="plot" id="p-rain"></div><p class="accum" id="cap-rain"></p></div>
   </section>
 
@@ -538,6 +538,22 @@ function makePlot(host, opts){
       "font-size": 9.5 });
     tx.setAttribute("class", "mono");
     tx.textContent = label;
+    api.add(tx);
+  };
+  /* A horizontal reference line with a label at the right margin. Skipped
+     silently when the value falls outside the visible range, so a caller can
+     offer a whole scale and only the part that applies gets drawn. */
+  api.threshold = (v, text) => {
+    if (!isNum(v) || v <= lo || v >= hi) return;
+    const y = Y(v);
+    api.add(el("line", { x1: pad.l, y1: y, x2: pad.l + iw, y2: y,
+      stroke: css("--axis"), "stroke-width": 1, "stroke-dasharray": "2 4",
+      opacity: .75 }));
+    if (!text) return;
+    const tx = el("text", { x: pad.l + iw - 3, y: y - 3, "text-anchor": "end",
+      fill: css("--ink-3"), "font-size": 9.5 });
+    tx.setAttribute("class", "mono");
+    tx.textContent = text;
     api.add(tx);
   };
   api.topLabel = (t, text) => {
@@ -956,14 +972,38 @@ function drawWeather(){
       if (isNum(d.rhmin)) p.marker(d.rhmin_t, d.rhmin, css("--c-cold"), Math.round(d.rhmin) + "%", true);
     }}});
 
-  /* wind + dominant direction */
+  /* wind + dominant direction, against the Beaufort scale */
+  //
+  // The y-axis is stretched to the first Beaufort boundary above the week's
+  // peak. Two reasons: there is then always a band edge visible to read the
+  // trace against, and a calm week stops being autoscaled until a 5 km/h
+  // breeze fills the panel and looks like weather. Where the wind does get up,
+  // this changes nothing — the boundary is already inside the range.
+  const windMax = Math.max(0, ...zip(h.t, h.wind).map(x => x[1]).filter(isNum),
+                           ...w.daily.map(d => d.wmax).filter(isNum));
+  const nextBft = (BEAUFORT.find(b => b[0] > windMax) || [])[0];
   chartSimple("#p-wind", { src: zip(h.t, h.wind), colour: css("--c-wind"),
     name: "Wind", unit: "km/h", yLabel: "km/h", yMin: 0, pad: { t: 26 },
-    after: p => { for (const d of w.daily){
-      if (isNum(d.wmax)) p.marker(d.wmax_t, d.wmax, css("--c-wind"), d.wmax.toFixed(1));
-      if (d.dir){ const mid = dayKeyTs(d.date) + 43200;
-        if (mid > p.t0 && mid < p.t1) p.topLabel(mid, d.dir); }
-    }}});
+    yMax: isNum(nextBft) ? nextBft * 1.06 : null,
+    after: p => {
+      /* Beaufort boundaries as reference lines. The whole scale is offered and
+         threshold() draws only what falls inside the plot, so a calm week shows
+         forces 1-2 and a gale week extends itself without any code change.
+         Each line sits at the force's lower bound and is named for the band
+         above it, which is how the scale is defined. */
+      for (let f = 1; f < BEAUFORT.length; f++)
+        p.threshold(BEAUFORT[f - 1][0], `Bft ${f} ${BEAUFORT[f][1]}`);
+
+      for (const d of w.daily){
+        if (isNum(d.wmax)){
+          const bf = beaufort(d.wmax);
+          p.marker(d.wmax_t, d.wmax, css("--c-wind"),
+                   d.wmax.toFixed(1) + (bf ? ` · Bft ${bf.f}` : ""));
+        }
+        if (d.dir){ const mid = dayKeyTs(d.date) + 43200;
+          if (mid > p.t0 && mid < p.t1) p.topLabel(mid, d.dir); }
+      }
+    }});
 
   /* rainfall bars */
   const rainPts = zip(h.t, h.rain).filter(p => isNum(p[1]));
