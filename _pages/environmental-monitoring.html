@@ -110,6 +110,12 @@ h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
 .now .bigtemp .u{font-size:22px;color:var(--ink-2)}
 .now .desc{color:var(--ink-2);font-size:14px;margin-top:5px}
 .statrow{display:flex;gap:26px;flex-wrap:wrap;margin-top:16px;padding-top:15px;border-top:1px solid var(--hairline)}
+/* Humidity and wind ride alongside the temperature — they are the conditions
+   right now, so they belong with the reading rather than under a rule with the
+   almanac. margin-left:auto pushes them to the far edge on a wide card; on a
+   narrow one they wrap under the temperature instead of squeezing it. */
+.now-stats{display:flex;gap:24px;flex-wrap:wrap;margin-left:auto}
+@media (max-width:560px){ .now-stats{margin-left:0;width:100%} }
 .stat{display:flex;align-items:center;gap:10px}
 .stat .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
 .stat .val{font-size:19px}
@@ -813,22 +819,24 @@ function paintNow(host, w, cloudIdx, th, stale){
         <div class="bigtemp mono">${isNum(w.temp) ? w.temp.toFixed(1) : "--"}<span class="u"> °C</span></div>
         <div class="desc">${ic.desc}${stale ? " · from last archived reading" : ""}</div>
       </div>
+      <div class="now-stats">
+        <div class="stat">
+          <div>
+            <div class="lab">Humidity</div>
+            <div class="val mono">${isNum(w.rh) ? Math.round(w.rh) : "--"}<span class="u"> %</span></div>
+          </div>
+        </div>
+        <div class="stat">
+          ${compassSvg(w.dir_deg)}
+          <div>
+            <div class="lab">Wind</div>
+            <div class="val mono">${isNum(w.wind) ? w.wind.toFixed(1) : "--"}<span class="u"> km/h</span></div>
+            <div class="sm mono">${dir || "--"}${bf ? ` · Bft ${bf.f} ${bf.name}` : ""}</div>
+          </div>
+        </div>
+      </div>
     </div>
     <div class="statrow">
-      <div class="stat">
-        <div>
-          <div class="lab">Humidity</div>
-          <div class="val mono">${isNum(w.rh) ? Math.round(w.rh) : "--"}<span class="u"> %</span></div>
-        </div>
-      </div>
-      <div class="stat">
-        ${compassSvg(w.dir_deg)}
-        <div>
-          <div class="lab">Wind</div>
-          <div class="val mono">${isNum(w.wind) ? w.wind.toFixed(1) : "--"}<span class="u"> km/h</span></div>
-          <div class="sm mono">${dir || "--"}${bf ? ` · Bft ${bf.f} ${bf.name}` : ""}</div>
-        </div>
-      </div>
       <div class="stat">
         ${sunArcSvg(w.time || Date.now() / 1000)}
         <div>
