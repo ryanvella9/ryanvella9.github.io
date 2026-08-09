@@ -115,6 +115,11 @@ h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
 .stat .val{font-size:19px}
 .stat .val .u{font-size:12px;color:var(--ink-2)}
 .stat .sm{font-size:11.5px;color:var(--ink-3)}
+/* Rise and set sit side by side, so the pair needs to stay a touch smaller
+   than a single-number stat or it wraps on a phone. */
+.stat .sun-times{font-size:15px;white-space:nowrap}
+.stat .sun-up{color:var(--sun);margin-right:1px}
+.stat .sun-dn{color:var(--moon);margin:0 1px 0 8px}
 .compass{width:44px;height:44px;flex:none}
 .pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .pm .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
@@ -339,10 +344,10 @@ function beaufort(kmh){
 const CARD = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
 const cardinal = d => isNum(d) ? CARD[Math.floor(mod(d + 11.25, 360) / 22.5)] : null;
 
-/* --------------------------------------------------- sun above horizon?
-   NOAA low-precision solar position - enough to pick a sun or moon icon. */
-function isDaytime(ts){
-  const d = new Date(ts * 1000);
+/* --------------------------------------------------- solar position
+   NOAA low-precision algorithm. Good to well under a minute for rise and set
+   at this latitude, which is finer than anyone reads off a dashboard. */
+function sunAltitude(ts){
   const jd = ts / 86400 + 2440587.5;
   const n = jd - 2451545.0;
   const L = mod(280.460 + 0.9856474 * n, 360);
@@ -355,8 +360,38 @@ function isDaytime(ts){
   const ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)) * 180 / Math.PI;
   const H = mod(lst - ra + 180, 360) - 180;
   const phi = LAT * Math.PI / 180, Hr = H * Math.PI / 180;
-  const alt = Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(Hr));
-  return alt > -0.1047; /* -6 deg: treat civil twilight as day */
+  return Math.asin(Math.sin(phi) * Math.sin(dec) + Math.cos(phi) * Math.cos(dec) * Math.cos(Hr));
+}
+
+function isDaytime(ts){
+  return sunAltitude(ts) > -0.1047; /* -6 deg: treat civil twilight as day */
+}
+
+/* Sunrise and sunset for the local day containing ts.
+   Found by walking the day and bisecting each horizon crossing rather than by
+   the closed-form hour angle: the same code then works unchanged at any
+   latitude, including where the sun does not rise at all, which the formula
+   would have to special-case. -0.833 deg is the conventional definition —
+   upper limb touching the horizon, with refraction. */
+function sunTimes(ts){
+  const H0 = -0.833 * Math.PI / 180;
+  const start = localMidnight(ts);
+  let rise = null, set = null;
+  let prevUp = sunAltitude(start) > H0;
+  for (let step = 1; step <= 288; step++){          /* 5-minute steps */
+    const t = start + step * 300;
+    const up = sunAltitude(t) > H0;
+    if (up !== prevUp){
+      let lo = t - 300, hi = t;
+      for (let i = 0; i < 12; i++){                 /* bisect to the second */
+        const mid = (lo + hi) / 2;
+        if ((sunAltitude(mid) > H0) === prevUp) lo = mid; else hi = mid;
+      }
+      if (up) rise = hi; else set = hi;
+      prevUp = up;
+    }
+  }
+  return { rise, set };
 }
 
 /* =====================================================================
@@ -653,6 +688,101 @@ function compassSvg(deg){
       <polygon points="${head}" fill="var(--c-wind)"/>` : ""}
   </svg>`;
 }
+/* ------------------------------------------------------------ moon phase
+   Meeus low-precision. The mean elongation D gives the position in the cycle,
+   which is what the drawn shape needs; the illuminated fraction comes from the
+   phase angle with its main periodic terms, because the mean value alone can
+   be out by a whole day near the quarters. */
+function moonPhase(ts){
+  const jd = ts / 86400 + 2440587.5;
+  const T = (jd - 2451545.0) / 36525;
+  const D = mod(297.8501921 + 445267.1114034 * T, 360);            /* elongation */
+  const M = mod(357.5291092 + 35999.0502909 * T, 360);             /* sun anomaly */
+  const Mp = mod(134.9633964 + 477198.8675055 * T, 360);           /* moon anomaly */
+  const rad = Math.PI / 180;
+  const i = 180 - D
+          - 6.289 * Math.sin(Mp * rad)
+          + 2.100 * Math.sin(M * rad)
+          - 1.274 * Math.sin((2 * D - Mp) * rad)
+          - 0.658 * Math.sin(2 * D * rad)
+          - 0.214 * Math.sin(2 * Mp * rad)
+          - 0.110 * Math.sin(D * rad);
+  return { frac: D / 360, illum: (1 + Math.cos(i * rad)) / 2 };
+}
+
+function moonName(frac){
+  if (frac < .02 || frac > .98) return "New moon";
+  if (frac < .23) return "Waxing crescent";
+  if (frac < .27) return "First quarter";
+  if (frac < .48) return "Waxing gibbous";
+  if (frac < .52) return "Full moon";
+  if (frac < .73) return "Waning gibbous";
+  if (frac < .77) return "Last quarter";
+  return "Waning crescent";
+}
+
+/* The disc is drawn as two arcs: the lit limb, then the terminator, whose
+   curvature is a squashed circle of half-width r*cos(2*pi*frac). That single
+   signed value carries the whole cycle — positive for a crescent, zero at the
+   quarters where the terminator is a straight line, negative for a gibbous. */
+function moonSvg(ts){
+  const { frac } = moonPhase(ts);
+  const r = 15, cx = 22, cy = 22;
+  const rx = Math.cos(2 * Math.PI * frac) * r;
+  const waxing = frac < 0.5;                 /* northern hemisphere: lit on the right */
+  const limb = waxing ? 1 : 0;
+  const term = (rx > 0) === waxing ? 0 : 1;
+  const lit = `M ${cx} ${cy - r} A ${r} ${r} 0 0 ${limb} ${cx} ${cy + r} `
+            + `A ${Math.abs(rx).toFixed(2)} ${r} 0 0 ${term} ${cx} ${cy - r} Z`;
+  return `<svg class="compass" viewBox="0 0 44 44" aria-hidden="true">
+    <circle cx="${cx}" cy="${cy}" r="${r}" fill="var(--pill)" stroke="var(--hairline)" stroke-width="1"/>
+    <path d="${lit}" fill="var(--moon)"/>
+  </svg>`;
+}
+
+/* Rise and set, arrowed so the pair reads without a legend. */
+function sunTimesLabel(ts){
+  const s = sunTimes(ts);
+  const f = t => t ? fmtTime(t) : "--:--";
+  return `<span class="sun-up">↑</span>${f(s.rise)} <span class="sun-dn">↓</span>${f(s.set)}`;
+}
+
+/* Length of day, and how much of it is left — the thing you actually want when
+   deciding whether there is still light for something. */
+function daylightLabel(ts){
+  const s = sunTimes(ts);
+  if (!s.rise || !s.set) return "";
+  const hhmm = secs => `${Math.floor(secs / 3600)}h ${String(Math.round(secs % 3600 / 60)).padStart(2, "0")}m`;
+  const total = s.set - s.rise;
+  const now = Date.now() / 1000;
+  if (now >= s.rise && now < s.set) return `${hhmm(total)} · ${hhmm(s.set - now)} left`;
+  return `${hhmm(total)} of daylight`;
+}
+
+/* A 44px arc matching the compass beside it: the track is the sun's path from
+   rise to set and the dot is where it currently sits, so elapsed daylight is
+   readable at a glance rather than by subtracting two clock times. */
+function sunArcSvg(ts){
+  const s = sunTimes(ts);
+  const now = Date.now() / 1000;
+  let frac = null;
+  if (s.rise && s.set && now >= s.rise && now <= s.set) frac = (now - s.rise) / (s.set - s.rise);
+  const R = 16, cx = 22, cy = 30;
+  const pt = f => [cx - R * Math.cos(Math.PI * f), cy - R * Math.sin(Math.PI * f)];
+  const [ax, ay] = pt(0), [bx, by] = pt(1);
+  const dot = frac == null ? "" : (() => {
+    const [x, y] = pt(frac);
+    return `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="3.4" fill="var(--sun)"/>`;
+  })();
+  return `<svg class="compass" viewBox="0 0 44 44" aria-hidden="true">
+    <path d="M ${ax} ${ay} A ${R} ${R} 0 0 1 ${bx} ${by}" fill="none"
+      stroke="var(--hairline)" stroke-width="2" stroke-linecap="round"/>
+    <line x1="${cx - R - 2}" y1="${cy}" x2="${cx + R + 2}" y2="${cy}"
+      stroke="var(--hairline)" stroke-width="1.5"/>
+    ${dot}
+  </svg>`;
+}
+
 const themeIcon = dark => dark
   ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>`
   : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>`;
@@ -709,6 +839,22 @@ function paintNow(host, w, cloudIdx, th, stale){
           <div class="lab">Wind</div>
           <div class="val mono">${isNum(w.wind) ? w.wind.toFixed(1) : "--"}<span class="u"> km/h</span></div>
           <div class="sm mono">${dir || "--"}${bf ? ` · Bft ${bf.f} ${bf.name}` : ""}</div>
+        </div>
+      </div>
+      <div class="stat">
+        ${sunArcSvg(w.time || Date.now() / 1000)}
+        <div>
+          <div class="lab">Sun</div>
+          <div class="val mono sun-times">${sunTimesLabel(w.time || Date.now() / 1000)}</div>
+          <div class="sm mono">${daylightLabel(w.time || Date.now() / 1000)}</div>
+        </div>
+      </div>
+      <div class="stat">
+        ${moonSvg(w.time || Date.now() / 1000)}
+        <div>
+          <div class="lab">Moon</div>
+          <div class="val mono">${Math.round(moonPhase(w.time || Date.now() / 1000).illum * 100)}<span class="u"> % lit</span></div>
+          <div class="sm mono">${moonName(moonPhase(w.time || Date.now() / 1000).frac)}</div>
         </div>
       </div>
     </div>`;
