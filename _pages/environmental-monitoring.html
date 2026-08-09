@@ -1198,12 +1198,29 @@ async function loadCurrent(){
     getJSON(CURRENT_URL, true),
     getJSON(CURRENT_LIVE_URL, true),
   ]);
-  let best = null;
-  for (const r of results){
-    if (r.status !== "fulfilled" || !r.value) continue;
-    if (!best || (r.value.generated || 0) > (best.generated || 0)) best = r.value;
+  const sources = results
+    .filter(r => r.status === "fulfilled" && r.value)
+    .map(r => r.value)
+    .sort((a, b) => (b.generated || 0) - (a.generated || 0));
+
+  if (sources.length){
+    /* Merged per instrument rather than taking the newest file whole. The three
+       sensors are queried independently and fail independently, so one timeout
+       in the freshest copy used to blank a panel even while an older copy held
+       a perfectly good reading for it. Each panel now takes the most recent
+       source that actually succeeded, and only reports unavailable when no
+       source has it. */
+    const merged = Object.assign({}, sources[0]);
+    for (const key of ["weather", "air", "sky"]){
+      let pick = null;
+      for (const s of sources){
+        const sec = s[key];
+        if (sec && sec.ok && (!pick || (sec.time || 0) > (pick.time || 0))) pick = sec;
+      }
+      if (pick) merged[key] = pick;
+    }
+    CUR = merged;
   }
-  if (best) CUR = best;
 
   /* top up the air panel from the public feed if it is fresher */
   try {
