@@ -747,18 +747,6 @@ function sunTimesLabel(ts){
   return `<span class="sun-up">↑</span>${f(s.rise)} <span class="sun-dn">↓</span>${f(s.set)}`;
 }
 
-/* Length of day, and how much of it is left — the thing you actually want when
-   deciding whether there is still light for something. */
-function daylightLabel(ts){
-  const s = sunTimes(ts);
-  if (!s.rise || !s.set) return "";
-  const hhmm = secs => `${Math.floor(secs / 3600)}h ${String(Math.round(secs % 3600 / 60)).padStart(2, "0")}m`;
-  const total = s.set - s.rise;
-  const now = Date.now() / 1000;
-  if (now >= s.rise && now < s.set) return `${hhmm(total)} · ${hhmm(s.set - now)} left`;
-  return `${hhmm(total)} of daylight`;
-}
-
 /* A 44px arc matching the compass beside it: the track is the sun's path from
    rise to set and the dot is where it currently sits, so elapsed daylight is
    readable at a glance rather than by subtracting two clock times. */
@@ -846,7 +834,6 @@ function paintNow(host, w, cloudIdx, th, stale){
         <div>
           <div class="lab">Sun</div>
           <div class="val mono sun-times">${sunTimesLabel(w.time || Date.now() / 1000)}</div>
-          <div class="sm mono">${daylightLabel(w.time || Date.now() / 1000)}</div>
         </div>
       </div>
       <div class="stat">
