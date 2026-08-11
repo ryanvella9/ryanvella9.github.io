@@ -1850,6 +1850,21 @@ const fmtLocal = new Intl.DateTimeFormat('en-GB', {
   hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Malta', hour12: false,
 });
 
+/* A frame is either an age or a lead time, and saying so is the whole point of
+   carrying a past window: "-12 h" is a thing that happened, "+12 h" is a thing
+   that might. The forecast length quoted alongside stays the forecast's, not
+   the length of the whole axis, because that is what a reader is judging the
+   lead time against. */
+function frameLabel(hours) {
+  const h = Math.round(hours);
+  return (h < 0 ? 'P' : 'F') + String(Math.abs(h)).padStart(3, '0');
+}
+
+function leadLabel(hours) {
+  const h = Math.round(hours);
+  return h < 0 ? `${h} h · past` : `+${h} h of ${SRC.steps[NT - 1]}`;
+}
+
 function validAt(tf) {
   const ia = Math.min(NT - 2, Math.floor(tf));
   const hours = NT === 1 ? SRC.steps[0]
@@ -1882,7 +1897,7 @@ function lockTimebar() {
     const { hours, date } = validAt(i);
     days.push(fmtDay.format(date));
     utcs.push(`${fmtUTC.format(date)} UTC`);
-    counts.push(`+${Math.round(hours)} h of ${SRC.steps[NT - 1]}`);
+    counts.push(leadLabel(hours));
   }
   $('tb-time').style.minWidth = measureMax($('tb-time'), ['00:00', '23:59']) + 'px';
   $('tb-day').style.minWidth = measureMax($('tb-day'), days) + 'px';
@@ -1912,8 +1927,8 @@ function syncTime() {
   $('tb-time').textContent = fmtLocal.format(date);
   $('tb-day').textContent = fmtDay.format(date);
   $('tb-utc').textContent = `${fmtUTC.format(date)} UTC`;
-  $('tb-lead').textContent = 'F' + String(Math.round(hours)).padStart(3, '0');
-  $('tb-count').textContent = `+${Math.round(hours)} h of ${SRC.steps[NT - 1]}`;
+  $('tb-lead').textContent = frameLabel(hours);
+  $('tb-count').textContent = leadLabel(hours);
   const s = $('scrub');
   if (document.activeElement !== s) s.value = String(Math.round(state.tf * 100));
   if (state.hover) readout(state.hover.x, state.hover.y);
@@ -2577,7 +2592,7 @@ function composeFrame(ctx, w, h, mapH) {
   ctx.fillText(fmtDay.format(date), 12 + tw + 9, 31);
   ctx.font = '12px ui-sans-serif, system-ui, sans-serif';
   ctx.fillStyle = muted;
-  const right = `${fmtUTC.format(date)} UTC · F${String(Math.round(hours)).padStart(3, '0')}`;
+  const right = `${fmtUTC.format(date)} UTC · ${frameLabel(hours)}`;
   ctx.fillText(right, w - ctx.measureText(right).width - 12, 30);
   // What the colours mean goes on the header's second line, not beside the bar:
   // at 480 px the title and the credit were fighting for the same right-hand
@@ -3120,7 +3135,9 @@ function syncHash() {
   } else {
     const hours = Math.round(validAt(state.tf).hours);
     const model = state.model === modelFor(state.domain) ? '' : `/${MODEL_SLUG[state.model]}`;
-    hash = `#${FIELD_SPECS[state.field].slug}/${state.domain}${model}/f${String(hours).padStart(3, '0')}`;
+    const h = Math.round(hours);
+    const tag = h < 0 ? `p${String(-h).padStart(3, '0')}` : `f${String(h).padStart(3, '0')}`;
+    hash = `#${FIELD_SPECS[state.field].slug}/${state.domain}${model}${tag ? '/' + tag : ''}`;
   }
   if (location.hash !== hash) {
     try { history.replaceState(null, '', hash); } catch (e) { /* file:// */ }
@@ -3136,9 +3153,9 @@ function applyHash() {
     return want && want !== state.model ? switchModel(want).catch(() => {}) : Promise.resolve();
   };
 
-  const m = /^#([\w-]+)\/([\w-]+)(?:\/(icon-eu|icon-2i|ifs))?(?:\/f?(\d+))?$/.exec(BOOT_HASH);
+  const m = /^#([\w-]+)\/([\w-]+)(?:\/(icon-eu|icon-2i|ifs))?(?:\/([fp]?)(\d+))?$/.exec(BOOT_HASH);
   if (!m) { showView('map'); toDefaultModel(); return; }
-  const [, product, domain, modelSlug, hourText] = m;
+  const [, product, domain, modelSlug, hourSign, hourText] = m;
 
   if (product === 'meteogram') { openMeteogram(); return; }
 
@@ -3155,7 +3172,8 @@ function applyHash() {
   const seek = () => {
     if (!D.shading.includes(field)) { /* product not offered here; keep default */ }
     else { state.field = field; buildFieldButtons(); drawColorbar(); syncDesc(); }
-    if (hourText !== undefined) seekToHour(Number(hourText));
+    // 'p' marks a past frame: #t2m/malta/p018 is eighteen hours before the run.
+    if (hourText !== undefined) seekToHour(Number(hourText) * (hourSign === 'p' ? -1 : 1));
     showView('map');
     drawAll();
     syncTime();
