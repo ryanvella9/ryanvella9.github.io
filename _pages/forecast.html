@@ -13,10 +13,10 @@ title: "Forecast"
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Interactive forecast panels (mock)</title>
+<title>Malta forecast</title>
 <style>
-  /* Tokens copied from web/index.html so the mock can be judged in the page it
-     would live in, rather than against a second look. */
+  /* Design tokens for the whole viewer. Kept here rather than in a stylesheet
+     so the page stays a single self-contained file. */
   :root {
     --bg: #f4f6f8;
     --panel: #ffffff;
@@ -98,13 +98,6 @@ title: "Forecast"
   .spacer { flex: 1; }
 
   main { max-width: 1320px; margin: 0 auto; padding: 10px 20px 12px; }
-
-  .mocknote {
-    background: var(--accent-soft); border: 1px solid var(--border);
-    border-radius: 5px; padding: 5px 10px; font-size: 11.5px; line-height: 1.45;
-    color: var(--muted); margin-bottom: 8px;
-  }
-  .mocknote b { color: var(--text); }
 
   /* Group labels sit beside their buttons rather than above them. Stacked, the
      control bar was 132 px — a sixth of a laptop viewport spent on captions,
@@ -1187,6 +1180,8 @@ function loadSource(domainKey, modelKey) {
   state.iso = D.contour.always || state.isoUser;
   $('tg-iso').setAttribute('aria-pressed', String(state.iso));
 
+  syncOverlayAvailability();
+
   // The readout rows are labelled from the source too — an upper-air panel
   // reports a height and an anomaly, not a temperature and a rainfall.
   $('r-temp-label').textContent = isUpper ? 'Height' : 'Temp';
@@ -1235,7 +1230,39 @@ function sampleAt(a, col, row) {
   return top + (bot - top) * fr;
 }
 
+/* The satellite gets its own index, not a clipped view of the forecast's.
+   Clamping to the model timeline looked simpler but could not work: the loop
+   reaches nine hours before the ICON-2I run begins, and those frames had no
+   position on an axis that starts at the run. Indexing the frame list directly
+   makes the whole 24 h reachable and stops the scrubber pretending there are
+   three days of imagery ahead. */
+/* Over imagery the overlays are not merely off, they are unavailable: there is
+   no model field behind the picture to draw. Disabling them says so, where
+   leaving them lit would invite a click that does nothing. */
+function syncOverlayAvailability() {
+  const imagery = state.field === 'sat';
+  for (const id of ['tg-wind', 'tg-iso', 'tg-places']) {
+    const b = $(id);
+    if (!b) continue;
+    b.disabled = imagery;
+    if (imagery) b.setAttribute('aria-pressed', 'false');
+  }
+}
+
+const SRC_SAT_TICKS = 6;   // a label every six hours across the loop
+const satMode = () => state.field === 'sat' && SAT && SAT.frames.length > 0;
+const satMax = () => (satMode() ? SAT.frames.length - 1 : 0);
+
+function satFrame() {
+  if (!satMode()) return null;
+  return SAT.frames[Math.max(0, Math.min(satMax(), Math.round(state.satTf || 0)))];
+}
+
 function setTime(tf) {
+  if (satMode()) {
+    state.satTf = Math.max(0, Math.min(satMax(), tf));
+    return;
+  }
   state.tf = Math.max(0, Math.min(NT - 1, tf));
   state.ia = Math.min(NT - 2, Math.floor(state.tf));
   state.ib = state.ia + 1;
@@ -1378,17 +1405,6 @@ function resize() {
 const SAT = window.SAT_MALTA || null;
 const SAT_CACHE = new Map();
 
-function satFrameFor(date) {
-  if (!SAT || !SAT.frames.length) return null;
-  const want = date.getTime();
-  let best = SAT.frames[0], bestGap = Infinity;
-  for (const f of SAT.frames) {
-    const gap = Math.abs(Date.parse(f.t) - want);
-    if (gap < bestGap) { bestGap = gap; best = f; }
-  }
-  return best;
-}
-
 function satImage(frame) {
   let im = SAT_CACHE.get(frame.file);
   if (!im) {
@@ -1412,8 +1428,7 @@ function preloadSatAround(frame) {
 }
 
 function drawSatellite() {
-  if (!SAT) return;
-  const frame = satFrameFor(validAt(state.tf).date);
+  const frame = satFrame();
   if (!frame) return;
   const im = satImage(frame);
   preloadSatAround(frame);
@@ -1727,6 +1742,15 @@ function drawGeo() {
      just a coloured blob — so it is drawn whatever the shading shows. */
   const cont = D.contour;
   const contourOK = cont.always || (state.field === cont.key);
+  if (state.field === 'sat') {
+    // Cartography only over imagery — coastline and graticule locate it, and
+    // nothing else is drawn.
+    drawGraticule(css);
+    strokeRings(ctxG, GEO.borders, css.getPropertyValue('--border-line').trim(), 0.8);
+    strokeRings(ctxG, GEO.land, css.getPropertyValue('--coast').trim(), 1.1);
+    return;
+  }
+
   if (state.iso && contourOK) {
     ctxG.save();
     ctxG.strokeStyle = cont.always ? 'rgba(16,20,24,.85)' : 'rgba(20,26,31,.42)';
@@ -1805,6 +1829,14 @@ function pxPerMetre(lat) {
 }
 
 function stepParticles(dt) {
+  /* Nothing animates over the satellite layer. The streaklines are a model's
+     wind; drawing them across a photograph invites the two to be read as one
+     observation, and the flow canvas is cleared rather than merely paused so no
+     stale streak is left behind from the previous panel. */
+  if (state.field === 'sat') {
+    ctxF.clearRect(0, 0, W, H);
+    return;
+  }
   const spec = LUTS[state.field];
   const buckets = [[], []];
   const darkTheme = isDark();
@@ -1916,7 +1948,8 @@ function frame(now) {
     // One model step per second at 1x. 41 steps => a 40 s loop, which is about
     // as long as anyone watches a forecast animation.
     setTime(state.tf + dt * state.speed);
-    if (state.tf >= NT - 1) setTime(0);
+    if (satMode()) { if ((state.satTf || 0) >= satMax()) setTime(0); }
+    else if (state.tf >= NT - 1) setTime(0);
     syncTime();
   }
 
@@ -2019,6 +2052,28 @@ function lockReadout() {
 }
 
 function syncTime() {
+  syncScrubRange();
+
+  /* In satellite mode the header reads the scan, not a forecast hour: there is
+     no lead time on an observation, and the count says where you are in the
+     loop instead. */
+  if (satMode()) {
+    const f = satFrame();
+    const date = new Date(Date.parse(f.t));
+    $('tb-time').textContent = fmtLocal.format(date);
+    $('tb-day').textContent = fmtDay.format(date);
+    $('tb-utc').textContent = `${fmtUTC.format(date)} UTC`;
+    $('tb-lead').textContent = f.kind === 'ir' ? 'IR' : 'RGB';
+    const age = Math.round((Date.now() - date.getTime()) / 60000);
+    $('tb-count').textContent = age < 90
+      ? `${age} min ago` : `${(age / 60).toFixed(1)} h ago`;
+    const sc = $('scrub');
+    if (document.activeElement !== sc) sc.value = String(Math.round((state.satTf || 0) * 100));
+    if (state.hover) readout(state.hover.x, state.hover.y);
+    syncHash();
+    return;
+  }
+
   const { hours, date } = validAt(state.tf);
   $('tb-time').textContent = fmtLocal.format(date);
   $('tb-day').textContent = fmtDay.format(date);
@@ -2034,6 +2089,27 @@ function syncTime() {
 function buildTicks() {
   const box = $('ticks');
   box.innerHTML = '';
+
+  /* Satellite ticks mark hours, not days: the whole loop is a single day, so
+     weekday labels would collapse to one word at either end and tell a reader
+     nothing about where they are in it. */
+  if (satMode()) {
+    const n = SRC_SAT_TICKS;
+    SAT.frames.forEach((f, i) => {
+      const d = new Date(Date.parse(f.t));
+      if (d.getUTCHours() % n || d.getUTCMinutes()) return;
+      const el = document.createElement('span');
+      el.textContent = new Intl.DateTimeFormat('en-GB', {
+        hour: '2-digit', hour12: false, timeZone: 'Europe/Malta' }).format(d);
+      const frac = i / Math.max(1, SAT.frames.length - 1);
+      el.style.left = frac * 100 + '%';
+      if (frac < 0.02) el.style.transform = 'none';
+      else if (frac > 0.98) el.style.transform = 'translateX(-100%)';
+      box.appendChild(el);
+    });
+    return;
+  }
+
   let lastDay = null;
   SRC.steps.forEach((h, i) => {
     const d = new Date(INIT.getTime() + h * 3600e3);
@@ -2121,6 +2197,15 @@ function clearReadout(msg) {
 }
 
 function readout(x, y) {
+  /* Nothing to read off a photograph. The model fields behind this panel are
+     still loaded, but quoting a temperature under a satellite pixel would say
+     the picture measured it. */
+  if (state.field === 'sat') {
+    clearReadout(state.satShown
+      ? 'Satellite image — no values to sample'
+      : 'Satellite image');
+    return;
+  }
   const lon = x2lon(x), lat = y2lat(y);
   const col = lon2col(lon), row = lat2row(lat);
   const u = uAt(col, row), v = vAt(col, row);
@@ -2422,12 +2507,17 @@ function syncMeta() {
 
 $('play').onclick = () => setPlaying(!state.playing);
 $('first').onclick = () => { setPlaying(false); setTime(0); syncTime(); };
-$('last').onclick = () => { setPlaying(false); setTime(NT - 1); syncTime(); };
-$('prev').onclick = () => { setPlaying(false); setTime(Math.round(state.tf) - 1); syncTime(); };
-$('next').onclick = () => { setPlaying(false); setTime(Math.round(state.tf) + 1); syncTime(); };
+$('last').onclick = () => { setPlaying(false); setTime(satMode() ? satMax() : NT - 1); syncTime(); };
+$('prev').onclick = () => { setPlaying(false); setTime(Math.round(satMode() ? state.satTf : state.tf) - 1); syncTime(); };
+$('next').onclick = () => { setPlaying(false); setTime(Math.round(satMode() ? state.satTf : state.tf) + 1); syncTime(); };
 
 $('scrub').max = String((NT - 1) * 100);
 $('scrub').oninput = (e) => { setPlaying(false); setTime(+e.target.value / 100); syncTime(); };
+
+function syncScrubRange() {
+  $('scrub').min = '0';
+  $('scrub').max = String(Math.round((satMode() ? satMax() : NT - 1) * 100));
+}
 
 $('speeds').onclick = (e) => {
   const b = e.target.closest('button'); if (!b) return;
@@ -2437,10 +2527,21 @@ $('speeds').onclick = (e) => {
 
 $('fields').onclick = (e) => {
   const b = e.target.closest('button'); if (!b) return;
+  const wasSat = satMode();
   state.field = b.dataset.field;
   pressGroup('fields', 'field', state.field);
+  /* Switching into or out of imagery swaps which clock the track belongs to, so
+     the ticks, the scrubber's extent and the overlay buttons all have to be
+     rebuilt — not just the shading. Landing on the newest scan rather than the
+     oldest is the useful default when someone asks for the satellite. */
+  if (satMode() !== wasSat) {
+    if (satMode() && state.satTf === undefined) state.satTf = satMax();
+    buildTicks();
+    syncOverlayAvailability();
+  }
   drawColorbar();
   syncDesc();
+  syncTime();
   drawAll();
 };
 
@@ -2470,7 +2571,7 @@ addEventListener('keydown', (e) => {
   else if (k === 'ArrowRight') { setPlaying(false); setTime(Math.round(state.tf) + 1); syncTime(); }
   else if (k === 'ArrowLeft') { setPlaying(false); setTime(Math.round(state.tf) - 1); syncTime(); }
   else if (k === 'Home') { setPlaying(false); setTime(0); syncTime(); }
-  else if (k === 'End') { setPlaying(false); setTime(NT - 1); syncTime(); }
+  else if (k === 'End') { setPlaying(false); setTime(satMode() ? satMax() : NT - 1); syncTime(); }
 });
 
 /* -------------------------------------------------------------- GIF export -
@@ -3311,6 +3412,7 @@ $('theme').innerHTML = isDark() ? SUN : MOON;
 resize();
 syncTime();
 applyHash();
+buildTicks();   // after applyHash: the layer decides which clock the track shows
 addEventListener('resize', () => {
   if (state.view === 'map') resize(); else drawMeteogram();
 });
