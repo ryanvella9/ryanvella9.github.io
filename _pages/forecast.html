@@ -612,6 +612,7 @@ title: "Forecast"
 
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_geo.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_data.js"></script>
+<script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_malta.js"></script>
 <script>
 /* ---------------------------------------------------------------------------
    Interactive forecast panels.
@@ -669,6 +670,7 @@ const FIELD_SPECS = {
   spd: { slug: 'wind10m', label: 'Wind speed', unit: ' m/s' },
   p: { slug: 'precip', label: 'Precipitation', unit: ' mm' },
   c: { slug: 'cloud', label: 'Cloud cover', unit: ' %' },
+  sat: { slug: 'satellite', label: 'Satellite', unit: '' },
   sig: { slug: '500g_anom', label: 'Height anomaly', unit: ' σ' },
   none: { slug: 'flow', label: 'None' },
 };
@@ -677,7 +679,10 @@ const SLUG_TO_FIELD = Object.fromEntries(
 
 const MODELS = {
   icon_eu: {
-    label: 'ICON-EU', domains: ['medit', 'malta'],
+    // Mediterranean only. ICON-EU resolves Malta as about three grid cells,
+    // where ICON-2I at 2 km gives the islands a coastline — offering both on
+    // the same frame invited a comparison in which one side could not compete.
+    label: 'ICON-EU', domains: ['medit'],
   },
   icon_2i: {
     label: 'ICON-2I', domains: ['malta'],
@@ -764,7 +769,12 @@ function adoptSource(modelKey, g) {
   return {
     ...common, accumHours: g.accumHours ?? 1,
     keys: hasCloud ? ['u', 'v', 't', 'p', 'c'] : ['u', 'v', 't', 'p'],
-    shading: hasCloud ? ['t', 'spd', 'p', 'c', 'none'] : ['t', 'spd', 'p', 'none'],
+    shading: (hasCloud ? ['t', 'spd', 'p', 'c'] : ['t', 'spd', 'p'])
+      // ICON-2I is the Malta-only source, which is the one frame the satellite
+      // image is cut to. Keyed off the model rather than a domain the builder
+      // cannot see from here.
+      .concat(window.SAT_MALTA && modelKey === 'icon_2i' ? ['sat'] : [])
+      .concat(['none']),
     contour: { key: 't', label: 'Isotherms', unit: '°C' },
     data: hasCloud
       ? { u: g.u, v: g.v, t: g.t, p: g.p, c: g.c }
@@ -1156,6 +1166,11 @@ function loadSource(domainKey, modelKey) {
       idx: SIGMA_IDX, idxOffset: 1000, idxScale: 100,
     };
   }
+  /* No entry for 'sat' on purpose. It is an image, not a field, so it has no
+     palette, no colour bar and nothing to sample under the cursor — and every
+     consumer here already guards on a missing spec. Registering a stub would
+     mean teaching each of them what an image is; leaving it out reuses the
+     path they were already written to handle. */
   for (const k of Object.keys(LUTS)) LUTS[k].ink = buildInkLUT(LUTS[k].lut);
 
   // A shading option the new source does not offer must not survive the switch.
@@ -1350,7 +1365,64 @@ function resize() {
 
 /* ---------------------------------------------------------------- raster ---- */
 
+/* The satellite frame is a picture, not a field: no value to interpolate and no
+   palette to build, so it bypasses the raster path and is blitted onto the map
+   canvas. Resampled server-side into the panel's own Mercator box, which is why
+   a plain drawImage lands on the coastline instead of drifting north of it.
+
+   It keeps its own clock. The timeline belongs to the forecast and runs hours
+   into the future; the imagery only ever runs up to now. Scrubbing back through
+   the past window shows the scan nearest that moment, and anywhere beyond the
+   last scan holds the most recent one — which is the honest thing for a picture
+   of something that has not happened yet. */
+const SAT = window.SAT_MALTA || null;
+const SAT_CACHE = new Map();
+
+function satFrameFor(date) {
+  if (!SAT || !SAT.frames.length) return null;
+  const want = date.getTime();
+  let best = SAT.frames[0], bestGap = Infinity;
+  for (const f of SAT.frames) {
+    const gap = Math.abs(Date.parse(f.t) - want);
+    if (gap < bestGap) { bestGap = gap; best = f; }
+  }
+  return best;
+}
+
+function satImage(frame) {
+  let im = SAT_CACHE.get(frame.file);
+  if (!im) {
+    im = new Image();
+    im.src = DATA_BASE + '/sat/' + frame.file;
+    im.onload = () => { if (state.field === 'sat') drawAll(); };
+    SAT_CACHE.set(frame.file, im);
+  }
+  return im;
+}
+
+/* The neighbours of the frame on screen, so scrubbing does not flash white on
+   every step. Only the immediate ones: preloading a whole day would pull five
+   megabytes nobody asked for. */
+function preloadSatAround(frame) {
+  if (!SAT) return;
+  const i = SAT.frames.indexOf(frame);
+  for (const j of [i - 1, i + 1]) {
+    if (j >= 0 && j < SAT.frames.length) satImage(SAT.frames[j]);
+  }
+}
+
+function drawSatellite() {
+  if (!SAT) return;
+  const frame = satFrameFor(validAt(state.tf).date);
+  if (!frame) return;
+  const im = satImage(frame);
+  preloadSatAround(frame);
+  if (im.complete && im.naturalWidth) ctxG.drawImage(im, 0, 0, W, H);
+  state.satShown = frame;
+}
+
 function drawRaster() {
+  if (state.field === 'sat') { drawSatellite(); return; }
   const spec = LUTS[state.field];
   if (!spec) return;
 
@@ -2120,10 +2192,24 @@ const DESCS = {
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
   c: 'Total cloud cover through the whole depth of the atmosphere, so a thin cirrus sheet and a deep thunderstorm both read as overcast. Blue is clear sky, white is complete cover.',
+  sat: 'MTG FCI from EUMETSAT, 20-minutely over the last 24 hours, resampled onto this frame. True colour by day; after sunset there is no visible light to photograph, so night falls back to the 10.5 µm infrared window. The scan nearest the selected time is shown, and past the newest scan the most recent one is held — there is no satellite picture of a forecast.',
   none: 'The wind field alone, as advected streaklines over land and sea.',
 };
 
 function syncDesc() {
+  if (state.field === 'sat') {
+    const f = state.satShown;
+    const when = f ? new Date(Date.parse(f.t)) : null;
+    // Which instrument this frame came from, because they are different
+    // measurements and the picture changes character at dusk.
+    const how = f && f.kind === 'ir'
+      ? 'infrared (10.5 µm), inverted so cloud is white'
+      : 'true colour';
+    $('desc').textContent = DESCS.sat + (when
+      ? ` Showing ${how} at ${fmtUTC.format(when)} UTC.` : '');
+    $('desc').title = $('desc').textContent;
+    return;
+  }
   const gap = SRC.steps.length > 1 ? SRC.steps[1] - SRC.steps[0] : 1;
   const km = Math.round(SRC.dy * 111);
   $('desc').textContent = `${DESCS[state.field]} ${MODELS[state.model].label} at ~${km} km, ` +
