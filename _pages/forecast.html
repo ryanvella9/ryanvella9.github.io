@@ -1255,7 +1255,11 @@ const satMax = () => (satMode() ? SAT.frames.length - 1 : 0);
 
 function satFrame() {
   if (!satMode()) return null;
-  return SAT.frames[Math.max(0, Math.min(satMax(), Math.round(state.satTf || 0)))];
+  /* Default to the newest scan, not the oldest. `|| 0` put a first visit on a
+     24-hour-old frame — at this latitude usually a night infrared one — which
+     reads as the layer being broken rather than as the far end of a loop. */
+  if (state.satTf === undefined) state.satTf = satMax();
+  return SAT.frames[Math.max(0, Math.min(satMax(), Math.round(state.satTf)))];
 }
 
 function setTime(tf) {
@@ -3412,7 +3416,9 @@ $('theme').innerHTML = isDark() ? SUN : MOON;
 resize();
 syncTime();
 applyHash();
+if (satMode() && state.satTf === undefined) state.satTf = satMax();
 buildTicks();   // after applyHash: the layer decides which clock the track shows
+syncTime();
 addEventListener('resize', () => {
   if (state.view === 'map') resize(); else drawMeteogram();
 });
