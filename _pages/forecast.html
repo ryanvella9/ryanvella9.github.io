@@ -668,6 +668,7 @@ const FIELD_SPECS = {
   t: { slug: 't2m', label: 'Temperature', unit: ' °C' },
   spd: { slug: 'wind10m', label: 'Wind speed', unit: ' m/s' },
   p: { slug: 'precip', label: 'Precipitation', unit: ' mm' },
+  c: { slug: 'cloud', label: 'Cloud cover', unit: ' %' },
   sig: { slug: '500g_anom', label: 'Height anomaly', unit: ' σ' },
   none: { slug: 'flow', label: 'None' },
 };
@@ -755,12 +756,19 @@ function adoptSource(modelKey, g) {
       data: { u: g.u, v: g.v, gh: g.gh, sig: g.sig },
     };
   }
+  /* Cloud is ICON-2I's alone: ICON-EU's payload has no CLCT, and offering a
+     shading a source cannot supply would give an empty panel on switch. Keyed
+     off the data rather than off the model name, so the option follows whoever
+     ships the field. */
+  const hasCloud = Array.isArray(g.c);
   return {
     ...common, accumHours: g.accumHours ?? 1,
-    keys: ['u', 'v', 't', 'p'],
-    shading: ['t', 'spd', 'p', 'none'],
+    keys: hasCloud ? ['u', 'v', 't', 'p', 'c'] : ['u', 'v', 't', 'p'],
+    shading: hasCloud ? ['t', 'spd', 'p', 'c', 'none'] : ['t', 'spd', 'p', 'none'],
     contour: { key: 't', label: 'Isotherms', unit: '°C' },
-    data: { u: g.u, v: g.v, t: g.t, p: g.p },
+    data: hasCloud
+      ? { u: g.u, v: g.v, t: g.t, p: g.p, c: g.c }
+      : { u: g.u, v: g.v, t: g.t, p: g.p },
   };
 }
 
@@ -771,6 +779,15 @@ let NT = 0, SCALE = 10, INIT = null, SRC = null;
 /* Lifted verbatim from pipeline/charts.py. The same degree, the same metre per
    second and the same millimetre have to be the same colour in the PNG and
    here, or the two renderings of one field become two different claims. */
+/* Clear sky is blue and cloud is white, which is what the sky itself does and
+   what every satellite product a reader has seen already says. Deliberately not
+   the dashboard's gold/slate sky vocabulary: that scale sorts a night into three
+   named categories, this one is a continuous 0-100% and a ramp has to read as a
+   quantity rather than as three bands with gradients between them. */
+const CLOUD_COLORS = [
+  '#1b4f8a', '#3c74ab', '#6fa3cf', '#a8c6dd', '#cfdde7', '#e8eef2', '#ffffff',
+];
+
 const TEMP_COLORS = [
   '#4a0d68', '#6a1b9a', '#4527a0', '#283593', '#1565c0', '#1e88e5',
   '#4fc3f7', '#26c6da', '#26a69a', '#66bb6a', '#b2d84a', '#f2e14c',
@@ -1116,6 +1133,13 @@ function loadSource(domainKey, modelKey) {
       tick: [1, 2, 5, 10].find((s) => (T_RANGE[1] - T_RANGE[0]) / s <= 7) ?? 10,
       clip: T_CLIP,
     };
+    if (D.keys.includes('c')) {
+      LUTS.c = {
+        lut: buildLUT(CLOUD_COLORS),
+        range: [0, 100], title: 'Total cloud cover (%)',
+        tick: 20, unit: ' %',
+      };
+    }
     LUTS.p = {
       lut: buildLUT(PRECIP_COLORS),
       range: [PRECIP_LEVELS[0], PRECIP_LEVELS[PRECIP_LEVELS.length - 1]],
