@@ -37,6 +37,12 @@ title: "Forecast"
     --label-halo: rgba(255, 255, 255, .85);
     --sea: #dfe8ee;
     --land: #f2efe6;
+    /* Grey wash over land on the upper-air panel, and the graticule. Both sit
+       on top of shading, so they are set as alpha over whatever is beneath
+       rather than as opaque colours. */
+    --land-mask: rgba(146, 152, 160, .34);
+    --grat: rgba(20, 26, 31, .20);
+    --grat-ink: rgba(20, 26, 31, .62);
   }
 
   @media (prefers-color-scheme: dark) {
@@ -57,6 +63,9 @@ title: "Forecast"
       --label-halo: rgba(10, 14, 18, .8);
       --sea: #10161c;
       --land: #1e242b;
+      --land-mask: rgba(126, 134, 145, .26);
+      --grat: rgba(226, 232, 238, .18);
+      --grat-ink: rgba(226, 232, 238, .60);
     }
   }
 
@@ -68,6 +77,8 @@ title: "Forecast"
     --coast: rgba(8, 11, 14, .9); --border-line: rgba(8, 11, 14, .45);
     --label: #f2f5f8; --label-halo: rgba(10, 14, 18, .8);
     --sea: #10161c; --land: #1e242b;
+    --land-mask: rgba(126, 134, 145, .26);
+    --grat: rgba(226, 232, 238, .18); --grat-ink: rgba(226, 232, 238, .60);
   }
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="dark"] { color-scheme: dark; }
@@ -691,7 +702,11 @@ const MODELS = {
    itself out, and the fields arrive when the page is opened. */
 DOMAIN_META.europe = {
   label: 'Europe / North Atlantic',
-  extent: { west: -30, east: 45, south: 28, north: 72 },
+  // Bootstrap only — the payload carries the authoritative extent and replaces
+  // this once it loads. It still has to match pipeline/config.py, because the
+  // shell lays the panel out from this ratio before any data arrives and a
+  // wrong value here shows as the map resizing the moment it appears.
+  extent: { west: -60, east: 45, south: 28, north: 72 },
   lazy: true,
 };
 
@@ -729,6 +744,13 @@ function adoptSource(modelKey, g) {
       // 6 dam is the interval these charts are conventionally contoured on, and
       // the one the rendered version uses.
       contour: { key: 'gh', label: 'Height', unit: 'dam', step: 6, always: true },
+      // Grey wash over land, as on the Albany and Bentley charts this follows.
+      // The anomaly is a property of the atmosphere and is shaded over sea and
+      // land alike, so the continents need to be legible *through* it — the
+      // wash subdues them enough to read coastline against ocean without
+      // hiding the field. Only the upper-air panel: on the surface panels the
+      // land is where the temperature actually is.
+      landmask: true,
       scales: { gh: g.ghScale, sig: g.sigScale },
       data: { u: g.u, v: g.v, gh: g.gh, sig: g.sig },
     };
@@ -1247,14 +1269,27 @@ function fitStage() {
       w = h * ASPECT;
       if (w > column) { w = column; h = w / ASPECT; }
     }
+    /* Widen the map to the panel floor rather than letting the card outgrow it.
+       PANEL_MIN exists so the colour scale and readout below the map get two
+       rows instead of three, but enforcing it on the *card* while the map was
+       sized from the viewport height left the map floating in a wider card —
+       white bands down both sides, 37 px each on the Malta frame. Driving the
+       width from the floor and taking the height from the aspect fills the card
+       instead. The map ends up taller than the one-screen ideal on a short
+       window; a chart that runs past the fold reads better than one with blank
+       margins, and the timeline stays reachable because the growth is bounded. */
+    if (w < PANEL_MIN && PANEL_MIN <= column) {
+      w = PANEL_MIN;
+      h = Math.min(w / ASPECT, window.innerHeight * 0.82);
+      w = h * ASPECT < PANEL_MIN ? PANEL_MIN : h * ASPECT;
+    }
+
     stage.style.width = Math.floor(w) + 'px';
     stage.style.height = Math.floor(h) + 'px';
-    // The figure border adds 2 px the stage does not have. The panel is never
-    // narrower than PANEL_MIN, so the scale and readout below the map get a
-    // row or two instead of three, and never wider than the column.
-    // Floored as well as capped: a zero here would feed back through the
+    // The figure border adds 2 px the stage does not have. Never wider than the
+    // column. Floored as well as capped: a zero here would feed back through the
     // figure's max-width and collapse the column on the next pass.
-    const panel = Math.max(120, Math.min(column, Math.max(Math.floor(w) + 2, PANEL_MIN)));
+    const panel = Math.max(120, Math.min(column, Math.floor(w) + 2));
     document.querySelector('main').style.setProperty('--panelw', panel + 'px');
   }
   return [stage.clientWidth, stage.clientHeight];
@@ -1513,8 +1548,81 @@ function isothermPaths(step) {
 
 /* Cartography, drawn onto the map canvas immediately after the shading. It does
    not clear first — drawMap owns the clear, and these are always a pair. */
+function fillRings(ctx, rings, color) {
+  if (!rings || !rings.length) return;
+  ctx.beginPath();
+  for (const ring of rings) {
+    for (let i = 0; i < ring.length; i++) {
+      const x = lon2x(ring[i][0]), y = lat2y(ring[i][1]);
+      if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+  }
+  ctx.fillStyle = color;
+  // evenodd so a ring inside a ring reads as a hole rather than filling the
+  // lake back in — the Caspian and the Great Lakes are both in this dataset.
+  ctx.fill('evenodd');
+}
+
+/* Graticule spacing: whatever keeps the frame near eight lines across. Fixed
+   degrees cannot serve a 105-degree Atlantic frame and a 2-degree Malta one
+   from the same constant — one would be bare, the other graph paper. */
+function graticuleStep(span) {
+  return [0.25, 0.5, 1, 2, 5, 10, 15, 20, 30].find(s => span / s <= 8) || 30;
+}
+
+const fmtLon = (v) => (v === 0 ? '0°' : `${Math.abs(v)}°${v < 0 ? 'W' : 'E'}`);
+const fmtLat = (v) => (v === 0 ? '0°' : `${Math.abs(v)}°${v < 0 ? 'S' : 'N'}`);
+
+function drawGraticule(css) {
+  const dLon = graticuleStep(BOX.east - BOX.west);
+  const dLat = graticuleStep(BOX.north - BOX.south);
+  const line = css.getPropertyValue('--grat').trim();
+  const ink = css.getPropertyValue('--grat-ink').trim();
+  const halo = css.getPropertyValue('--label-halo').trim();
+
+  const lons = [], lats = [];
+  for (let v = Math.ceil(BOX.west / dLon) * dLon; v <= BOX.east; v += dLon) lons.push(v);
+  for (let v = Math.ceil(BOX.south / dLat) * dLat; v <= BOX.north; v += dLat) lats.push(v);
+
+  ctxG.save();
+  ctxG.strokeStyle = line;
+  ctxG.lineWidth = 0.7;
+  ctxG.setLineDash([3, 4]);
+  ctxG.beginPath();
+  for (const v of lons) { const x = lon2x(v); ctxG.moveTo(x, 0); ctxG.lineTo(x, H); }
+  for (const v of lats) { const y = lat2y(v); ctxG.moveTo(0, y); ctxG.lineTo(W, y); }
+  ctxG.stroke();
+  ctxG.setLineDash([]);
+
+  /* Labels ride inside the frame rather than in a margin, because the canvas is
+     the whole panel — there is no axis gutter to put them in. Haloed for the
+     same reason the city labels are: they sit over saturated shading. */
+  ctxG.font = '500 10px ui-sans-serif, system-ui, sans-serif';
+  ctxG.lineWidth = 2.5;
+  ctxG.strokeStyle = halo;
+  ctxG.fillStyle = ink;
+
+  ctxG.textAlign = 'center'; ctxG.textBaseline = 'top';
+  for (const v of lons) {
+    const x = lon2x(v);
+    if (x < 18 || x > W - 18) continue;
+    ctxG.strokeText(fmtLon(v), x, 5); ctxG.fillText(fmtLon(v), x, 5);
+  }
+  ctxG.textAlign = 'left'; ctxG.textBaseline = 'middle';
+  for (const v of lats) {
+    const y = lat2y(v);
+    if (y < 14 || y > H - 14) continue;
+    ctxG.strokeText(fmtLat(v), 5, y); ctxG.fillText(fmtLat(v), 5, y);
+  }
+  ctxG.restore();
+}
+
 function drawGeo() {
   const css = getComputedStyle(document.documentElement);
+
+  if (D.landmask) fillRings(ctxG, GEO.land, css.getPropertyValue('--land-mask').trim());
+  drawGraticule(css);
 
   /* Contours. On the surface panels these are isotherms, hidden when the
      shading is something a temperature line has nothing to do with. On the
