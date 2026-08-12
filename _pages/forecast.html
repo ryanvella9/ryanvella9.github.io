@@ -606,11 +606,17 @@ title: "Forecast"
         <span class="tb-count" id="sat-age"></span>
       </div>
       <div class="stage" id="sat-stage"><canvas id="sat-canvas"></canvas></div>
-      <div class="scale"><span class="cbar-title" id="sat-src"></span></div>
+      <!-- Same strip the map puts its colour scale in, so the two views have
+           the same silhouette. There is no scale to draw here — a photograph
+           has no palette — so the strip carries the attribution instead of
+           sitting empty. -->
+      <div class="infobar"><div class="cbar-title" id="sat-src"></div></div>
     </figure>
 
-    <input type="range" id="sat-scrub" min="0" max="0" value="0" step="1" />
-    <div class="ticks" id="sat-ticks"></div>
+    <div class="timeline">
+      <input type="range" id="sat-scrub" min="0" max="0" value="0" step="1" />
+      <div class="ticks" id="sat-ticks"></div>
+    </div>
     <p class="desc" id="sat-desc"></p>
   </section>
 
@@ -643,8 +649,14 @@ title: "Forecast"
         Mercator, unlike the Lambert used by the rendered PNGs — a conformal
         projection is what lets the streaklines be advected in screen space
         without distorting direction.<br />
+        <b>Satellite.</b> EUMETSAT Meteosat Third Generation FCI Level 1c
+        (CC BY 4.0), the Malta subset of the full disk at 20-minute cadence over
+        the last 24 hours. True colour from the visible channels while the sun
+        is up; after dark the 10.5 µm infrared window, inverted so cold cloud
+        tops are white in both. It is observation, not forecast: the loop ends
+        at the newest scan.<br />
         Keyboard: <kbd>←</kbd> <kbd>→</kbd> step, <kbd>space</kbd> play/pause,
-        <kbd>Home</kbd>/<kbd>End</kbd> jump.
+        <kbd>Home</kbd>/<kbd>End</kbd> jump — on whichever view is showing.
       </div>
     </details>
   </footer>
@@ -2457,6 +2469,15 @@ $('tg-iso').onclick = () => {
 addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key;
+  if (state.view === 'sat') {
+    if (k === ' ') { e.preventDefault(); satSetPlaying(!satState.playing); }
+    else if (k === 'ArrowRight') { satSetPlaying(false); satSetIndex(satState.i + 1); }
+    else if (k === 'ArrowLeft') { satSetPlaying(false); satSetIndex(satState.i - 1); }
+    else if (k === 'Home') { satSetPlaying(false); satSetIndex(0); }
+    else if (k === 'End') { satSetPlaying(false); satSetIndex(satMax()); }
+    return;
+  }
+  if (state.view === 'mgram') return;
   if (k === ' ') { e.preventDefault(); setPlaying(!state.playing); }
   else if (k === 'ArrowRight') { setPlaying(false); setTime(Math.round(state.tf) + 1); syncTime(); }
   else if (k === 'ArrowLeft') { setPlaying(false); setTime(Math.round(state.tf) - 1); syncTime(); }
@@ -3184,10 +3205,23 @@ function satResize() {
   if (!cv || section.hidden || section.clientWidth === 0) return;
   const ar = satAspect();
   const col = section.clientWidth;
-  const h = Math.max(240, Math.min(window.innerHeight - 260, col / ar));
-  const w = Math.min(col, h * ar);
+  let w, h;
+  if (isNarrow()) {
+    w = col;
+    h = Math.min(w / ar, window.innerHeight * 0.62);
+    w = h * ar > col ? col : h * ar;
+  } else {
+    h = Math.max(MIN_MAP_H, Math.min(window.innerHeight - 250, col / ar));
+    w = h * ar;
+    if (w > col) { w = col; h = w / ar; }
+    // Same floor as the map: below this the source line and the description
+    // wrap onto extra rows inside a card with empty column beside it.
+    if (w < PANEL_MIN && PANEL_MIN <= col) { w = PANEL_MIN; h = w / ar; }
+  }
   stage.style.width = Math.floor(w) + 'px';
   stage.style.height = Math.floor(h) + 'px';
+  document.querySelector('main').style
+    .setProperty('--panelw', Math.max(120, Math.min(col, Math.floor(w) + 2)) + 'px');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   cv.width = Math.round(w * dpr);
   cv.height = Math.round(h * dpr);
@@ -3214,7 +3248,13 @@ function satDraw() {
    resampled server-side into this exact Mercator box, which is what lets a
    plain drawImage put the coast on the coast. */
 function satCarto(c, w, h) {
-  if (!GEO || !SAT) return;
+  /* GEOALL.malta, not GEO. GEO is whichever domain the map last loaded, so a
+     reader who looked at the 500 hPa chart and came back got the Europe
+     coastline — generalised to continental scale and clipped to that box — drawn
+     over Malta: the islands became a four-sided blob. The frames are always the
+     Malta domain, so the geometry always is too. */
+  const geo = (typeof GEOALL !== 'undefined' && GEOALL.malta) || GEO;
+  if (!geo || !SAT) return;
   const ex = SAT.extent;
   const yTop = merc(ex.north), ySpan = merc(ex.north) - merc(ex.south);
   const X = (lon) => ((lon - ex.west) / (ex.east - ex.west)) * w;
@@ -3240,7 +3280,7 @@ function satCarto(c, w, h) {
   // Brighter than the map's coastline: it is drawn over a photograph rather
   // than over a smooth field, so a hairline disappears into the texture.
   c.beginPath();
-  for (const ring of (GEO.land || [])) {
+  for (const ring of (geo.land || [])) {
     ring.forEach(([lon, lat], i) =>
       (i ? c.lineTo(X(lon), Y(lat)) : c.moveTo(X(lon), Y(lat))));
   }
