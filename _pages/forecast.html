@@ -108,6 +108,10 @@ title: "Forecast"
     border-radius: 6px; padding: 7px 10px; margin-bottom: 8px;
   }
   .group { display: flex; align-items: center; gap: 6px; }
+  /* display:flex above wins over the hidden attribute's UA rule, so the
+     satellite panel's animation controls need this to disappear when a still
+     is selected rather than a loop. */
+  .group[hidden] { display: none; }
   .group label {
     font-size: 9.5px; text-transform: uppercase; letter-spacing: .09em;
     color: var(--faint); white-space: nowrap;
@@ -577,7 +581,18 @@ title: "Forecast"
        positioned the forecast silently repositioned the loop. -->
   <section id="view-sat" hidden>
     <div class="controls">
-      <div class="group">
+      <!-- Three sources, one geostationary and two polar. The loop is first
+           because it is the one that answers "what is happening now"; the two
+           Sentinels are stills at resolutions FCI cannot reach, and selecting
+           one hides the animation controls rather than leaving a scrubber that
+           addresses a single frame. -->
+      <div class="group" id="sat-source-group" hidden>
+        <label>Source</label>
+        <div class="btns" id="sat-sources">
+          <button data-source="mtg" aria-pressed="true">MTG loop</button>
+        </div>
+      </div>
+      <div class="group" id="sat-anim-group">
         <label>Animation</label>
         <div class="btns">
           <button id="sat-first" title="Oldest scan">|&lt;</button>
@@ -587,7 +602,7 @@ title: "Forecast"
           <button id="sat-last" title="Newest scan">&gt;|</button>
         </div>
       </div>
-      <div class="group">
+      <div class="group" id="sat-speed-group">
         <label>Speed</label>
         <div class="btns" id="sat-speeds">
           <button data-speed="1" aria-pressed="true">1x</button>
@@ -613,7 +628,7 @@ title: "Forecast"
       <div class="infobar"><div class="cbar-title" id="sat-src"></div></div>
     </figure>
 
-    <div class="timeline">
+    <div class="timeline" id="sat-timeline">
       <input type="range" id="sat-scrub" min="0" max="0" value="0" step="1" />
       <div class="ticks" id="sat-ticks"></div>
     </div>
@@ -649,6 +664,13 @@ title: "Forecast"
         Mercator, unlike the Lambert used by the rendered PNGs — a conformal
         projection is what lets the streaklines be advected in screen space
         without distorting direction.<br />
+        <b>Satellite.</b> EUMETSAT MTG FCI (CC BY 4.0) for the 24-hour loop,
+        20-minutely at about 1 km. The two stills are Copernicus Sentinel data
+        (ESA): Sentinel-3 OLCI at 300 m, roughly daily, on the same frame as
+        the maps, and Sentinel-2 MSI at 10 m every two to three days, zoomed to
+        the islands because at map width its detail would not survive. All
+        three are observations, not forecasts, and all are resampled into this
+        page's Mercator box server-side.<br />
         <b>Satellite.</b> EUMETSAT Meteosat Third Generation FCI Level 1c
         (CC BY 4.0), the Malta subset of the full disk at 20-minute cadence over
         the last 24 hours. True colour from the visible channels while the sun
@@ -665,6 +687,7 @@ title: "Forecast"
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_geo.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_data.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_malta.js"></script>
+<script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sentinel_malta.js"></script>
 <script>
 /* ---------------------------------------------------------------------------
    Interactive forecast panels.
@@ -2409,7 +2432,14 @@ function syncMeta() {
       `${MG.data.model} · init ${fmtUTC.format(new Date(MG.data.init))} UTC`;
     return;
   }
-  if (state.view === 'sat' && SAT) {
+  if (state.view === 'sat' && (SAT || SENTINEL)) {
+    const still = satStill();
+    if (still) {
+      $('cycles').textContent =
+        `${still.label} · single pass, ${still.res}`;
+      $('attrib').textContent = `${SENTINEL.credit} · © Ryan Vella`;
+      return;
+    }
     $('cycles').textContent = `${SAT.model} · observed, last ${SAT.frames.length} scans`;
     $('attrib').textContent = `${SAT.credit} · © Ryan Vella`;
     return;
@@ -2470,6 +2500,11 @@ addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key;
   if (state.view === 'sat') {
+    // A still has one frame, so stepping and playing mean nothing on it. The
+    // keys are ignored rather than remapped to switching source: arrows that
+    // step through time on one source and swap instrument on another would be
+    // the same gesture doing two unrelated things.
+    if (satIsStill()) return;
     if (k === ' ') { e.preventDefault(); satSetPlaying(!satState.playing); }
     else if (k === 'ArrowRight') { satSetPlaying(false); satSetIndex(satState.i + 1); }
     else if (k === 'ArrowLeft') { satSetPlaying(false); satSetIndex(satState.i - 1); }
@@ -3164,17 +3199,39 @@ $('mg-wrap').addEventListener('pointerleave', () => {
    collision removed. */
 const SAT = window.SAT_MALTA || null;
 const SAT_CACHE = new Map();
-const satState = { i: 0, playing: false, speed: 1, timer: null };
+const satState = { i: 0, playing: false, speed: 1, timer: null, source: 'mtg' };
+
+/* The two polar-orbiter stills, if the fetcher has published any. They share
+   this view rather than getting one of their own because they answer the same
+   question the loop does — what is over Malta — at a different resolution and
+   cadence. What they do not share is a timeline: a still has one frame, so
+   selecting one hides the animation controls instead of leaving a scrubber
+   that addresses nothing. */
+const SENTINEL = window.SENTINEL_MALTA || null;
+const satStills = () => (SENTINEL && SENTINEL.images) || [];
+const satStill = () => satStills().find((s) => s.key === satState.source) || null;
+const satIsStill = () => satState.source !== 'mtg';
 
 const satMax = () => (SAT && SAT.frames.length ? SAT.frames.length - 1 : 0);
 const satFrame = () => (SAT && SAT.frames.length ? SAT.frames[satState.i] : null);
+
+/* Each source carries its own extent, so this cannot come from one manifest.
+   Sentinel-2 is framed on the islands rather than on the forecast domain — at
+   domain width its 10 m pixels would render at 224 m and look like the
+   Sentinel-3 frame beside it — and the coastline overlay has to follow that
+   or it would draw Malta's coast across open sea. */
+function satExtent() {
+  const still = satStill();
+  if (still) return still.extent;
+  return SAT ? SAT.extent : null;
+}
 
 /* Its own aspect, from the manifest rather than from ASPECT: that one follows
    whichever domain the map is showing, so a reader who had Europe open would
    get the Malta frames letterboxed into a continental box. */
 function satAspect() {
-  if (!SAT) return 940 / 760;
-  const ex = SAT.extent;
+  const ex = satExtent();
+  if (!ex) return 940 / 760;
   return ((ex.east - ex.west) * Math.PI / 180) / (merc(ex.north) - merc(ex.south));
 }
 
@@ -3230,23 +3287,23 @@ function satResize() {
 }
 
 function satDraw() {
-  const cv = $('sat-canvas'), f = satFrame();
+  const cv = $('sat-canvas'), f = satIsStill() ? satStill() : satFrame();
   if (!cv || !f) return;
   const c = cv.getContext('2d');
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   const w = cv.width / dpr, h = cv.height / dpr;
   c.clearRect(0, 0, w, h);
   const im = satImage(f);
-  satPreload();
+  if (!satIsStill()) satPreload();
   // A frame still loading leaves the canvas blank rather than stretching the
   // previous one: a wrong picture with a right timestamp is worse than a gap.
   if (im.complete && im.naturalWidth) c.drawImage(im, 0, 0, w, h);
   satCarto(c, w, h);
 }
 
-/* Coastline and graticule over the image, so it can be located. The frames are
-   resampled server-side into this exact Mercator box, which is what lets a
-   plain drawImage put the coast on the coast. */
+/* Graticule over every source, coastline over the loop only — see below. The
+   frames are resampled server-side into this exact Mercator box, which is what
+   lets a plain drawImage put the coast on the coast. */
 function satCarto(c, w, h) {
   /* GEOALL.malta, not GEO. GEO is whichever domain the map last loaded, so a
      reader who looked at the 500 hPa chart and came back got the Europe
@@ -3254,8 +3311,8 @@ function satCarto(c, w, h) {
      over Malta: the islands became a four-sided blob. The frames are always the
      Malta domain, so the geometry always is too. */
   const geo = (typeof GEOALL !== 'undefined' && GEOALL.malta) || GEO;
-  if (!geo || !SAT) return;
-  const ex = SAT.extent;
+  const ex = satExtent();
+  if (!geo || !ex) return;
   const yTop = merc(ex.north), ySpan = merc(ex.north) - merc(ex.south);
   const X = (lon) => ((lon - ex.west) / (ex.east - ex.west)) * w;
   const Y = (lat) => ((yTop - merc(lat)) / ySpan) * h;
@@ -3277,6 +3334,16 @@ function satCarto(c, w, h) {
   c.setLineDash([]);
   c.restore();
 
+  /* The loop needs a drawn coastline and the stills do not. At FCI's ~1 km,
+     through haze and under cloud, the islands are a smudge a few pixels across
+     and the outline is the only thing that says where they are. Sentinel draws
+     its own coast far better than GSHHG can: at 300 m and especially at 10 m
+     the shoreline is right there in the photograph, and a generalised vector
+     laid over it cannot follow the real one — it sits a pixel or two off,
+     hides the harbours it is meant to locate, and turns the sharpest thing in
+     the frame into something that looks stickered on. */
+  if (satIsStill()) return;
+
   // Brighter than the map's coastline: it is drawn over a photograph rather
   // than over a smooth field, so a hairline disappears into the texture.
   c.beginPath();
@@ -3296,22 +3363,67 @@ function satSetIndex(i) {
   satDraw();
 }
 
+/* Minutes for the loop, days for a still. The loop's newest frame is always
+   under an hour old, so minutes are the useful unit; a Sentinel-2 pass can be
+   four days back, and "96.0 h ago" is a number a reader has to convert. */
+function satAge(ms) {
+  const mins = Math.round(ms / 60000);
+  if (mins < 90) return mins + ' min ago';
+  if (mins < 48 * 60) return (mins / 60).toFixed(1) + ' h ago';
+  const days = mins / 1440;
+  return days < 1.5 ? 'yesterday' : Math.round(days) + ' days ago';
+}
+
 function satSync() {
-  const f = satFrame();
+  const f = satIsStill() ? satStill() : satFrame();
   if (!f) return;
   const d = new Date(Date.parse(f.t));
   $('sat-time').textContent = fmtLocal.format(d);
   $('sat-day').textContent = fmtDay.format(d);
-  $('sat-kind').textContent = f.kind === 'ir' ? 'Infrared 10.5 µm' : 'True colour';
-  const mins = Math.round((Date.now() - d.getTime()) / 60000);
-  $('sat-age').textContent = mins < 90
-    ? mins + ' min ago' : (mins / 60).toFixed(1) + ' h ago';
+  if (satIsStill()) {
+    // Resolution rather than waveband: both stills are true colour, so what
+    // distinguishes them — and the reason both are offered — is the pixel size.
+    $('sat-kind').textContent = 'True colour · ' + f.res +
+      (f.cloud === undefined ? '' : ' · ' + Math.round(f.cloud) + '% cloud');
+  } else {
+    $('sat-kind').textContent = f.kind === 'ir' ? 'Infrared 10.5 µm' : 'True colour';
+  }
+  $('sat-age').textContent = satAge(Date.now() - d.getTime());
   const sc = $('sat-scrub');
   sc.max = String(satMax());
   // Not while it is being dragged: writing the value back mid-gesture fights
   // the thumb on a touchscreen.
   if (document.activeElement !== sc) sc.value = String(satState.i);
   satHash();
+}
+
+/* Switching source is switching instrument, not switching frame: the extent,
+   the aspect and the presence of a timeline all change with it, so this
+   re-lays-out the panel rather than just repainting the canvas. */
+function satSetSource(key) {
+  const ok = key === 'mtg' ? !!(SAT && SAT.frames.length)
+                           : satStills().some((s) => s.key === key);
+  if (!ok) key = (SAT && SAT.frames.length) ? 'mtg' : (satStills()[0] || {}).key;
+  if (!key) return;
+  satState.source = key;
+  satSetPlaying(false);
+  for (const b of $('sat-sources').children) {
+    b.setAttribute('aria-pressed', String(b.dataset.source === key));
+  }
+  const still = satIsStill();
+  $('sat-anim-group').hidden = still;
+  $('sat-speed-group').hidden = still;
+  $('sat-timeline').hidden = still;
+  const f = satStill();
+  $('sat-src').textContent = still
+    ? f.label + ' · ' + SENTINEL.credit + ' · © Ryan Vella'
+    : SAT.model + ' · ' + SAT.credit + ' · every ' + SAT.cadenceMin + ' min · © Ryan Vella';
+  $('sat-desc').textContent = still ? f.note : SAT_DESC;
+  // The loop's ticks are built from its own frame list, so they survive a
+  // detour through a still; nothing to rebuild here.
+  syncMeta();
+  satResize();          // aspect differs between sources; this redraws too
+  satSync();
 }
 
 function satTicks() {
@@ -3347,31 +3459,73 @@ function satSetPlaying(on) {
   }
 }
 
-/* The scan's own time, not a forecast hour: #satellite/20260812T1040. */
+/* The scan's own time, not a forecast hour: #satellite/20260812T1040.
+   A still is addressed by mission instead — #satellite/s2 — because it has no
+   frame to choose and the picture behind that link changes every few days
+   anyway: what the reader is linking to is "the latest Sentinel-2", not a
+   particular pass. */
 function satHash() {
-  const f = satFrame();
-  if (!f || state.view !== 'sat') return;
-  const hash = '#satellite/' + f.t.slice(0, 16).replace(/[-:]/g, '');
+  if (state.view !== 'sat') return;
+  let hash;
+  if (satIsStill()) {
+    hash = '#satellite/' + satState.source;
+  } else {
+    const f = satFrame();
+    if (!f) return;
+    hash = '#satellite/' + f.t.slice(0, 16).replace(/[-:]/g, '');
+  }
   if (location.hash !== hash) {
     try { history.replaceState(null, '', hash); } catch (e) { /* file:// */ }
   }
 }
 
+const SAT_DESC =
+  'MTG FCI over Malta, the last 24 hours. True colour while the sun is up, ' +
+  '10.5 µm infrared after dark — inverted so cloud is white in both. ' +
+  'Observation only: this loop ends at the newest scan and has no forecast.';
+
 function satInit() {
-  if (!SAT || !SAT.frames.length) {
-    // No loop published — hide the tab rather than offer an empty view.
+  const hasLoop = !!(SAT && SAT.frames.length);
+  const stills = satStills();
+  if (!hasLoop && !stills.length) {
+    // Nothing published at all — hide the tab rather than offer an empty view.
     const b = [...$('tabs').children].find((x) => x.dataset.view === 'sat');
     if (b) b.hidden = true;
     return;
   }
-  satState.i = satMax();          // newest scan, not the far end of yesterday
-  satTicks();
-  $('sat-src').textContent =
-    SAT.model + ' · ' + SAT.credit + ' · every ' + SAT.cadenceMin + ' min · © Ryan Vella';
-  $('sat-desc').textContent =
-    'MTG FCI over Malta, the last 24 hours. True colour while the sun is up, ' +
-    '10.5 µm infrared after dark — inverted so cloud is white in both. ' +
-    'Observation only: this loop ends at the newest scan and has no forecast.';
+  if (hasLoop) {
+    satState.i = satMax();        // newest scan, not the far end of yesterday
+    satTicks();
+    $('sat-src').textContent =
+      SAT.model + ' · ' + SAT.credit + ' · every ' + SAT.cadenceMin + ' min · © Ryan Vella';
+    $('sat-desc').textContent = SAT_DESC;
+  } else {
+    // The loop is the panel's usual subject, but it is fetched on a different
+    // schedule from a different agency, and it should be able to fail without
+    // taking two working pictures down with it.
+    [...$('sat-sources').children].find((b) => b.dataset.source === 'mtg').hidden = true;
+    satState.source = stills[0].key;
+  }
+
+  /* The toggle appears only when there is something to toggle between. A
+     fetcher that has never run, or a fortnight where no pass cleared the cloud
+     and coverage checks, leaves the panel exactly as it was rather than
+     offering a button that selects a missing image. */
+  const box = $('sat-sources');
+  for (const s of stills) {
+    const b = document.createElement('button');
+    b.dataset.source = s.key;
+    b.textContent = s.label.replace(' OLCI', '').replace(' MSI', '');
+    b.title = s.label + ' · ' + s.res;
+    b.setAttribute('aria-pressed', 'false');
+    box.appendChild(b);
+  }
+  if (stills.length + (hasLoop ? 1 : 0) > 1) $('sat-source-group').hidden = false;
+  box.onclick = (e) => {
+    const b = e.target.closest('button');
+    if (b) satSetSource(b.dataset.source);
+  };
+  satSetSource(satState.source);   // lays out the controls for whichever it is
 
   $('sat-first').onclick = () => { satSetPlaying(false); satSetIndex(0); };
   $('sat-last').onclick = () => { satSetPlaying(false); satSetIndex(satMax()); };
@@ -3495,6 +3649,14 @@ function seekToHour(hours) {
    each one would otherwise become a history entry, turning the back button into
    a frame-by-frame rewind of wherever the reader had dragged. */
 function syncHash() {
+  /* The satellite view addresses itself: its clock is the scan's, not the
+     model's, and satHash is the only thing that knows whether a loop frame or
+     a still is showing. Without this the boot sequence — applyHash, then
+     syncTime, which ends in syncHash — overwrote a #satellite link with the
+     map's own hash a moment after honouring it, so the view was right but the
+     address bar said #t2m/malta and anyone copying the URL sent a temperature
+     chart to whoever they meant to send a satellite picture. */
+  if (state.view === 'sat') { satHash(); return; }
   let hash;
   if (state.view === 'mgram') {
     // The meteogram shows the whole run at once, so it has no frame to address.
@@ -3525,7 +3687,16 @@ function applyHash() {
      carry both; they mean nothing here, so the view just opens on its newest
      scan rather than refusing the link. */
   if (/^#satellite(\/|$)/.test(BOOT_HASH)) {
-    if (SAT && SAT.frames.length) { showView('sat'); return; }
+    if ((SAT && SAT.frames.length) || satStills().length) {
+      // #satellite/s2 and /s3 select a still; anything else (including the
+      // timestamp form and the old shading-layer links) opens the loop.
+      const want = /^#satellite\/(s2|s3)$/.exec(BOOT_HASH);
+      // showView first: satSetSource re-lays-out the panel, and satResize is a
+      // no-op while the section is still hidden and has no width.
+      showView('sat');
+      if (want && satStills().some((s) => s.key === want[1])) satSetSource(want[1]);
+      return;
+    }
     showView('map'); toDefaultModel(); return;
   }
 
