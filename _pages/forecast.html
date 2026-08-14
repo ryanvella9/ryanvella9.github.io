@@ -753,10 +753,12 @@ const SLUG_TO_FIELD = Object.fromEntries(
 
 const MODELS = {
   icon_eu: {
-    // Mediterranean only. ICON-EU resolves Malta as about three grid cells,
-    // where ICON-2I at 2 km gives the islands a coastline — offering both on
-    // the same frame invited a comparison in which one side could not compete.
-    label: 'ICON-EU', domains: ['medit'],
+    // Offered on Malta as well as the Mediterranean. ICON-2I is the better
+    // answer there and stays the default, but a second model on the same frame
+    // is worth having for its own sake: where the two disagree is a reading of
+    // how settled the forecast is, and ICON-EU reaches +120 h where ICON-2I
+    // stops at +72.
+    label: 'ICON-EU', domains: ['medit', 'malta'],
   },
   icon_2i: {
     label: 'ICON-2I', domains: ['malta'],
