@@ -424,6 +424,7 @@ title: "Forecast"
       <label>Overlay</label>
       <div class="btns">
         <button id="tg-wind" aria-pressed="true">Wind flow</button>
+        <button id="tg-cloud" aria-pressed="false">Clouds</button>
         <button id="tg-iso" aria-pressed="false">Isotherms</button>
         <button id="tg-places" aria-pressed="false">Places</button>
       </div>
@@ -795,6 +796,12 @@ DOMAIN_META.europe = {
 const srcKey = (dom, mod) => dom + '|' + mod;
 const SOURCES = {};
 for (const [k, d] of Object.entries(PANEL.domains)) {
+  /* Cloud is offered wherever the payload actually carries it, exactly as the
+     lazily-loaded sources decide it. Hard-coding the field list here is what
+     made a cycle that had started shipping CLCT still show no cloud on the
+     ICON-EU panels: the data was in the file and the viewer had been told, in
+     four places, that it was not. */
+  const hasCloud = Array.isArray(d.c);
   SOURCES[srcKey(k, 'icon_eu')] = {
     model: PANEL.model, credit: 'DWD', init: PANEL.init, steps: PANEL.steps,
     scale: PANEL.scale, accumHours: 3,
@@ -802,10 +809,12 @@ for (const [k, d] of Object.entries(PANEL.domains)) {
     // Which shading options this source can offer, and what the contour overlay
     // draws. A source declares these rather than the viewer assuming them,
     // which is what lets an upper-air source share the same engine.
-    keys: ['u', 'v', 't', 'p'],
-    shading: ['t', 'spd', 'p', 'none'],
+    keys: hasCloud ? ['u', 'v', 't', 'p', 'c'] : ['u', 'v', 't', 'p'],
+    shading: hasCloud ? ['t', 'spd', 'p', 'c', 'none'] : ['t', 'spd', 'p', 'none'],
     contour: { key: 't', label: 'Isotherms', unit: '°C' },
-    data: { u: d.u, v: d.v, t: d.t, p: d.p },
+    data: hasCloud
+      ? { u: d.u, v: d.v, t: d.t, p: d.p, c: d.c }
+      : { u: d.u, v: d.v, t: d.t, p: d.p },
   };
 }
 
@@ -884,15 +893,25 @@ const WIND_COLORS = [
   '#f6d84e', '#f6a942', '#ee6f3c', '#d8404c', '#b02878', '#8c2090',
 ];
 
-const PRECIP_COLORS = [
-  '#d8f0ff', '#a8d8f8', '#78b8f0', '#5a8fe0', '#4060d0', '#6a3fd0',
-  '#9028c0', '#b81ea0', '#d81e80', '#f03c90',
-];
 /* Rainfall is read on a roughly logarithmic ladder — the difference between 0.5
    and 2 mm matters as much as the one between 50 and 100 — so the scale is a
-   ladder of levels rather than a linear range. charts.py's PRECIP_LEVELS,
-   unchanged, so a colour means the same depth on both renderings. */
-const PRECIP_LEVELS = [0.2, 0.5, 1, 2, 5, 10, 20, 35, 50, 75, 100];
+   ladder of levels rather than a linear range.
+
+   Retuned for what actually falls here rather than for the old PNG's scale.
+   That one topped out at 100 mm and spent half its range above 20, which over
+   the central Mediterranean meant almost every shower rendered in the bottom
+   two or three colours; this one ends at 30 and puts eight of its twelve steps
+   below 10 mm, where the rain is. Below 0.25 mm nothing is drawn: that is drizzle
+   the model cannot be held to, and shading it would grey out whole domains.
+
+   Cyan through blue to green, yellow, orange and red — the convention every
+   radar and forecast product a reader has already seen uses, so the ladder needs
+   no learning. */
+const PRECIP_LEVELS = [0.25, 0.5, 1, 1.5, 2, 3, 5, 7, 10, 15, 20, 25, 30];
+const PRECIP_COLORS = [
+  '#dff3fb', '#b3e5f6', '#8ad6f1', '#59bfe9', '#39a1df', '#2e79ce',
+  '#33a869', '#88c93f', '#f0dc2c', '#f6a52a', '#ee6e2b', '#d5242b',
+];
 
 /* The 500 hPa anomaly, also from charts.py. Diverging about zero with white at
    the middle, and unevenly spaced — the levels tighten between 1 and 3 sigma,
@@ -914,6 +933,25 @@ function hexToRgb(h) {
    ~80k pixels and repaints on every scrub tick, so the ramp is resolved once
    and then it is an array index. `start`/`end` take a slice of the ramp, which
    is how the temperature anchoring below is applied. */
+/* A flat colour per band rather than a gradient through them.
+
+   Rainfall is read off a legend, not off a continuum: "is that 5 mm or 15" is
+   the question, and a smooth ramp makes every value an interpolation the reader
+   has to estimate. Discrete steps put a visible edge at each level, which is
+   what turns a blob into a contoured shower — and it is what every radar
+   product does, so the shape reads as depth without being learned. */
+function buildStepLUT(colors, n = 256) {
+  const stops = colors.map(hexToRgb);
+  const lut = new Uint8ClampedArray(n * 3);
+  for (let i = 0; i < n; i++) {
+    // The ladder maps a value to (band + fraction) / bands, so flooring the
+    // position by the band count lands exactly on the level boundaries.
+    const b = Math.min(stops.length - 1, Math.floor((i / n) * stops.length));
+    lut[i * 3] = stops[b][0]; lut[i * 3 + 1] = stops[b][1]; lut[i * 3 + 2] = stops[b][2];
+  }
+  return lut;
+}
+
 function buildLUT(colors, start = 0, end = 1, n = 256) {
   const stops = colors.map(hexToRgb);
   const lut = new Uint8ClampedArray(n * 3);
@@ -1020,7 +1058,7 @@ const state = {
   field: 't',
   // Place labels off by default: they are an aid for finding your bearings the
   // first time, and clutter over the field every time after that.
-  wind: true, iso: false, isoUser: false, places: false,
+  wind: true, clouds: false, iso: false, isoUser: false, places: false,
   playing: false, speed: 1,
   hover: null,
 };
@@ -1225,7 +1263,7 @@ function loadSource(domainKey, modelKey) {
       };
     }
     LUTS.p = {
-      lut: buildLUT(PRECIP_COLORS),
+      lut: buildStepLUT(PRECIP_COLORS),
       range: [PRECIP_LEVELS[0], PRECIP_LEVELS[PRECIP_LEVELS.length - 1]],
       title: `Precipitation (mm / ${SRC.accumHours} h)`,
       levels: PRECIP_LEVELS, ladder: true, base: true, unit: ' mm',
@@ -1508,6 +1546,48 @@ function drawRaster() {
   // smooth-by-construction input reconstructs detail that was never there.
   ctxG.imageSmoothingQuality = 'low';
   ctxG.drawImage(off, 0, 0, W, H);
+}
+
+/* Cloud cover as a translucent white sheet, so it can be read together with
+   whatever the shading is showing rather than instead of it.
+
+   Alpha rises faster than cover so that broken cloud still reads as broken:
+   a linear ramp makes 50% cover a uniform grey haze that hides the map without
+   saying much, where the square puts most of the opacity in the last third,
+   which is where overcast actually is. Nothing is drawn below a tenth cover —
+   a 5% field is clear sky with a wisp in it, not a veil. */
+let cloudCv = null, cloudCtx = null, cloudImg = null;
+
+function drawClouds() {
+  if (!state.clouds || !CUR.c) return;
+
+  const ow = off.width, oh = off.height;
+  if (!cloudCv || cloudCv.width !== ow || cloudCv.height !== oh) {
+    cloudCv = document.createElement('canvas');
+    cloudCv.width = ow; cloudCv.height = oh;
+    cloudCtx = cloudCv.getContext('2d');
+    cloudImg = cloudCtx.createImageData(ow, oh);
+  }
+  const px = cloudImg.data;
+
+  const cols = new Float32Array(ow);
+  for (let i = 0; i < ow; i++) cols[i] = lon2col(x2lon(((i + 0.5) / ow) * W));
+
+  for (let j = 0; j < oh; j++) {
+    const row = lat2row(y2lat(((j + 0.5) / oh) * H));
+    for (let i = 0; i < ow; i++) {
+      const o = (j * ow + i) * 4;
+      const c = sampleAt(CUR.c, cols[i], row);
+      if (Number.isNaN(c) || c < 10) { px[o + 3] = 0; continue; }
+      const f = Math.min(1, c / 100);
+      px[o] = 255; px[o + 1] = 255; px[o + 2] = 255;
+      px[o + 3] = Math.round(238 * f * f);
+    }
+  }
+  cloudCtx.putImageData(cloudImg, 0, 0);
+  ctxG.imageSmoothingEnabled = true;
+  ctxG.imageSmoothingQuality = 'low';
+  ctxG.drawImage(cloudCv, 0, 0, W, H);
 }
 
 /* ------------------------------------------------------------ cartography --- */
@@ -1926,7 +2006,19 @@ function drawMap() {
   ctxG.clearRect(0, 0, W, H);
   const spec = LUTS[state.field];
   if (!spec || spec.base) drawBase(css);
+
+  /* Cloud goes under a shading that leaves gaps and over one that does not.
+
+     Precipitation covers a few percent of a domain, so the cloud it fell out of
+     belongs underneath: rain reads on top of the sheet that produced it, which
+     is the picture every forecast product draws. Temperature and wind speed
+     cover every pixel, so cloud under them would simply be invisible, and goes
+     on top as a veil instead. */
+  const cloudUnder = !spec || spec.base;
+  if (cloudUnder) drawClouds();
   drawRaster();
+  if (!cloudUnder) drawClouds();
+
   drawGeo();
 }
 
@@ -2121,9 +2213,11 @@ function drawColorbar() {
 
   const ticks = $('cbar-ticks');
   ticks.innerHTML = '';
-  // A rung on the ladder is labelled only if there is room; eleven labels on a
-  // 300 px bar is a grey smear, not a scale.
-  const values = spec.ladder ? (spec.base ? [0.2, 1, 5, 20, 50, 100]
+  // A rung on the ladder is labelled only if there is room; thirteen labels on
+  // a 300 px bar is a grey smear, not a scale. These are spaced by *position*
+  // on the ladder rather than by value, because the ladder is logarithmic and
+  // evenly-spaced values bunch every label into the right-hand third.
+  const values = spec.ladder ? (spec.base ? [0.25, 1, 2, 5, 10, 20, 30]
                                           : [-6, -3, -2, -1, 0, 1, 2, 3, 6]) : (() => {
     const out = [];
     for (let v = spec.range[0]; v <= spec.range[1] + 1e-9; v += spec.tick) out.push(v);
@@ -2390,6 +2484,16 @@ function buildFieldButtons() {
     b.setAttribute('aria-pressed', String(key === state.field));
     box.appendChild(b);
   }
+  const cloudBtn = $('tg-cloud');
+  const hasCloud = D.keys.includes('c');
+  cloudBtn.disabled = !hasCloud;
+  cloudBtn.title = hasCloud ? 'Total cloud cover as a translucent sheet'
+    : 'This model does not carry a cloud field on this domain';
+  if (!hasCloud) {
+    state.clouds = false;
+    cloudBtn.setAttribute('aria-pressed', 'false');
+  }
+
   const iso = $('tg-iso');
   iso.textContent = D.contour.label;
   iso.title = `Contours of ${D.contour.label.toLowerCase()} (${D.contour.unit})`;
@@ -2487,6 +2591,7 @@ const toggle = (id, key) => {
   };
 };
 toggle('tg-wind', 'wind');
+toggle('tg-cloud', 'clouds');
 toggle('tg-places', 'places');
 
 // Contours are the one toggle whose default depends on the source, so the
