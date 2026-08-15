@@ -659,9 +659,17 @@ title: "Forecast"
         <b>Data.</b> DWD ICON-EU 0.0625°, native over Malta and subsampled to
         0.25° over the Central Mediterranean; ItaliaMeteo-Arpae ICON-2I
         0.025 × 0.02° (CC BY 4.0), hourly to +72 h, Malta only — its domain
-        stops at 33.7 °N. Coastlines are GSHHG full resolution, the same source
+        stops at 33.7 °N; ECMWF IFS 0.25° open data (CC BY 4.0), 6-hourly to
+        +144 h, on every frame — the 500 hPa chart over Europe and the surface
+        fields over the other two. IFS is offered there as a second opinion
+        rather than a better one: at 0.25° it is the coarsest of the three, and
+        over Malta it is a dozen grid points, but it is run independently of
+        ICON, so where the two disagree is a reading of how settled the
+        forecast is. Coastlines are GSHHG full resolution, the same source
         the rendered Malta charts use. Precipitation is the total over each step
-        interval, differenced from the model's accumulation.
+        interval, differenced from the model's accumulation — six hours on IFS
+        against three on ICON-EU and one on ICON-2I, which is why the same
+        shower shades deeper on the coarser model.
         Mercator, unlike the Lambert used by the rendered PNGs — a conformal
         projection is what lets the streaklines be advected in screen space
         without distorting direction.<br />
@@ -727,9 +735,10 @@ const DATA_BASE = 'https://ryanvella9.github.io/malta-forecast-charts';
 
 /* A "source" is one model over one domain. Everything that differs between them
    — grid, time axis, initialisation, accumulation interval — hangs off here
-   rather than off the page, because the two models agree on none of it:
+   rather than off the page, because the three models agree on none of it:
    ICON-EU is 3-hourly to +120 on a 0.0625 deg grid, ICON-2I is hourly to +72 on
-   0.02 deg, and they initialise at different hours. */
+   0.02 deg, IFS is 6-hourly to +144 on 0.25 deg, and they initialise at
+   different hours. */
 const DOMAIN_META = {};
 for (const [k, d] of Object.entries(PANEL.domains)) {
   DOMAIN_META[k] = { label: d.label, extent: d.extent };
@@ -773,11 +782,33 @@ const MODELS = {
     why: 'ICON-2I covers Italy and the central Mediterranean only — its domain stops at 33.7°N, well inside the Central Mediterranean frame',
   },
   ifs: {
-    label: 'IFS', domains: ['europe'],
-    file: 'upper_europe.js', global: 'UPPER',
-    geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
+    // Offered on every frame, which is what makes a second opinion available
+    // everywhere rather than on the upper-air panel alone. At 0.25° it resolves
+    // less than either ICON does — over Malta it is barely a dozen grid points,
+    // and the panel says so in its resolution note — so it is never a domain's
+    // default. Its value is disagreement: where a global model run in Reading
+    // and one run in Offenbach part company is a reading of how settled the
+    // forecast is that neither can give alone.
+    label: 'IFS', domains: ['europe', 'medit', 'malta'],
+    /* Two payloads, because IFS is asked two different questions here: the
+       500 hPa frame over Europe and the surface fields over the Mediterranean
+       ones. A domain names the file it needs; a model without `parts` names one
+       file for all of them, which is every other model. */
+    parts: {
+      europe: {
+        file: 'upper_europe.js', global: 'UPPER',
+        geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
+      },
+      medit: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
+      malta: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
+    },
   },
 };
+
+/* Which payload a model uses on a given domain. The file is a property of the
+   pair rather than of the model, because IFS serves two of them. */
+const modelPart = (domainKey, modelKey) =>
+  (MODELS[modelKey].parts && MODELS[modelKey].parts[domainKey]) || MODELS[modelKey];
 
 /* The upper-air frame is a domain like any other, so the 500 hPa page is the
    same engine with a different source rather than a second map viewer. It is
@@ -818,16 +849,24 @@ for (const [k, d] of Object.entries(PANEL.domains)) {
   };
 }
 
-/* Normalise a lazily-loaded payload into the same shape. ICON-2I is a surface
-   source like ICON-EU; IFS is the upper-air one, whose shading is the
-   standardised anomaly and whose contours are the height field itself. */
-function adoptSource(modelKey, g) {
+/* Normalise a lazily-loaded payload into the same shape.
+
+   A payload either carries a single frame at its top level, as ICON-2I's does,
+   or a map of them under `domains`, as ICON-EU's and the IFS surface build's do
+   — one download that serves both Mediterranean frames. Resolving that here is
+   what lets one file back several sources. */
+function adoptSource(modelKey, g, domainKey) {
+  const d = g.domains ? g.domains[domainKey] : g;
   const common = {
     model: g.model, credit: g.credit, init: g.init, steps: g.steps,
-    scale: g.scale, nx: g.nx, ny: g.ny, dx: g.dx, dy: g.dy,
-    lon0: g.lon0, lat0: g.lat0,
+    scale: g.scale, nx: d.nx, ny: d.ny, dx: d.dx, dy: d.dy,
+    lon0: d.lon0, lat0: d.lat0,
   };
-  if (modelKey === 'ifs') {
+  /* Upper-air or surface is read off what the payload holds, not off which
+     model shipped it. IFS is now both, and the model-name test this replaced
+     would have adopted its 2 m temperature as a geopotential height chart —
+     shading a sigma ladder over degrees Celsius, with no error anywhere. */
+  if (Array.isArray(d.gh)) {
     return {
       ...common, accumHours: null,
       keys: ['u', 'v', 'gh', 'sig'],
@@ -843,25 +882,23 @@ function adoptSource(modelKey, g) {
       // land is where the temperature actually is.
       landmask: true,
       scales: { gh: g.ghScale, sig: g.sigScale },
-      data: { u: g.u, v: g.v, gh: g.gh, sig: g.sig },
+      data: { u: d.u, v: d.v, gh: d.gh, sig: d.sig },
     };
   }
-  /* Cloud is ICON-2I's alone: ICON-EU's payload has no CLCT, and offering a
-     shading a source cannot supply would give an empty panel on switch. Keyed
-     off the data rather than off the model name, so the option follows whoever
-     ships the field. */
-  const hasCloud = Array.isArray(g.c);
+  /* Offering a shading a source cannot supply would give an empty panel on
+     switch, so the option follows the data: whoever ships a cloud field gets
+     the cloud button. That is keyed off the array rather than off the model
+     name because it has already changed hands twice — cloud was ICON-2I's
+     alone, then ICON-EU's too, and now IFS's. */
+  const hasCloud = Array.isArray(d.c);
   return {
     ...common, accumHours: g.accumHours ?? 1,
     keys: hasCloud ? ['u', 'v', 't', 'p', 'c'] : ['u', 'v', 't', 'p'],
-      // ICON-2I is the Malta-only source, which is the one frame the satellite
-      // image is cut to. Keyed off the model rather than a domain the builder
-      // cannot see from here.
     shading: hasCloud ? ['t', 'spd', 'p', 'c', 'none'] : ['t', 'spd', 'p', 'none'],
     contour: { key: 't', label: 'Isotherms', unit: '°C' },
     data: hasCloud
-      ? { u: g.u, v: g.v, t: g.t, p: g.p, c: g.c }
-      : { u: g.u, v: g.v, t: g.t, p: g.p },
+      ? { u: d.u, v: d.v, t: d.t, p: d.p, c: d.c }
+      : { u: d.u, v: d.v, t: d.t, p: d.p },
   };
 }
 
@@ -2460,6 +2497,7 @@ function switchDomain(key) {
   const model = modelFor(key);
   const go = () => {
     registerLoaded(key, model);
+    if (!SOURCES[srcKey(key, model)]) throw new Error(`${model} has no ${key} data`);
     loadSource(key, model);
     buildModelButtons();
     afterSourceChange(when);
@@ -2469,7 +2507,8 @@ function switchDomain(key) {
   // there.
   if (SOURCES[srcKey(key, model)]) { go(); return Promise.resolve(); }
   setBusy(true);
-  return ensureModel(model).then(go).catch((e) => console.error(e)).finally(() => setBusy(false));
+  return ensureSource(key, model).then(go)
+    .catch((e) => console.error(e)).finally(() => setBusy(false));
 }
 
 function setBusy(on) {
@@ -2487,27 +2526,35 @@ const loadScript = (src) => new Promise((resolve, reject) => {
   document.head.appendChild(s);
 });
 
+/* Keyed by file, not by (domain, model): the IFS surface payload backs two
+   domains, and keying by pair would have the Mediterranean and Malta panels
+   each start their own download of the same four megabytes. */
 const loading = new Map();
-function ensureModel(key) {
-  const m = MODELS[key];
-  if (!m.file || window[m.global]) return Promise.resolve();
-  if (loading.has(key)) return loading.get(key);
-  // The upper-air model brings its own cartography: a 75-degree frame wants
+function ensureSource(domainKey, modelKey) {
+  const p = modelPart(domainKey, modelKey);
+  if (!p.file || window[p.global]) return Promise.resolve();
+  if (loading.has(p.file)) return loading.get(p.file);
+  // The upper-air payload brings its own cartography: a 75-degree frame wants
   // Natural Earth 50m, not the full-resolution geometry the Malta panel uses.
-  const files = [m.file].concat(m.geoFile && !window[m.geoGlobal] ? [m.geoFile] : [])
+  const files = [p.file].concat(p.geoFile && !window[p.geoGlobal] ? [p.geoFile] : [])
     .map((f) => `${DATA_BASE}/${f}`);
-  const p = Promise.all(files.map(loadScript)).finally(() => loading.delete(key));
-  loading.set(key, p);
-  return p;
+  const req = Promise.all(files.map(loadScript)).finally(() => loading.delete(p.file));
+  loading.set(p.file, req);
+  return req;
 }
 
 function registerLoaded(domainKey, modelKey) {
-  const m = MODELS[modelKey];
-  const g = window[m.global];
+  const p = modelPart(domainKey, modelKey);
+  const g = window[p.global];
   const k = srcKey(domainKey, modelKey);
-  if (!SOURCES[k] && g) SOURCES[k] = adoptSource(modelKey, g);
-  if (m.geoGlobal && window[m.geoGlobal] && !GEOALL[domainKey]) {
-    GEOALL[domainKey] = window[m.geoGlobal];
+  /* A payload that reached the page without the frame being asked for is not
+     adopted: a build that skipped a domain would otherwise register `undefined`
+     as a source and the panel would fail on its first read of nx. */
+  if (!SOURCES[k] && g && (!g.domains || g.domains[domainKey])) {
+    SOURCES[k] = adoptSource(modelKey, g, domainKey);
+  }
+  if (p.geoGlobal && window[p.geoGlobal] && !GEOALL[domainKey]) {
+    GEOALL[domainKey] = window[p.geoGlobal];
   }
 }
 
@@ -2535,8 +2582,15 @@ function switchModel(key) {
   const when = currentValid();
   const label = MODELS[key].label;
   if (btn) { btn.disabled = true; btn.textContent = label + ' …'; }
-  return ensureModel(key).then(() => {
+  return ensureSource(state.domain, key).then(() => {
     registerLoaded(state.domain, key);
+    /* A cycle in which one build failed still publishes the rest, so a model
+       the page offers is not proof its payload arrived. Failing here is what
+       puts the ✕ on the button instead of leaving the panel drawing the old
+       model's grid under the new model's name. */
+    if (!SOURCES[srcKey(state.domain, key)]) {
+      throw new Error(`${key} has no ${state.domain} data in this cycle`);
+    }
     loadSource(state.domain, key);
     afterSourceChange(when);
   }).catch((e) => {
@@ -2610,8 +2664,13 @@ function buildModelButtons() {
 
 function syncMeta() {
   if (state.view === 'mgram' && MG.data) {
+    // Both models are named when the long range is grafted on, so the credit
+    // line matches what the chart is actually showing.
+    const src = MG.data.tailModel
+      ? `${MG.data.model} to +${MG.data.steps[MG.data.tailFrom - 1]} h, then ${MG.data.tailModel}`
+      : MG.data.model;
     $('cycles').textContent =
-      `${MG.data.model} · init ${fmtUTC.format(new Date(MG.data.init))} UTC`;
+      `${src} · init ${fmtUTC.format(new Date(MG.data.init))} UTC`;
     return;
   }
   if (state.view === 'sat' && (SAT || SENTINEL)) {
@@ -3183,7 +3242,16 @@ function drawMeteogram() {
   const init = new Date(d.init);
   const times = d.steps.map((s) => new Date(init.getTime() + s * 3600e3));
   const n = times.length;
-  const X = (i) => L.x0 + (i / (n - 1)) * (L.x1 - L.x0);
+  // Positioned by forecast hour, not by array index. The ICON-2I head is
+  // hourly and the ICON-EU tail three-hourly, so an index axis would hand the
+  // last two days the same width per point as the first three days get per
+  // hour — compressing them to a third of their span, and bending the slope of
+  // every line at the join for no meteorological reason.
+  const hSpan = (d.steps[n - 1] - d.steps[0]) || 1;
+  const X = (i) => L.x0 + ((d.steps[i] - d.steps[0]) / hSpan) * (L.x1 - L.x0);
+  // Hours each rain bucket covers. Older payloads predate the field and were
+  // uniformly hourly, which is what the fallback says.
+  const SPAN = d.span || d.steps.map(() => 1);
 
   /* Night shading, computed from the local hour rather than from a solar
      calculation: the point of the band is to say "this is the small hours",
@@ -3264,13 +3332,23 @@ function drawMeteogram() {
   c.closePath();
   c.fillStyle = 'rgba(120,140,160,.30)';
   c.fill();
-  const rainMax = Math.max(1, Math.ceil(Math.max(...d.precip)));
-  const bw = Math.max(1.5, (L.x1 - L.x0) / n - 1);
+  // Rate, not depth. A three-hour ICON-EU bucket holds three times the rain of
+  // an hourly ICON-2I one at the same intensity, so plotting depth would put a
+  // step change at the join that the weather does not have — and the caption
+  // underneath says mm/h.
+  const rate = d.precip.map((v, i) => v / (SPAN[i] || 1));
+  const rainMax = Math.max(1, Math.ceil(Math.max(...rate)));
+  const pxPerH = (L.x1 - L.x0) / hSpan;
   c.fillStyle = css.getPropertyValue('--c-rain').trim() || '#1565c0';
-  d.precip.forEach((v, i) => {
+  rate.forEach((v, i) => {
     if (v <= 0) return;
+    // Drawn across the hours the bucket actually accumulated over, which end
+    // at this step rather than straddling it: rain recorded at 15:00 fell
+    // before 15:00, and a three-hour bar centred on its endpoint would put
+    // half of itself in the future.
+    const bw = Math.max(1.5, SPAN[i] * pxPerH - 1);
     const hh = rC.h * Math.min(1, v / rainMax);
-    c.fillRect(X(i) - bw / 2, rC.y + rC.h - hh, bw, hh);
+    c.fillRect(X(i) - bw, rC.y + rC.h - hh, bw, hh);
   });
   c.fillStyle = muted;
   c.font = '10px ui-sans-serif, system-ui, sans-serif';
@@ -3284,10 +3362,16 @@ function drawMeteogram() {
   line(rW, d.gust, 0, wHi, css.getPropertyValue('--c-wind').trim() || '#00695c', 1.2, [3, 3]);
   line(rW, d.wind, 0, wHi, css.getPropertyValue('--c-wind').trim() || '#00695c', 2);
   // Direction arrows along the top of the wind panel, every few hours so they
-  // stay legible; each points the way the wind is blowing TO.
-  const every = Math.max(1, Math.round(n / 26));
+  // stay legible; each points the way the wind is blowing TO. Spaced along the
+  // axis rather than along the array — the tail's points are three hours apart
+  // where the head's are one, so stepping by index would crowd the near days
+  // and thin out the far ones.
+  const minGap = (L.x1 - L.x0) / 26;
   c.strokeStyle = muted; c.fillStyle = muted; c.lineWidth = 1.1;
-  for (let i = 0; i < n; i += every) {
+  let lastArrow = -Infinity;
+  for (let i = 0; i < n; i++) {
+    if (X(i) - lastArrow < minGap) continue;
+    lastArrow = X(i);
     const a = (d.dir[i] + 180) * Math.PI / 180;
     const x = X(i), y = rW.y + 9;
     const dx = Math.sin(a) * 5, dy = -Math.cos(a) * 5;
@@ -3305,7 +3389,29 @@ function drawMeteogram() {
   axis(rP, pLo, pHi, Math.max(2, Math.round((pHi - pLo) / 3 / 2) * 2));
   line(rP, d.pres, pLo, pHi, ink, 1.6);
 
-  MG.scales = { tLo, tHi, wHi, pLo, pHi, rainMax, X, n, times };
+  // --- model change ------------------------------------------------------
+  // Where ICON-2I runs out and ICON-EU takes over. Two models disagree a
+  // little even about the same hour, so the lines can step at this point;
+  // marking it says the step is a change of source, not of weather. Drawn last
+  // of the data layers so it sits over the traces rather than under them.
+  if (d.tailFrom > 0 && d.tailFrom < n) {
+    const xj = Math.round(X(d.tailFrom) - (X(d.tailFrom) - X(d.tailFrom - 1)) / 2) + 0.5;
+    c.save();
+    c.strokeStyle = muted;
+    c.lineWidth = 1;
+    c.setLineDash([3, 3]);
+    c.beginPath(); c.moveTo(xj, L.padT); c.lineTo(xj, L.h - L.padB); c.stroke();
+    c.setLineDash([]);
+    c.fillStyle = muted;
+    c.font = '10px ui-sans-serif, system-ui, sans-serif';
+    const lab = d.tailShort || 'ICON-EU';
+    // Left of the rule if the tail is too narrow to hold the label.
+    const lw = c.measureText(lab).width;
+    c.fillText(lab, Math.min(xj + 4, L.x1 - lw), L.padT + 9);
+    c.restore();
+  }
+
+  MG.scales = { tLo, tHi, wHi, pLo, pHi, rainMax, X, n, times, rate, SPAN, hSpan };
 
   // --- crosshair ---------------------------------------------------------
   if (MG.hover !== null) {
@@ -3331,6 +3437,7 @@ function mgTip(i) {
   const d = MG.data, L = MG.layout;
   if (!d || !L) return;
   const t = MG.scales.times[i];
+  const sp = (MG.scales.SPAN || [])[i] || 1;
   const fmtT = new Intl.DateTimeFormat('en-GB', {
     weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: d.tz });
   const pts = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
@@ -3342,8 +3449,11 @@ function mgTip(i) {
     `<div class="row"><span>Wind</span><b>${d.wind[i].toFixed(1)} m/s ${pts[Math.round(d.dir[i] / 22.5) % 16]}</b></div>` +
     `<div class="row"><span>Gust</span><b>${d.gust[i].toFixed(1)} m/s</b></div>` +
     `<div class="row"><span>Cloud</span><b>${d.cloud[i]}%</b></div>` +
-    `<div class="row"><span>Rain</span><b>${d.precip[i] > 0 ? d.precip[i].toFixed(1) + ' mm' : '—'}</b></div>` +
-    `<div class="row"><span>Pressure</span><b>${d.pres[i].toFixed(1)} hPa</b></div>`;
+    `<div class="row"><span>Rain</span><b>${d.precip[i] > 0 ? d.precip[i].toFixed(1) + ' mm' + (sp > 1 ? ` / ${sp} h` : '') : '—'}</b></div>` +
+    `<div class="row"><span>Pressure</span><b>${d.pres[i].toFixed(1)} hPa</b></div>` +
+    // Which model this hour came from. Only worth the line once there are two
+    // of them, and only named in short form — the full string is in the header.
+    (d.tailFrom ? `<div class="row"><span>Model</span><b>${i >= d.tailFrom ? (d.tailShort || 'ICON-EU') : 'ICON-2I'}</b></div>` : '');
   tip.style.opacity = '1';
   const x = MG.scales.X(i);
   // Flip the tip to the other side of the crosshair near the right edge, so it
@@ -3357,9 +3467,20 @@ $('mg-wrap').addEventListener('pointermove', (e) => {
   if (!MG.data || !MG.layout) return;
   const r = $('mg-wrap').getBoundingClientRect();
   const x = e.clientX - r.left;
-  const L = MG.layout, n = MG.data.steps.length;
+  const L = MG.layout, steps = MG.data.steps, n = steps.length;
   const f = (x - L.x0) / (L.x1 - L.x0);
-  MG.hover = Math.max(0, Math.min(n - 1, Math.round(f * (n - 1))));
+  // The axis is hours, and hours are no longer evenly spaced across the array,
+  // so the pointer is converted to a forecast hour and the nearest step to it
+  // is picked. Scaling the fraction by n - 1 would land on the wrong point
+  // anywhere past the model join. Derived here rather than read back off
+  // MG.scales so the hover does not depend on a draw having completed.
+  const hSpan = (steps[n - 1] - steps[0]) || 1;
+  const hour = steps[0] + Math.max(0, Math.min(1, f)) * hSpan;
+  let best = 0;
+  for (let i = 1; i < n; i++) {
+    if (Math.abs(steps[i] - hour) < Math.abs(steps[best] - hour)) best = i;
+  }
+  MG.hover = best;
   drawMeteogram();
   mgTip(MG.hover);
 });
