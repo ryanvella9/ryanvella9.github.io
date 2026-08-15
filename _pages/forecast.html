@@ -1348,6 +1348,59 @@ function sampleAt(a, col, row) {
   return top + (bot - top) * fr;
 }
 
+/* Bicubic (Catmull-Rom) sampling, for the shading only.
+
+   Bilinear is C0: the surface is continuous but its slope jumps at every cell
+   boundary, and on a 0.25 deg field that puts a kink every 28 km. Shading a
+   continuous ramp hides it; shading discrete bands does not, because a band
+   edge is a contour of the interpolated surface and those kinks bend it into
+   the diamonds and facets that make a shower look pixelated. Catmull-Rom is
+   C1 — slope is continuous across cells — so the band edges come out as the
+   rounded curves the reference product has, from exactly the same data.
+
+   The cost is 16 samples a pixel against 4. That is affordable here because the
+   raster is built at a quarter resolution and upscaled, so it is ~80k pixels
+   rather than ~1.2M; the streaklines, which are thousands of samples every
+   frame, stay bilinear where the difference would not be visible anyway. */
+function catmull(p0, p1, p2, p3, t) {
+  const a = -0.5 * p0 + 1.5 * p1 - 1.5 * p2 + 0.5 * p3;
+  const b = p0 - 2.5 * p1 + 2 * p2 - 0.5 * p3;
+  const c = -0.5 * p0 + 0.5 * p2;
+  return ((a * t + b) * t + c) * t + p1;
+}
+
+function sampleCubic(a, col, row) {
+  if (col < 0 || row < 0 || col > NX - 1 || row > NY - 1) return NaN;
+  const c1 = Math.min(NX - 1, col | 0), r1 = Math.min(NY - 1, row | 0);
+  const fc = col - c1, fr = row - r1;
+
+  // Edges clamp to the border row/column rather than wrapping or going out of
+  // bounds — a shower against the frame edge should flatten, not fold back.
+  const cx0 = c1 > 0 ? c1 - 1 : 0;
+  const cx2 = c1 < NX - 1 ? c1 + 1 : NX - 1;
+  const cx3 = c1 < NX - 2 ? c1 + 2 : NX - 1;
+  const ry0 = r1 > 0 ? r1 - 1 : 0;
+  const ry2 = r1 < NY - 1 ? r1 + 1 : NY - 1;
+  const ry3 = r1 < NY - 2 ? r1 + 2 : NY - 1;
+
+  const row0 = ry0 * NX, row1 = r1 * NX, row2 = ry2 * NX, row3 = ry3 * NX;
+  const s0 = catmull(a[row0 + cx0], a[row0 + c1], a[row0 + cx2], a[row0 + cx3], fc);
+  const s1 = catmull(a[row1 + cx0], a[row1 + c1], a[row1 + cx2], a[row1 + cx3], fc);
+  const s2 = catmull(a[row2 + cx0], a[row2 + c1], a[row2 + cx2], a[row2 + cx3], fc);
+  const s3 = catmull(a[row3 + cx0], a[row3 + c1], a[row3 + cx2], a[row3 + cx3], fc);
+  return catmull(s0, s1, s2, s3, fr);
+}
+
+/* Cubic overshoots near a sharp edge — that is what makes it look smooth — but
+   a negative millimetre is not a quantity, and left alone the undershoot around
+   a heavy cell paints a dry halo through the middle of a shower. Clamped for
+   fields that cannot go below zero. */
+const NONNEG = { p: true, c: true, spd: true };
+function sampleShade(key, a, col, row) {
+  const v = sampleCubic(a, col, row);
+  return (NONNEG[key] && v < 0) ? 0 : v;
+}
+
 /* The satellite gets its own index, not a clipped view of the forecast's.
    Clamping to the model timeline looked simpler but could not work: the loop
    reaches nine hours before the ICON-2I run begins, and those frames had no
@@ -1382,8 +1435,17 @@ const ctxF = cvFlow.getContext('2d');
 /* The raster is built at a coarse resolution and upscaled. The field it is
    drawing is a smooth interpolation of a model grid — every pixel above that is
    interpolation either way, so letting the browser's scaler do it turns a
-   per-frame cost of ~1.2M samples into ~80k. */
+   per-frame cost of ~1.2M samples into ~80k.
+
+   Banded fields are the exception and render finer. A continuous ramp upscales
+   invisibly, because the colour between two computed pixels is very nearly the
+   colour that would have been computed there. A ladder does not: the value is
+   quantised to a band *before* the upscale, so the browser blends between band
+   colours and every contour edge becomes a soft four-pixel gradient — which is
+   what made the showers look blurred rather than contoured. Computing those at
+   half the step puts the edge where the contour actually is. */
 const RASTER_STEP = 4;
+const RASTER_STEP_BANDED = 2;
 const off = document.createElement('canvas');
 const ctxO = off.getContext('2d');
 let imgData = null;
@@ -1478,9 +1540,7 @@ function resize() {
   ctxG.setTransform(DPR, 0, 0, DPR, 0, 0);
   ctxF.setTransform(DPR, 0, 0, DPR, 0, 0);
 
-  off.width = Math.max(2, Math.ceil(W / RASTER_STEP));
-  off.height = Math.max(2, Math.ceil(H / RASTER_STEP));
-  imgData = ctxO.createImageData(off.width, off.height);
+  sizeRaster(RASTER_STEP);
 
   seedParticles();
   drawAll();
@@ -1488,9 +1548,20 @@ function resize() {
 
 /* ---------------------------------------------------------------- raster ---- */
 
+/* The offscreen is resized only when the step it needs changes, so switching
+   between a banded and a continuous field does not reallocate on every frame. */
+function sizeRaster(step) {
+  const w = Math.max(2, Math.ceil(W / step));
+  const h = Math.max(2, Math.ceil(H / step));
+  if (off.width === w && off.height === h && imgData) return;
+  off.width = w; off.height = h;
+  imgData = ctxO.createImageData(w, h);
+}
+
 function drawRaster() {
   const spec = LUTS[state.field];
   if (!spec) return;
+  sizeRaster(spec.ladder ? RASTER_STEP_BANDED : RASTER_STEP);
 
   const { lut, range } = spec;
   const ow = off.width, oh = off.height;
@@ -1512,7 +1583,7 @@ function drawRaster() {
       let k;
 
       if (field === 'spd') {
-        const u = sampleAt(CUR.u, col, row), v = sampleAt(CUR.v, col, row);
+        const u = sampleCubic(CUR.u, col, row), v = sampleCubic(CUR.v, col, row);
         if (Number.isNaN(u)) { px[o + 3] = 0; continue; }
         k = Math.round((Math.sqrt(u * u + v * v) - range[0]) * inv);
       } else if (spec.idx) {
@@ -1520,14 +1591,14 @@ function drawRaster() {
         // entry means "nothing here" — dry ground is left transparent rather
         // than washed palest blue, because 98% of an August domain is dry and
         // a wash over all of it hides the land the showers sit on.
-        const val = sampleAt(CUR[field], col, row);
+        const val = sampleShade(field, CUR[field], col, row);
         if (Number.isNaN(val)) { px[o + 3] = 0; continue; }
         let q = Math.round(val * spec.idxScale) + spec.idxOffset;
         q = q < 0 ? 0 : q >= spec.idx.length ? spec.idx.length - 1 : q;
         k = spec.idx[q];
         if (k < 0) { px[o + 3] = 0; continue; }
       } else {
-        const val = sampleAt(CUR[field], col, row);
+        const val = sampleShade(field, CUR[field], col, row);
         if (Number.isNaN(val)) { px[o + 3] = 0; continue; }
         k = Math.round((val - range[0]) * inv);
       }
@@ -1561,7 +1632,8 @@ let cloudCv = null, cloudCtx = null, cloudImg = null;
 function drawClouds() {
   if (!state.clouds || !CUR.c) return;
 
-  const ow = off.width, oh = off.height;
+  const ow = Math.max(2, Math.ceil(W / RASTER_STEP));
+  const oh = Math.max(2, Math.ceil(H / RASTER_STEP));
   if (!cloudCv || cloudCv.width !== ow || cloudCv.height !== oh) {
     cloudCv = document.createElement('canvas');
     cloudCv.width = ow; cloudCv.height = oh;
@@ -1577,7 +1649,7 @@ function drawClouds() {
     const row = lat2row(y2lat(((j + 0.5) / oh) * H));
     for (let i = 0; i < ow; i++) {
       const o = (j * ow + i) * 4;
-      const c = sampleAt(CUR.c, cols[i], row);
+      const c = sampleShade('c', CUR.c, cols[i], row);
       if (Number.isNaN(c) || c < 10) { px[o + 3] = 0; continue; }
       const f = Math.min(1, c / 100);
       px[o] = 255; px[o + 1] = 255; px[o + 2] = 255;
@@ -2256,7 +2328,11 @@ function readout(x, y) {
   $('r-pos').textContent = `${Math.abs(lat).toFixed(2)}°${ns}  ${Math.abs(lon).toFixed(2)}°${ew}`;
 
   const isUpper = D.keys.includes('sig');
-  const t = isUpper ? sampleAt(CUR.gh, col, row) : sampleAt(CUR.t, col, row);
+  // The readout samples the way the shading does, so the number under the
+  // crosshair belongs to the band it is sitting in. Reporting a bilinear value
+  // over a bicubic map would disagree with the colour by a whole step near an
+  // edge, which is exactly where anyone bothers to hover.
+  const t = isUpper ? sampleCubic(CUR.gh, col, row) : sampleShade('t', CUR.t, col, row);
   $('r-temp').textContent = isUpper ? t.toFixed(0) + ' dam' : t.toFixed(1) + ' °C';
 
   const sp = Math.hypot(u, v);
@@ -2266,7 +2342,7 @@ function readout(x, y) {
   const pts = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   $('r-dir').textContent = `${pts[Math.round(dir / 22.5) % 16]} ${Math.round(dir)}°`;
 
-  const extra = isUpper ? sampleAt(CUR.sig, col, row) : sampleAt(CUR.p, col, row);
+  const extra = isUpper ? sampleCubic(CUR.sig, col, row) : sampleShade('p', CUR.p, col, row);
   $('r-prec').textContent = isUpper
     ? (extra >= 0 ? '+' : '') + extra.toFixed(1) + ' σ'
     : (extra < 0.05 ? '—' : extra.toFixed(1) + ' mm');
@@ -2274,7 +2350,7 @@ function readout(x, y) {
   const spec = LUTS[state.field];
   const mark = $('cbar-mark');
   if (spec) {
-    const val = state.field === 'spd' ? sp : sampleAt(CUR[state.field], col, row);
+    const val = state.field === 'spd' ? sp : sampleShade(state.field, CUR[state.field], col, row);
     const f = barPos(spec, val);
     // A negative position means "no rain here", which has nowhere to sit on the
     // ladder. On the linear scales it just means the value is past the trimmed
