@@ -4802,9 +4802,16 @@ function showView(name) {
   $('view-map').hidden = name !== 'map';
   $('view-mgram').hidden = name !== 'mgram';
   $('view-sat').hidden = name !== 'sat';
+  /* Which map tab a domain belongs to. This was a two-way test — europe, else
+     the surface panels — and a third map tab had nowhere to land: the pressure
+     frame lit "Surface panels" while drawing a pressure chart, so the tab bar
+     said the reader was on a page they were not on, and the new one looked like
+     it did nothing. A domain that names no tab of its own belongs to the
+     surface panels, which is what the close-up frames all are. */
+  const tabDomain = { europe: 'europe', europe_sfc: 'europe_sfc' }[state.domain] || 'malta';
   for (const b of $('tabs').children) {
     const on = b.dataset.view === name &&
-      (name !== 'map' || b.dataset.domain === (state.domain === 'europe' ? 'europe' : 'malta'));
+      (name !== 'map' || b.dataset.domain === tabDomain);
     b.setAttribute('aria-pressed', String(on));
   }
   if (name === 'sat') { syncMeta(); satResize(); satSync(); satIdlePreload(); return; }
