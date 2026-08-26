@@ -582,15 +582,20 @@ title: "Forecast"
        positioned the forecast silently repositioned the loop. -->
   <section id="view-sat" hidden>
     <div class="controls">
-      <!-- Three sources, one geostationary and two polar. The loop is first
-           because it is the one that answers "what is happening now"; the two
+      <!-- Four sources: two geostationary loops and two polar stills. Malta is
+           first because it is the one that answers "what is happening here";
+           the full disc is the same instrument pulled back to the whole
+           hemisphere, on a shorter window and a faster cadence. The two
            Sentinels are stills at resolutions FCI cannot reach, and selecting
            one hides the animation controls rather than leaving a scrubber that
-           addresses a single frame. -->
+           addresses a single frame.
+           Labelled by what each one shows rather than by mission: three of the
+           four are MTG, so "MTG loop" stopped telling a reader which. -->
       <div class="group" id="sat-source-group" hidden>
         <label>Source</label>
         <div class="btns" id="sat-sources">
-          <button data-source="mtg" aria-pressed="true">MTG loop</button>
+          <button data-source="mtg" aria-pressed="true">Malta</button>
+          <button data-source="disc" aria-pressed="false">Full disc</button>
         </div>
       </div>
       <div class="group" id="sat-anim-group">
@@ -702,6 +707,7 @@ title: "Forecast"
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_geo.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_data.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_malta.js"></script>
+<script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_disc.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sentinel_malta.js"></script>
 <script>
 /* ---------------------------------------------------------------------------
@@ -2710,7 +2716,7 @@ function syncMeta() {
       `${src} · init ${fmtUTC.format(new Date(MG.data.init))} UTC`;
     return;
   }
-  if (state.view === 'sat' && (SAT || SENTINEL)) {
+  if (state.view === 'sat' && (satLoop() || SENTINEL)) {
     const still = satStill();
     if (still) {
       $('cycles').textContent =
@@ -2718,8 +2724,9 @@ function syncMeta() {
       $('attrib').textContent = `${SENTINEL.credit} · © Ryan Vella`;
       return;
     }
-    $('cycles').textContent = `${SAT.model} · observed, last ${SAT.frames.length} scans`;
-    $('attrib').textContent = `${SAT.credit} · © Ryan Vella`;
+    const L = satLoop();
+    $('cycles').textContent = `${L.model} · observed, last ${L.frames.length} scans`;
+    $('attrib').textContent = `${L.credit} · © Ryan Vella`;
     return;
   }
   $('cycles').textContent = `${SRC.model} · init ${fmtUTC.format(INIT)} UTC`;
@@ -3574,8 +3581,26 @@ $('mg-wrap').addEventListener('pointerleave', () => {
    that positioned the forecast silently repositioned the loop. Same feature,
    collision removed. */
 const SAT = window.SAT_MALTA || null;
+const SAT_DISC = window.SAT_DISC || null;
 const SAT_CACHE = new Map();
 const SAT_BAD = new Set();
+
+/* Two loops now rather than one loop and some stills, which is what the source
+   key used to mean: anything that was not 'mtg' had a single frame and hid the
+   timeline. A full disc breaks that — it is not the Malta box widened, it is a
+   different product on a different cadence over a different window, and it
+   animates. So the loops are registered here and everything below asks which
+   one is selected instead of reaching for SAT directly.
+
+   Registered only when it has frames. A fetcher that has never run, or one
+   whose window has aged out, leaves its button hidden rather than offering a
+   source that selects an empty timeline. */
+const SAT_LOOPS = {};
+if (SAT && SAT.frames.length) SAT_LOOPS.mtg = SAT;
+if (SAT_DISC && SAT_DISC.frames.length) SAT_LOOPS.disc = SAT_DISC;
+
+const satLoop = () => SAT_LOOPS[satState.source] || null;
+const satLoopKeys = () => Object.keys(SAT_LOOPS);
 
 /* `prev` and `fade` are the dissolve. The loop paints two frames — the one
    being left at full opacity, the one arriving at `fade` — instead of swapping
@@ -3587,8 +3612,11 @@ const SAT_BAD = new Set();
 const satState = {
   i: 0, prev: null, fade: 1,
   playing: false, speed: 1, raf: null, stepAt: 0, step: null,
-  source: 'mtg', buffering: false, buffered: false,
+  source: 'mtg', buffering: false,
 };
+// Which loops have been fetched in full. Per source, so pressing Play on the
+// full disc buffers the disc rather than trusting a warm Malta cache.
+const satBuffered = new Set();
 
 /* The two polar-orbiter stills, if the fetcher has published any. They share
    this view rather than getting one of their own because they answer the same
@@ -3599,10 +3627,19 @@ const satState = {
 const SENTINEL = window.SENTINEL_MALTA || null;
 const satStills = () => (SENTINEL && SENTINEL.images) || [];
 const satStill = () => satStills().find((s) => s.key === satState.source) || null;
-const satIsStill = () => satState.source !== 'mtg';
+// A still is now "not one of the loops" rather than "not mtg" — the test has to
+// survive a second loop being added beside the first.
+const satIsStill = () => !satLoop();
 
-const satMax = () => (SAT && SAT.frames.length ? SAT.frames.length - 1 : 0);
-const satFrame = () => (SAT && SAT.frames.length ? SAT.frames[satState.i] : null);
+const satMax = () => { const L = satLoop(); return L ? L.frames.length - 1 : 0; };
+const satFrame = () => { const L = satLoop(); return L ? L.frames[satState.i] : null; };
+
+/* Mercator for the Malta frames, which are resampled server-side into the
+   viewer's own box; equirectangular for the full disc, which is what
+   EUMETView reprojects to. The page has to be told which, because it draws a
+   graticule from the extent and every parallel would land in the wrong place
+   otherwise — at 77 degrees the two disagree by most of the frame. */
+const satProjection = () => (satLoop() || {}).projection || 'mercator';
 
 /* Each source carries its own extent, so this cannot come from one manifest.
    Sentinel-2 is framed on the islands rather than on the forecast domain — at
@@ -3612,7 +3649,8 @@ const satFrame = () => (SAT && SAT.frames.length ? SAT.frames[satState.i] : null
 function satExtent() {
   const still = satStill();
   if (still) return still.extent;
-  return SAT ? SAT.extent : null;
+  const L = satLoop();
+  return L ? L.extent : null;
 }
 
 /* Its own aspect, from the manifest rather than from ASPECT: that one follows
@@ -3621,6 +3659,7 @@ function satExtent() {
 function satAspect() {
   const ex = satExtent();
   if (!ex) return 940 / 760;
+  if (satProjection() === 'equirect') return (ex.east - ex.west) / (ex.north - ex.south);
   return ((ex.east - ex.west) * Math.PI / 180) / (merc(ex.north) - merc(ex.south));
 }
 
@@ -3645,14 +3684,15 @@ const satReady = (f) => {
   return !!(im && im.complete && im.naturalWidth);
 };
 const satSettled = (f) => satReady(f) || SAT_BAD.has(f.file);
-const satHeld = () => (SAT ? SAT.frames.filter(satSettled).length : 0);
+const satHeld = () => { const L = satLoop(); return L ? L.frames.filter(satSettled).length : 0; };
 
 /* The neighbours, so the scrubber has something either side of wherever the
    reader is standing before the full fetch below has finished. */
 function satPreload() {
-  if (!SAT) return;
+  const L = satLoop();
+  if (!L) return;
   for (const j of [satState.i + 1, satState.i - 1, satState.i + 2]) {
-    if (j >= 0 && j <= satMax()) satImage(SAT.frames[j]);
+    if (j >= 0 && j <= satMax()) satImage(L.frames[j]);
   }
 }
 
@@ -3664,18 +3704,21 @@ function satPreload() {
    A day of frames is about 1.5 MB, less than a single one of the forecast
    field files this page loads without comment, and it is fetched only once the
    reader is actually in the satellite view. */
-let satAllQueued = false;
+// Per source, not one flag for the panel: a reader who has warmed the Malta
+// loop has fetched nothing at all of the full disc.
+const satAllQueued = new Set();
 function satPreloadAll() {
-  if (!SAT || satAllQueued) return;
-  satAllQueued = true;
-  for (const f of SAT.frames) satImage(f);
+  const L = satLoop();
+  if (!L || satAllQueued.has(satState.source)) return;
+  satAllQueued.add(satState.source);
+  for (const f of L.frames) satImage(f);
 }
 
 /* On idle rather than on arrival: opening the tab usually coincides with the
    map view still finishing its own fetches, and the loop is not needed in full
    until Play is pressed. */
 function satIdlePreload() {
-  if (!SAT || !SAT.frames.length || satAllQueued) return;
+  if (!satLoop() || satAllQueued.has(satState.source)) return;
   (window.requestIdleCallback || ((fn) => setTimeout(fn, 1200)))(satPreloadAll);
 }
 
@@ -3731,7 +3774,7 @@ function satDraw() {
      blank exactly as before: a wrong picture with a right timestamp is worse
      than a gap. */
   const back = (!satIsStill() && satState.fade < 1 && satState.prev !== null)
-    ? SAT.frames[satState.prev] : null;
+    ? satLoop().frames[satState.prev] : null;
   const layered = back && satReady(back);
   if (layered) c.drawImage(satImage(back), 0, 0, w, h);
 
@@ -3755,9 +3798,14 @@ function satCarto(c, w, h) {
   const geo = (typeof GEOALL !== 'undefined' && GEOALL.malta) || GEO;
   const ex = satExtent();
   if (!geo || !ex) return;
-  const yTop = merc(ex.north), ySpan = merc(ex.north) - merc(ex.south);
+  // The full disc arrives equirectangular, so its parallels are evenly spaced
+  // rather than stretched towards the pole. Running it through merc() would
+  // put the 60th parallel about a fifth of the frame from where it belongs.
+  const equi = satProjection() === 'equirect';
+  const fy = (lat) => (equi ? lat : merc(lat));
+  const yTop = fy(ex.north), ySpan = fy(ex.north) - fy(ex.south);
   const X = (lon) => ((lon - ex.west) / (ex.east - ex.west)) * w;
-  const Y = (lat) => ((yTop - merc(lat)) / ySpan) * h;
+  const Y = (lat) => ((yTop - fy(lat)) / ySpan) * h;
   const css = getComputedStyle(document.documentElement);
 
   c.save();
@@ -3783,8 +3831,14 @@ function satCarto(c, w, h) {
      the shoreline is right there in the photograph, and a generalised vector
      laid over it cannot follow the real one — it sits a pixel or two off,
      hides the harbours it is meant to locate, and turns the sharpest thing in
-     the frame into something that looks stickered on. */
-  if (satIsStill()) return;
+     the frame into something that looks stickered on.
+
+     The full disc is out for both reasons at once. GEOALL.malta is a Malta-box
+     coastline, so on a hemisphere it would draw the islands' outline across a
+     few pixels of the Mediterranean and nothing else — and it would not be
+     needed anyway, since Geo Colour renders land itself: green and ochre by
+     day, and the cities lit at night. */
+  if (satIsStill() || satState.source !== 'mtg') return;
 
   // Brighter than the map's coastline: it is drawn over a photograph rather
   // than over a smooth field, so a hairline disappears into the texture.
@@ -3833,6 +3887,11 @@ function satSync() {
     // distinguishes them — and the reason both are offered — is the pixel size.
     $('sat-kind').textContent = 'True colour · ' + f.res +
       (f.cloud === undefined ? '' : ' · ' + Math.round(f.cloud) + '% cloud');
+  } else if (satLoop().product) {
+    // A loop that names one product for every frame — the full disc, which is
+    // Geo Colour throughout because it blends the wavebands by solar angle
+    // rather than switching between them.
+    $('sat-kind').textContent = satLoop().product;
   } else {
     $('sat-kind').textContent = f.kind === 'ir' ? 'Infrared 10.5 µm' : 'True colour';
   }
@@ -3849,9 +3908,8 @@ function satSync() {
    the aspect and the presence of a timeline all change with it, so this
    re-lays-out the panel rather than just repainting the canvas. */
 function satSetSource(key) {
-  const ok = key === 'mtg' ? !!(SAT && SAT.frames.length)
-                           : satStills().some((s) => s.key === key);
-  if (!ok) key = (SAT && SAT.frames.length) ? 'mtg' : (satStills()[0] || {}).key;
+  const ok = SAT_LOOPS[key] || satStills().some((s) => s.key === key);
+  if (!ok) key = satLoopKeys()[0] || (satStills()[0] || {}).key;
   if (!key) return;
   satState.source = key;
   satSetPlaying(false);
@@ -3862,13 +3920,25 @@ function satSetSource(key) {
   $('sat-anim-group').hidden = still;
   $('sat-speed-group').hidden = still;
   $('sat-timeline').hidden = still;
+
+  const L = satLoop();
+  if (L) {
+    /* Its own newest scan, not the index the last loop was sitting on. The two
+       windows have neither the same length nor the same meaning — frame 40 of
+       the day-long Malta loop is yesterday evening, and of the two-hour disc it
+       does not exist — so carrying the position across would land a reader
+       somewhere arbitrary, or nowhere. */
+    satState.i = satMax();
+    satState.prev = null;
+    satState.fade = 1;
+    satTicks();         // interval follows the window, so it is rebuilt per loop
+  }
+
   const f = satStill();
   $('sat-src').textContent = still
     ? f.label + ' · ' + SENTINEL.credit + ' · © Ryan Vella'
-    : SAT.model + ' · ' + SAT.credit + ' · every ' + SAT.cadenceMin + ' min · © Ryan Vella';
-  $('sat-desc').textContent = still ? f.note : SAT_DESC;
-  // The loop's ticks are built from its own frame list, so they survive a
-  // detour through a still; nothing to rebuild here.
+    : L.model + ' · ' + L.credit + ' · every ' + L.cadenceMin + ' min · © Ryan Vella';
+  $('sat-desc').textContent = still ? f.note : (SAT_DESCS[key] || '');
   syncMeta();
   satResize();          // aspect differs between sources; this redraws too
   satSync();
@@ -3876,13 +3946,20 @@ function satSetSource(key) {
 
 function satTicks() {
   const box = $('sat-ticks');
-  if (!box || !SAT) return;
+  const L = satLoop();
+  if (!box || !L) return;
   box.innerHTML = '';
-  SAT.frames.forEach((f, i) => {
+
+  /* The interval has to follow the window, not be written down. Six-hourly
+     labels across a 24-hour loop give four; across the full disc's two hours
+     they give none at all, and the scrubber loses its axis entirely. Chosen
+     from the span so either loop gets a handful of labels. */
+  const span = (Date.parse(L.frames[L.frames.length - 1].t) - Date.parse(L.frames[0].t)) / 60000;
+  const every = [10, 15, 30, 60, 120, 180, 360, 720].find((m) => span / m <= 6) || 720;
+
+  L.frames.forEach((f, i) => {
     const d = new Date(Date.parse(f.t));
-    // A label every six hours. The loop spans a single day, so weekday names
-    // would collapse to one word and the hour is what a reader is placing.
-    if (d.getUTCHours() % 6 || d.getUTCMinutes()) return;
+    if ((d.getUTCHours() * 60 + d.getUTCMinutes()) % every) return;
     const el = document.createElement('span');
     el.textContent = new Intl.DateTimeFormat('en-GB', {
       hour: '2-digit', minute: '2-digit', hour12: false,
@@ -3917,7 +3994,7 @@ const SAT_WRAP_HOLD_MS = 1300;   // the newest scan, held, before starting over
 const SAT_WRAP_FADE_MS = 650;
 
 function satStep(from, to) {
-  const fs = SAT.frames;
+  const fs = satLoop().frames;
   const wrap = to < from;
   const kind = !wrap && fs[from] && fs[to] && fs[from].kind !== fs[to].kind;
   let hold = SAT_HOLD_MS, fade = SAT_FADE_MS;
@@ -3937,7 +4014,7 @@ function satAdvance(ts) {
   // the fetch is a pause; a pause is legible and a hole is not. The step is
   // rewritten as a pure hold on the frame already up, so the tick has no
   // dissolve to run against a picture that is not there.
-  if (!satReady(SAT.frames[to])) {
+  if (!satReady(satLoop().frames[to])) {
     satPreloadAll();
     satState.prev = null;
     satState.fade = 1;
@@ -3987,21 +4064,24 @@ function satTick(ts) {
    they just pressed; a bar elsewhere on the page would be answering a question
    they did not ask. */
 function satBuffer() {
+  const src = satState.source;
   satPreloadAll();
   satState.buffering = true;
   const btn = $('sat-play');
-  const total = SAT.frames.length;
+  const total = satLoop().frames.length;
   const deadline = performance.now() + 12000;
   btn.disabled = true;
   const poll = () => {
-    if (!satState.buffering) return;
+    // Abandoned if the reader switched source or left the view while it ran:
+    // finishing would start the wrong loop playing.
+    if (!satState.buffering || satState.source !== src) return;
     const n = satHeld();
     // The deadline is for a connection slow enough that waiting is worse than
     // the stutter. Playback still refuses to dissolve into a frame it does not
     // have, so the loop pauses on a picture rather than blanking.
     if (n >= total || performance.now() > deadline) {
       satState.buffering = false;
-      satState.buffered = true;
+      satBuffered.add(src);
       btn.disabled = false;
       satSetPlaying(true);
       return;
@@ -4015,8 +4095,8 @@ function satBuffer() {
 function satSetPlaying(on) {
   // Nothing to play. The controls are hidden whenever this is true, so this is
   // only reachable by a keypress arriving before the panel has settled.
-  if (on && !(SAT && SAT.frames.length)) return;
-  if (on && !satState.buffered) { satBuffer(); return; }
+  if (on && !satLoop()) return;
+  if (on && !satBuffered.has(satState.source)) { satBuffer(); return; }
   satState.buffering = false;
   satState.playing = on;
   const btn = $('sat-play');
@@ -4054,20 +4134,34 @@ function satHash() {
   } else {
     const f = satFrame();
     if (!f) return;
-    hash = '#satellite/' + f.t.slice(0, 16).replace(/[-:]/g, '');
+    // Malta keeps the bare timestamp form it has always had, so links already
+    // out there still mean what they meant. A second loop needs naming, or the
+    // same timestamp would address two different pictures.
+    const stamp = f.t.slice(0, 16).replace(/[-:]/g, '');
+    hash = '#satellite/' + (satState.source === 'mtg' ? stamp : satState.source + '/' + stamp);
   }
   if (location.hash !== hash) {
     try { history.replaceState(null, '', hash); } catch (e) { /* file:// */ }
   }
 }
 
-const SAT_DESC =
-  'MTG FCI over Malta, the last 24 hours. True colour while the sun is up, ' +
-  '10.5 µm infrared after dark — inverted so cloud is white in both. ' +
-  'Observation only: this loop ends at the newest scan and has no forecast.';
+const SAT_DESCS = {
+  mtg:
+    'MTG FCI over Malta, the last 24 hours. True colour while the sun is up, ' +
+    '10.5 µm infrared after dark — inverted so cloud is white in both. ' +
+    'Observation only: this loop ends at the newest scan and has no forecast.',
+  disc:
+    'The whole Meteosat disc, the last two hours at ten-minutely. Geo Colour: ' +
+    'true colour in daylight blended into infrared and city lights across the ' +
+    'terminator, so the night side stays readable and nothing switches ' +
+    'instrument mid-loop. A shorter window than the Malta view because the ' +
+    'point of it is the synoptic picture right now — where the fronts and the ' +
+    'Atlantic lows are that the forecast panels are about to act on.',
+};
 
 function satInit() {
-  const hasLoop = !!(SAT && SAT.frames.length);
+  const loops = satLoopKeys();
+  const hasLoop = loops.length > 0;
   const stills = satStills();
   if (!hasLoop && !stills.length) {
     // Nothing published at all — hide the tab rather than offer an empty view.
@@ -4075,25 +4169,20 @@ function satInit() {
     if (b) b.hidden = true;
     return;
   }
-  if (hasLoop) {
-    satState.i = satMax();        // newest scan, not the far end of yesterday
-    satTicks();
-    $('sat-src').textContent =
-      SAT.model + ' · ' + SAT.credit + ' · every ' + SAT.cadenceMin + ' min · © Ryan Vella';
-    $('sat-desc').textContent = SAT_DESC;
-  } else {
-    // The loop is the panel's usual subject, but it is fetched on a different
-    // schedule from a different agency, and it should be able to fail without
-    // taking two working pictures down with it.
-    [...$('sat-sources').children].find((b) => b.dataset.source === 'mtg').hidden = true;
-    satState.source = stills[0].key;
+  /* Each loop is fetched on its own schedule from its own service, and any of
+     them must be able to fail without taking the others down. A loop with no
+     frames was never registered in SAT_LOOPS, so its button is hidden here
+     rather than left to select an empty timeline. */
+  const box = $('sat-sources');
+  for (const b of [...box.children]) {
+    if (!SAT_LOOPS[b.dataset.source]) b.hidden = true;
   }
+  satState.source = hasLoop ? (SAT_LOOPS.mtg ? 'mtg' : loops[0]) : stills[0].key;
 
   /* The toggle appears only when there is something to toggle between. A
      fetcher that has never run, or a fortnight where no pass cleared the cloud
      and coverage checks, leaves the panel exactly as it was rather than
      offering a button that selects a missing image. */
-  const box = $('sat-sources');
   for (const s of stills) {
     const b = document.createElement('button');
     b.dataset.source = s.key;
@@ -4102,7 +4191,7 @@ function satInit() {
     b.setAttribute('aria-pressed', 'false');
     box.appendChild(b);
   }
-  if (stills.length + (hasLoop ? 1 : 0) > 1) $('sat-source-group').hidden = false;
+  if (stills.length + loops.length > 1) $('sat-source-group').hidden = false;
   box.onclick = (e) => {
     const b = e.target.closest('button');
     if (b) satSetSource(b.dataset.source);
@@ -4275,14 +4364,17 @@ function applyHash() {
      carry both; they mean nothing here, so the view just opens on its newest
      scan rather than refusing the link. */
   if (/^#satellite(\/|$)/.test(BOOT_HASH)) {
-    if ((SAT && SAT.frames.length) || satStills().length) {
-      // #satellite/s2 and /s3 select a still; anything else (including the
-      // timestamp form and the old shading-layer links) opens the loop.
-      const want = /^#satellite\/(s2|s3)$/.exec(BOOT_HASH);
+    if (satLoopKeys().length || satStills().length) {
+      // #satellite/s2 and /s3 select a still, #satellite/disc the full-disc
+      // loop (with or without a timestamp after it); anything else — including
+      // the bare timestamp form and the old shading-layer links — opens the
+      // Malta loop, which is what those links have always meant.
+      const want = /^#satellite\/(s2|s3|disc|mtg)(?:\/|$)/.exec(BOOT_HASH);
       // showView first: satSetSource re-lays-out the panel, and satResize is a
       // no-op while the section is still hidden and has no width.
       showView('sat');
-      if (want && satStills().some((s) => s.key === want[1])) satSetSource(want[1]);
+      const key = want && want[1];
+      if (key && (SAT_LOOPS[key] || satStills().some((s) => s.key === key))) satSetSource(key);
       return;
     }
     showView('map'); toDefaultModel(); return;
