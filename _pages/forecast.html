@@ -1203,33 +1203,14 @@ function projectedBox(proj, box, samples = 180) {
   return { x0, x1, y0, y1 };
 }
 
-/* The largest projected rectangle that still lies entirely inside the lon/lat
-   box, found by taking each curved edge's innermost point.
+/* The frame is the enclosing box, not a rectangle inscribed in the domain.
 
-   The rendered PNG can use the enclosing box instead, because cartopy fills its
-   corners from global coastline and land features and the pipeline pads the data
-   crop out to meet them. The payload here is exactly the domain and not one
-   grid point more, so an enclosing box leaves the corners with no data and no
-   geography — a fan floating in white. Inscribing costs the far corners and
-   fills the frame, which is what a synoptic chart looks like. */
-function inscribedBox(proj, box, samples = 180) {
-  let x0 = -Infinity, x1 = Infinity, y0 = -Infinity, y1 = Infinity;
-  for (let i = 0; i <= samples; i++) {
-    const f = i / samples;
-    const lon = box.west + (box.east - box.west) * f;
-    const lat = box.south + (box.north - box.south) * f;
-    const w = proj.fwd(box.west, lat), e = proj.fwd(box.east, lat);
-    const s = proj.fwd(lon, box.south), n = proj.fwd(lon, box.north);
-    if (w[0] > x0) x0 = w[0];
-    if (e[0] < x1) x1 = e[0];
-    if (s[1] > y0) y0 = s[1];
-    if (n[1] < y1) y1 = n[1];
-  }
-  return { x0, x1, y0, y1 };
-}
-
-const frameBox = (proj, box) =>
-  (proj.separable ? projectedBox : inscribedBox)(proj, box);
+   Inscribing was tried and is wrong here: the largest rectangle that fits inside
+   the projected domain keeps barely half of it, and the half it drops is the
+   south-west — which on this frame is the western Atlantic the 60 W extent
+   exists to show in the first place. The payload is widened instead, exactly as
+   charts.py pads its data crop, so the corners have something in them. */
+const frameBox = projectedBox;
 
 /* --------------------------------------------------------- per-domain state */
 
@@ -2295,14 +2276,6 @@ function seedParticles() {
   }
 }
 
-/* Mercator scale factor: px per metre on the ground at this latitude. Because
-   the projection is conformal this is one number, not two, so a wind vector in
-   m/s becomes a screen velocity by a single multiply. */
-function pxPerMetre(lat) {
-  const pxPerRadLon = W / ((BOX.east - BOX.west) * Math.PI / 180);
-  return pxPerRadLon / (R_EARTH * Math.cos(lat * Math.PI / 180));
-}
-
 function stepParticles(dt) {
   const spec = LUTS[state.field];
   const buckets = [[], []];
@@ -2314,7 +2287,7 @@ function stepParticles(dt) {
       p.x = Math.random() * W; p.y = Math.random() * H; p.age = 0;
       continue;
     }
-    const lon = x2lon(p.x), lat = y2lat(p.y);
+    const [lon, lat] = lonlat(p.x, p.y);
     const col = lon2col(lon), row = lat2row(lat);
     const u = uAt(col, row), v = vAt(col, row);
     if (Number.isNaN(u) || Number.isNaN(v)) {
@@ -2322,10 +2295,23 @@ function stepParticles(dt) {
       continue;
     }
 
-    const k = pxPerMetre(lat) * TIME_ACCEL * dt;
+    /* Advance the parcel on the globe, then project where it ended up, rather
+       than adding a screen-space vector to its pixel position.
+
+       u and v are east and north. On Mercator those are +x and -y and the two
+       are the same thing, which is what the old screen-space step relied on. On
+       a conic they are not: the meridian is rotated on screen by the grid
+       convergence, up to about 40 degrees at the edges of this frame, so a
+       streakline stepped in screen space would blow across the Atlantic at a
+       visibly wrong angle. Stepping in lon/lat is exact under any projection and
+       costs one extra transform per parcel per frame. */
+    const secs = TIME_ACCEL * dt;
+    const dLat = (v * secs) / R_EARTH * 180 / Math.PI;
+    const dLon = (u * secs) / (R_EARTH * Math.cos(lat * Math.PI / 180)) * 180 / Math.PI;
+    const np = xy(lon + dLon, lat + dLat);
     p.px = p.x; p.py = p.y;
-    p.x += u * k;
-    p.y -= v * k;
+    p.x = np[0];
+    p.y = np[1];
 
     if (p.x < 0 || p.x > W || p.y < 0 || p.y > H) {
       p.x = Math.random() * W; p.y = Math.random() * H; p.age = 0;
