@@ -396,6 +396,7 @@ title: "Forecast"
       <button data-view="map" data-domain="malta" aria-pressed="true">Surface panels</button>
       <button data-view="mgram" aria-pressed="false">Meteogram</button>
       <button data-view="map" data-domain="europe" aria-pressed="false">500 hPa</button>
+      <button data-view="map" data-domain="europe_sfc" aria-pressed="false">Surface pressure</button>
       <button data-view="sat" aria-pressed="false">Satellite</button>
     </nav>
     <small id="cycles">loading…</small>
@@ -769,6 +770,7 @@ const FIELD_SPECS = {
   p: { slug: 'precip', label: 'Precipitation', unit: ' mm' },
   c: { slug: 'cloud', label: 'Cloud cover', unit: ' %' },
   sig: { slug: '500g_anom', label: 'Height anomaly', unit: ' σ' },
+  msl: { slug: 'mslp', label: 'Pressure', unit: ' hPa' },
   none: { slug: 'flow', label: 'None' },
 };
 const SLUG_TO_FIELD = Object.fromEntries(
@@ -808,7 +810,7 @@ const MODELS = {
     // default. Its value is disagreement: where a global model run in Reading
     // and one run in Offenbach part company is a reading of how settled the
     // forecast is that neither can give alone.
-    label: 'IFS', domains: ['europe', 'medit', 'malta', 'zurich'],
+    label: 'IFS', domains: ['europe', 'europe_sfc', 'medit', 'malta', 'zurich'],
     /* Two payloads, because IFS is asked two different questions here: the
        500 hPa frame over Europe and the surface fields over the Mediterranean
        ones. A domain names the file it needs; a model without `parts` names one
@@ -816,6 +818,12 @@ const MODELS = {
     parts: {
       europe: {
         file: 'upper_europe.js', global: 'UPPER',
+        geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
+      },
+      // Same cartography as the upper-air frame — same projection, same box —
+      // so opening both pages downloads the coastlines once.
+      europe_sfc: {
+        file: 'sfc_europe.js', global: 'SFC',
         geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
       },
       medit: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
@@ -840,6 +848,16 @@ DOMAIN_META.europe = {
   // this once it loads. It still has to match pipeline/config.py, because the
   // shell lays the panel out from this ratio before any data arrives and a
   // wrong value here shows as the map resizing the moment it appears.
+  extent: { west: -60, east: 45, south: 28, north: 72 },
+  lazy: true,
+};
+
+/* The surface chart is the same frame at a different level, so it is a second
+   domain rather than a shading option on the first. Keeping them apart is what
+   lets each be one lazy download: a reader who only ever opens the 500 hPa page
+   never fetches a pressure field, and vice versa. */
+DOMAIN_META.europe_sfc = {
+  label: 'Europe / North Atlantic',
   extent: { west: -60, east: 45, south: 28, north: 72 },
   lazy: true,
 };
@@ -912,6 +930,36 @@ function adoptSource(modelKey, g, domainKey) {
       data: { u: d.u, v: d.v, gh: d.gh, sig: d.sig },
     };
   }
+  /* Mean sea level pressure: isobars and the centres between them, the surface
+     chart's whole content. Read off the payload the same way the upper-air one
+     is, so a source is what it carries rather than what shipped it.
+
+     It carries no wind, and that is deliberate rather than missing — the chart
+     this follows does not draw one, and the isobar spacing already states the
+     geostrophic flow. `keys` is the single field, which is what makes every
+     wind-dependent path below check for its absence instead of assuming it. */
+  if (Array.isArray(d.msl)) {
+    return {
+      ...common, accumHours: null,
+      keys: ['msl'],
+      shading: ['msl', 'none'],
+      flowFields: [],
+      // 4 hPa is the interval the Met Office and every other surface analysis
+      // uses, and the one a reader will have calibrated their eye to.
+      contour: { key: 'msl', label: 'Pressure', unit: 'hPa', step: 4, always: true },
+      // The pressure field is a property of the atmosphere, not of the ground,
+      // so the continents are subdued to be read *through* it — same reasoning
+      // as the height anomaly.
+      landmask: true,
+      // Highs and lows, labelled with their central pressure. Without these the
+      // chart is a field of closed curves and the reader has to work out which
+      // way each one turns.
+      centres: true,
+      scales: { msl: g.mslScale },
+      data: { msl: d.msl },
+    };
+  }
+
   /* Offering a shading a source cannot supply would give an empty panel on
      switch, so the option follows the data: whoever ships a cloud field gets
      the cloud button. That is keyed off the array rather than off the model
@@ -995,6 +1043,27 @@ const SIGMA_COLORS = [
   '#f6d6ea', '#e7a0d0', '#d266b8', '#a544ad', '#75399f', '#3f3d97',
   '#315fae', '#74add1', '#ffffff', '#ffffff', '#fbe57a', '#f9c744',
   '#f39c39', '#ec7529', '#db4f27', '#c22d20', '#8f1a16', '#808888',
+];
+
+/* Mean sea level pressure. Diverging about 1013 hPa, because pressure is read as
+   a polarity — which side of normal, and how far — rather than as a magnitude.
+   Blue for low and red for high is the convention every reader of a surface
+   chart already has, and the midpoint is a neutral grey rather than a hue, so
+   "ordinary pressure" reads as nothing in particular instead of as a colour.
+
+   Four steps per arm, lightness rising monotonically to the midpoint and falling
+   again, checked rather than eyeballed: L runs 0.471, 0.620, 0.764, 0.895 up to
+   0.952 at the grey, then 0.912, 0.777, 0.629, 0.484 down the other side, and
+   the midpoint's chroma is 0.004. Deliberately lower-chroma than the anomaly
+   ramp next door: this one sits under black isobars and has to stay behind them.
+
+   Not the sigma palette with new numbers, on purpose — the two Europe pages
+   would otherwise be the same picture in the same colours at two levels, and a
+   reader who glanced at the tab bar would not know which one they were on. */
+const PRESSURE_COLORS = [
+  '#2f5f87', '#5c8cb0', '#93b8d2', '#cfdfe9',
+  '#f0efec',
+  '#f2ddd2', '#dfa88f', '#c2704f', '#96412a',
 ];
 
 function hexToRgb(h) {
@@ -1176,6 +1245,7 @@ function makeLCC(lon0, lat0, sp1, sp2) {
    wind, so there are no particles to advect. */
 const DOMAIN_PROJ = {
   europe: makeLCC(7.5, 50, 35, 65),
+  europe_sfc: makeLCC(7.5, 50, 35, 65),
 };
 const projFor = (key) => DOMAIN_PROJ[key] || MERCATOR;
 
@@ -1249,11 +1319,17 @@ function loopExtent() {
   let tlo = Infinity, thi = -Infinity, shi = 0;
   const spans = [];
   const hasT = !!FT;
+  // The surface-pressure source carries pressure and nothing else, so there is
+  // no wind range to fit. Absence is the normal case for it rather than a
+  // half-built payload, which is why this reads the field rather than erroring.
+  const hasWind = !!FU;
   for (let f = 0; f < NT; f++) {
-    const U = FU[f], V = FV[f];
-    for (let i = 0; i < U.length; i++) {
-      const s = U[i] * U[i] + V[i] * V[i];
-      if (s > shi) shi = s;
+    if (hasWind) {
+      const U = FU[f], V = FV[f];
+      for (let i = 0; i < U.length; i++) {
+        const s = U[i] * U[i] + V[i] * V[i];
+        if (s > shi) shi = s;
+      }
     }
     if (!hasT) continue;
     const T = FT[f];
@@ -1404,16 +1480,31 @@ function loadSource(domainKey, modelKey) {
   TIME_ACCEL = 30000 * ((BOX.east - BOX.west) / 26);
 
   const isUpper = D.keys.includes('sig');
+  const isPressure = D.keys.includes('msl');
 
-  LUTS = {
-    spd: {
+  LUTS = {};
+  // No wind ramp on the surface-pressure source: it carries no u/v, and offering
+  // a shading whose field is absent is what `shading` is filtered against.
+  if (!isPressure) {
+    LUTS.spd = {
       lut: buildLUT(WIND_COLORS),
       range: S_RANGE,
       title: isUpper ? '500 hPa wind speed (m s⁻¹)' : '10 m wind speed (m s⁻¹)',
       tick: S_RANGE[1] > 40 ? 10 : 2.5, unit: ' m/s',
-    },
-  };
-  if (!isUpper) {
+    };
+  }
+  if (isPressure) {
+    LUTS.msl = {
+      lut: buildLUT(PRESSURE_COLORS),
+      // Symmetric about 1013 hPa, because a diverging ramp that is not centred
+      // on its own midpoint paints "average" in a colour that means something.
+      // Beyond either end the ramp clamps, which is the honest thing to do with
+      // a 940 hPa Atlantic bomb rather than restretching the whole scale for it.
+      range: [973, 1053],
+      title: 'Mean sea level pressure (hPa)',
+      tick: 10, unit: ' hPa',
+    };
+  } else if (!isUpper) {
     LUTS.t = {
       lut: buildLUT(TEMP_COLORS, ...rampSlice(T_RANGE[0], T_RANGE[1], TEMP_ABS)),
       range: T_RANGE, title: '2 m temperature (°C)', unit: ' °C',
@@ -1469,8 +1560,9 @@ function loadSource(domainKey, modelKey) {
 
   // The readout rows are labelled from the source too — an upper-air panel
   // reports a height and an anomaly, not a temperature and a rainfall.
-  $('r-temp-label').textContent = isUpper ? 'Height' : 'Temp';
-  $('r-prec-label').textContent = isUpper ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
+  $('r-temp-label').textContent = isPressure ? 'Pressure' : isUpper ? 'Height' : 'Temp';
+  $('r-prec-label').textContent = isPressure ? '—'
+    : isUpper ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
   setTime(state.tf);
 }
 
@@ -2050,6 +2142,124 @@ function isothermPaths(step) {
   return paths;
 }
 
+/* The highs and lows a surface chart is read by.
+
+   A closed isobar says a centre is inside it but not which way it turns, and at
+   4 hPa spacing a shallow feature closes no isobar at all — so these are found
+   in the field rather than from the contours. A centre is a grid point that is a
+   strict extremum over its neighbourhood *and* stands out from that
+   neighbourhood by more than a wrinkle's worth of pressure.
+
+   Radius is in grid cells rather than degrees on purpose: it is a statement
+   about how many samples a feature has to span to be one, and the payload's
+   spacing is what decides that. */
+/* Two radii, because one cannot do this job.
+
+   Testing for an extremum and testing how much it matters want opposite scales.
+   Measure prominence close in and a broad anticyclone fails: its centre is flat,
+   so it clears no threshold over a few degrees and the largest feature on the
+   chart goes unlabelled — which is exactly what a single 4° radius did here.
+   Measure the extremum far out and every shallow wrinkle inside a ridge
+   qualifies.
+
+   So: a strict extremum over the near radius decides *where* a centre is, and
+   the far radius decides *whether* it is worth naming. The near test carries a
+   tolerance because a flat centre is full of ties, and a ">" against its own
+   plateau would reject the very features the far radius exists to catch.
+
+   The far window is only evaluated for points that already passed the near one —
+   a few dozen, not fifty thousand — so the larger radius costs nothing. */
+const CENTRE_R = 6;              // grid cells — 3°, where the centre is
+const CENTRE_R_FAR = 16;         // grid cells — 8°, whether it matters
+const CENTRE_FLAT = 0.05;        // hPa of tie tolerance on a flat centre
+const CENTRE_PROMINENCE = 4.0;   // hPa a centre must stand clear of the far ring
+const CENTRE_MIN_PX = 80;        // two labels closer than this are one feature
+
+function pressureCentres() {
+  const F = CUR.msl;
+  if (!F) return [];
+
+  // Min and max over a window, clamped at the grid edge rather than skipped:
+  // the payload is wider than the frame, so a centre visible on the map always
+  // has data around it, but not always the full radius of it.
+  const window = (r, c, rad) => {
+    let lo = Infinity, hi = -Infinity;
+    const r0 = Math.max(0, r - rad), r1 = Math.min(NY - 1, r + rad);
+    const c0 = Math.max(0, c - rad), c1 = Math.min(NX - 1, c + rad);
+    for (let rr = r0; rr <= r1; rr++) {
+      for (let cc = c0; cc <= c1; cc++) {
+        const w = F[rr * NX + cc];
+        if (Number.isNaN(w)) return null;
+        if (w < lo) lo = w;
+        if (w > hi) hi = w;
+      }
+    }
+    return [lo, hi];
+  };
+
+  const found = [];
+  for (let r = CENTRE_R; r < NY - CENTRE_R; r++) {
+    for (let c = CENTRE_R; c < NX - CENTRE_R; c++) {
+      const v = F[r * NX + c];
+      if (Number.isNaN(v)) continue;
+      const near = window(r, c, CENTRE_R);
+      if (!near) continue;
+      const isLow = v <= near[0] + CENTRE_FLAT;
+      const isHigh = v >= near[1] - CENTRE_FLAT;
+      if (!isLow && !isHigh) continue;
+
+      const far = window(r, c, CENTRE_R_FAR);
+      if (!far) continue;
+      const depth = isHigh ? v - far[0] : far[1] - v;
+      if (depth < CENTRE_PROMINENCE) continue;
+
+      const [x, y] = xy(D.lon0 + c * D.dx, D.lat0 + r * D.dy);
+      if (x < 16 || x > W - 16 || y < 18 || y > H - 20) continue;
+      found.push({ x, y, v, high: isHigh && !isLow, depth });
+    }
+  }
+  /* Deepest first, then drop anything that would print on top of one already
+     kept. Two extrema a few cells apart are one feature the grid happened to
+     give two equal samples, and labelling it twice reads as two lows. */
+  found.sort((a, b) => b.depth - a.depth);
+  const kept = [];
+  for (const f of found) {
+    if (kept.some((k) => Math.hypot(k.x - f.x, k.y - f.y) < CENTRE_MIN_PX)) continue;
+    kept.push(f);
+  }
+  return kept;
+}
+
+function drawCentres(css) {
+  const halo = css.getPropertyValue('--label-halo').trim();
+  ctxG.save();
+  ctxG.textAlign = 'center';
+  ctxG.lineJoin = 'round';
+  for (const c of pressureCentres()) {
+    // The letter takes the colour its own end of the ramp has, so the shading
+    // and the annotation cannot contradict each other.
+    const tint = c.high ? '#96412a' : '#2f5f87';
+    ctxG.fillStyle = tint;
+    ctxG.strokeStyle = halo;
+
+    ctxG.font = '700 19px ui-sans-serif, system-ui, sans-serif';
+    ctxG.textBaseline = 'alphabetic';
+    ctxG.lineWidth = 3.5;
+    ctxG.strokeText(c.high ? 'H' : 'L', c.x, c.y);
+    ctxG.fillText(c.high ? 'H' : 'L', c.x, c.y);
+
+    // Whole hectopascals: the tenth the payload carries is real but not
+    // something a chart centre is ever quoted to.
+    ctxG.font = '600 10px ui-sans-serif, system-ui, sans-serif';
+    ctxG.textBaseline = 'top';
+    const label = String(Math.round(c.v));
+    ctxG.lineWidth = 3;
+    ctxG.strokeText(label, c.x, c.y + 3);
+    ctxG.fillText(label, c.x, c.y + 3);
+  }
+  ctxG.restore();
+}
+
 /* Cartography, drawn onto the map canvas immediately after the shading. It does
    not clear first — drawMap owns the clear, and these are always a pair. */
 function fillRings(ctx, rings, color) {
@@ -2232,6 +2442,10 @@ function drawGeo() {
   strokeRings(ctxG, GEO.lakes, css.getPropertyValue('--coast').trim(), 0.7);
   strokeRings(ctxG, GEO.land, css.getPropertyValue('--coast').trim(), 1.1);
 
+  // After the coastlines so a centre sitting on a shore is not drawn through,
+  // and only where the source says it has them.
+  if (D.centres && state.iso) drawCentres(css);
+
   if (state.places) {
     const ink = css.getPropertyValue('--label').trim();
     const halo = css.getPropertyValue('--label-halo').trim();
@@ -2365,6 +2579,10 @@ function drawParticles(buckets) {
    at particle positions misses the maximum most frames and jitters between the
    ones it does catch. */
 function peakWind() {
+  // null, not 0: the surface-pressure source has no wind at all, and a peak of
+  // "0.0 m/s" would be a claim about a calm frame rather than about an absent
+  // field. The caller hides the readout on null.
+  if (!CUR.u || !CUR.v) return null;
   let peak = 0;
   for (let i = 0; i < NX * NY; i++) {
     const s = CUR.u[i] * CUR.u[i] + CUR.v[i] * CUR.v[i];
@@ -2424,7 +2642,8 @@ function frame(now) {
   if (key !== rasterKey) {
     rasterKey = key;
     drawMap();
-    $('wl-max').textContent = peakWind().toFixed(1) + ' m/s';
+    const pk = peakWind();
+    $('wl-max').textContent = pk === null ? '—' : pk.toFixed(1) + ' m/s';
   }
 
   if (flowOn()) drawParticles(stepParticles(dt));
@@ -2625,12 +2844,36 @@ function clearReadout(msg) {
 function readout(x, y) {
   const [lon, lat] = lonlat(x, y);
   const col = lon2col(lon), row = lat2row(lat);
-  const u = uAt(col, row), v = vAt(col, row);
+  const isPressure = D.keys.includes('msl');
+  // On the surface-pressure source the wind is absent by design, so the
+  // in-domain test falls to the field that source does carry.
+  const u = isPressure ? 0 : uAt(col, row);
+  const v = isPressure ? 0 : vAt(col, row);
+  const probe = isPressure ? sampleAt(CUR.msl, col, row) : u;
 
-  if (Number.isNaN(u)) { clearReadout('Outside the domain'); return; }
+  if (Number.isNaN(probe)) { clearReadout('Outside the domain'); return; }
 
   const ns = lat >= 0 ? 'N' : 'S', ew = lon >= 0 ? 'E' : 'W';
   $('r-pos').textContent = `${Math.abs(lat).toFixed(2)}°${ns}  ${Math.abs(lon).toFixed(2)}°${ew}`;
+
+  if (isPressure) {
+    // Three of the four rows have nothing to say here. Blanking them is better
+    // than leaving the previous panel's numbers under the cursor.
+    $('r-temp').textContent = sampleCubic(CUR.msl, col, row).toFixed(1) + ' hPa';
+    $('r-wind').textContent = '—';
+    $('r-dir').textContent = '—';
+    $('r-prec').textContent = '—';
+    const pspec = LUTS[state.field];
+    const pmark = $('cbar-mark');
+    if (pspec) {
+      const f = barPos(pspec, sampleShade('msl', CUR.msl, col, row));
+      pmark.style.opacity = '1';
+      pmark.style.left = (f * 100) + '%';
+    } else {
+      pmark.style.opacity = '0';
+    }
+    return;
+  }
 
   const isUpper = D.keys.includes('sig');
   // The readout samples the way the shading does, so the number under the
@@ -2697,6 +2940,7 @@ const DESCS = {
   spd: '10 m wind speed shaded, with the flow itself drawn as advected streaklines over it.',
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
+  msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending. No fronts: they are analysed by a forecaster, not carried by a model.',
   c: 'Total cloud cover through the whole depth of the atmosphere, so a thin cirrus sheet and a deep thunderstorm both read as overcast. Blue is clear sky, white is complete cover.',
   sat: 'MTG FCI from EUMETSAT, 20-minutely over the last 24 hours, resampled onto this frame. True colour by day; after sunset there is no visible light to photograph, so night falls back to the 10.5 µm infrared window. The scan nearest the selected time is shown, and past the newest scan the most recent one is held — there is no satellite picture of a forecast.',
   none: 'The wind field alone, as advected streaklines over land and sea.',
@@ -2705,7 +2949,14 @@ const DESCS = {
 function syncDesc() {
   const gap = SRC.steps.length > 1 ? SRC.steps[1] - SRC.steps[0] : 1;
   const km = Math.round(SRC.dy * 111);
-  $('desc').textContent = `${DESCS[state.field]} ${MODELS[state.model].label} at ~${km} km, ` +
+  /* "None" means no shading, which on every other panel leaves the wind as the
+     only thing drawn — hence the stock text. On the surface-pressure panel there
+     is no wind to be left with: turning the shading off leaves the isobars, and
+     saying otherwise describes a layer the source does not carry. */
+  const lead = (state.field === 'none' && D.keys.includes('msl'))
+    ? 'Isobars alone, without the pressure shading behind them.'
+    : DESCS[state.field];
+  $('desc').textContent = `${lead} ${MODELS[state.model].label} at ~${km} km, ` +
     `${gap}-hourly to +${SRC.steps[SRC.steps.length - 1]} h, interpolated between steps. ` +
     'Hover for exact values.';
   $('desc').title = $('desc').textContent;
@@ -2908,6 +3159,11 @@ function buildDomainButtons() {
   const box = $('domains');
   box.innerHTML = '';
   for (const [key, d] of Object.entries(DOMAIN_META)) {
+    /* The surface-pressure frame is reached by its own tab and is the same box
+       as the upper-air one, so listing it here too would put two buttons reading
+       "Europe / North Atlantic" side by side in the domain row with nothing to
+       tell them apart. The tab bar is where the choice between levels belongs. */
+    if (key === 'europe_sfc') continue;
     const b = document.createElement('button');
     b.textContent = d.label;
     b.dataset.domain = key;
