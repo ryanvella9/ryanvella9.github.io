@@ -749,6 +749,7 @@ for (const [k, d] of Object.entries(PANEL.domains)) {
 // it is the better answer, so that is where the Malta panel starts.
 DOMAIN_META.medit.defaultModel = 'icon_eu';
 DOMAIN_META.malta.defaultModel = 'icon_2i';
+if (DOMAIN_META.zurich) DOMAIN_META.zurich.defaultModel = 'icon_eu';
 
 /* What each shading option is, independent of which source happens to offer it.
    `key` is the field in the payload; 'spd' is derived from u and v. */
@@ -770,7 +771,7 @@ const MODELS = {
     // is worth having for its own sake: where the two disagree is a reading of
     // how settled the forecast is, and ICON-EU reaches +120 h where ICON-2I
     // stops at +72.
-    label: 'ICON-EU', domains: ['medit', 'malta'],
+    label: 'ICON-EU', domains: ['medit', 'malta', 'zurich'],
   },
   icon_2i: {
     label: 'ICON-2I', domains: ['malta'],
@@ -873,6 +874,13 @@ function adoptSource(modelKey, g, domainKey) {
       ...common, accumHours: null,
       keys: ['u', 'v', 'gh', 'sig'],
       shading: ['sig', 'spd', 'none'],
+      /* Streaklines only where the flow is the subject.
+
+         Over the height anomaly they were noise: the contours already state the
+         flow — height gradient *is* geostrophic wind, so the streaks re-drew
+         what the isohypses had drawn, at 60 fps, on top of the shading both
+         were competing for. Over wind speed they are the point, and they stay. */
+      flowFields: ['spd'],
       // 6 dam is the interval these charts are conventionally contoured on, and
       // the one the rendered version uses.
       contour: { key: 'gh', label: 'Height', unit: 'dam', step: 6, always: true },
@@ -905,6 +913,14 @@ function adoptSource(modelKey, g, domainKey) {
 }
 
 let NT = 0, SCALE = 10, INIT = null, SRC = null;
+
+/* Whether streaklines belong over the current shading. A source may restrict
+   them to particular fields; most do not, and for those the reader's toggle is
+   the whole answer. */
+function flowAllowed() {
+  return !D || !D.flowFields || D.flowFields.includes(state.field);
+}
+const flowOn = () => state.wind && flowAllowed();
 
 /* ----------------------------------------------------------------- palettes */
 
@@ -2161,7 +2177,7 @@ function frame(now) {
     $('wl-max').textContent = peakWind().toFixed(1) + ' m/s';
   }
 
-  if (state.wind) drawParticles(stepParticles(dt));
+  if (flowOn()) drawParticles(stepParticles(dt));
   else ctxF.clearRect(0, 0, W, H);
 
   requestAnimationFrame(frame);
@@ -2616,6 +2632,13 @@ function buildFieldButtons() {
     b.setAttribute('aria-pressed', String(key === state.field));
     box.appendChild(b);
   }
+  const windBtn = $('tg-wind');
+  const windOK = flowAllowed();
+  windBtn.disabled = !windOK;
+  windBtn.title = windOK ? 'Wind drawn as advected streaklines'
+    : 'The height contours already show this flow — streaklines are offered on the wind-speed shading';
+  windBtn.setAttribute('aria-pressed', String(state.wind && windOK));
+
   const cloudBtn = $('tg-cloud');
   const hasCloud = D.keys.includes('c');
   cloudBtn.disabled = !hasCloud;
@@ -2714,7 +2737,9 @@ $('speeds').onclick = (e) => {
 $('fields').onclick = (e) => {
   const b = e.target.closest('button'); if (!b) return;
   state.field = b.dataset.field;
-  pressGroup('fields', 'field', state.field);
+  // Rebuilt rather than just re-pressed: whether the flow toggle applies
+  // depends on the shading, so changing shading has to re-decide it.
+  buildFieldButtons();
   drawColorbar();
   syncDesc();
   drawAll();
@@ -3006,7 +3031,7 @@ function composeFrame(ctx, w, h, mapH) {
   ctx.fillText(sub, 12, 43);
 
   ctx.drawImage(cvMap, 0, HEADER_H, w, mapH);
-  if (state.wind) ctx.drawImage(cvFlow, 0, HEADER_H, w, mapH);
+  if (flowOn()) ctx.drawImage(cvFlow, 0, HEADER_H, w, mapH);
 
   // Colour bar, drawn from the same LUT the shading used.
   const by = HEADER_H + mapH;
@@ -3083,7 +3108,7 @@ async function makeGif() {
     drawMap();
     // Advance the streaklines between frames so the flow moves rather than
     // freezing into the same tangle on every one.
-    if (state.wind) for (let k = 0; k < 6; k++) drawParticles(stepParticles(0.016));
+    if (flowOn()) for (let k = 0; k < 6; k++) drawParticles(stepParticles(0.016));
     composeFrame(octx, p.w, p.h, mapH);
     return octx.getImageData(0, 0, p.w, p.h).data;
   };
@@ -3505,7 +3530,20 @@ $('mg-wrap').addEventListener('pointerleave', () => {
    collision removed. */
 const SAT = window.SAT_MALTA || null;
 const SAT_CACHE = new Map();
-const satState = { i: 0, playing: false, speed: 1, timer: null, source: 'mtg' };
+const SAT_BAD = new Set();
+
+/* `prev` and `fade` are the dissolve. The loop paints two frames — the one
+   being left at full opacity, the one arriving at `fade` — instead of swapping
+   one for the other. Twenty minutes of weather arriving as a hard cut is what
+   made the animation strobe even when every frame was already in hand: a
+   cross-dissolve is what lets the eye read the cloud in one frame as the same
+   cloud in the next. `fade` is 1 whenever nothing is in flight, which is what
+   stepping, scrubbing, pausing and the stills all leave it at. */
+const satState = {
+  i: 0, prev: null, fade: 1,
+  playing: false, speed: 1, raf: null, stepAt: 0, step: null,
+  source: 'mtg', buffering: false, buffered: false,
+};
 
 /* The two polar-orbiter stills, if the fetcher has published any. They share
    this view rather than getting one of their own because they answer the same
@@ -3545,21 +3583,55 @@ function satImage(frame) {
   let im = SAT_CACHE.get(frame.file);
   if (!im) {
     im = new Image();
+    im.decoding = 'async';
     im.src = DATA_BASE + '/sat/' + frame.file;
     im.onload = () => { if (state.view === 'sat') satDraw(); };
+    // A frame that 404s must not hold the buffering bar at 98% forever. It is
+    // counted as settled and skipped; the loop is a scan short, which is what
+    // a missing scan is.
+    im.onerror = () => { SAT_BAD.add(frame.file); };
     SAT_CACHE.set(frame.file, im);
   }
   return im;
 }
 
-/* Only the neighbours, so scrubbing does not flash white on every step.
-   Preloading the whole day would pull five megabytes for a reader who looks at
-   one frame. */
+const satReady = (f) => {
+  const im = SAT_CACHE.get(f.file);
+  return !!(im && im.complete && im.naturalWidth);
+};
+const satSettled = (f) => satReady(f) || SAT_BAD.has(f.file);
+const satHeld = () => (SAT ? SAT.frames.filter(satSettled).length : 0);
+
+/* The neighbours, so the scrubber has something either side of wherever the
+   reader is standing before the full fetch below has finished. */
 function satPreload() {
   if (!SAT) return;
-  for (const j of [satState.i - 1, satState.i + 1]) {
+  for (const j of [satState.i + 1, satState.i - 1, satState.i + 2]) {
     if (j >= 0 && j <= satMax()) satImage(SAT.frames[j]);
   }
+}
+
+/* The whole loop, once. Holding only the neighbours is what the flashing
+   actually was: at 420 ms a frame the browser had that long to fetch the next
+   JPEG, and satDraw cleared the canvas and drew nothing when it had not
+   arrived — so a slow scan came out as a hole punched in the animation, and at
+   4x the holes outnumbered the pictures. The frugality was misjudged as well.
+   A day of frames is about 1.5 MB, less than a single one of the forecast
+   field files this page loads without comment, and it is fetched only once the
+   reader is actually in the satellite view. */
+let satAllQueued = false;
+function satPreloadAll() {
+  if (!SAT || satAllQueued) return;
+  satAllQueued = true;
+  for (const f of SAT.frames) satImage(f);
+}
+
+/* On idle rather than on arrival: opening the tab usually coincides with the
+   map view still finishing its own fetches, and the loop is not needed in full
+   until Play is pressed. */
+function satIdlePreload() {
+  if (!SAT || !SAT.frames.length || satAllQueued) return;
+  (window.requestIdleCallback || ((fn) => setTimeout(fn, 1200)))(satPreloadAll);
 }
 
 function satResize() {
@@ -3601,9 +3673,28 @@ function satDraw() {
   c.clearRect(0, 0, w, h);
   const im = satImage(f);
   if (!satIsStill()) satPreload();
-  // A frame still loading leaves the canvas blank rather than stretching the
-  // previous one: a wrong picture with a right timestamp is worse than a gap.
-  if (im.complete && im.naturalWidth) c.drawImage(im, 0, 0, w, h);
+
+  /* The frame being left, underneath at full opacity. Two opaque images at
+     alpha 1 and alpha t is a true cross-dissolve — no compositing tricks, and
+     nothing on screen is ever a picture under someone else's timestamp: the
+     readout switches at the midpoint, where the blend stops being mostly the
+     old scan and starts being mostly the new one. Only playback sets this up,
+     and only ever onto a frame already decoded, so the dissolve is never a way
+     of covering for a fetch that has not landed.
+
+     A frame still loading, reached by stepping or scrubbing, leaves the canvas
+     blank exactly as before: a wrong picture with a right timestamp is worse
+     than a gap. */
+  const back = (!satIsStill() && satState.fade < 1 && satState.prev !== null)
+    ? SAT.frames[satState.prev] : null;
+  const layered = back && satReady(back);
+  if (layered) c.drawImage(satImage(back), 0, 0, w, h);
+
+  if (im.complete && im.naturalWidth) {
+    if (layered) c.globalAlpha = satState.fade;
+    c.drawImage(im, 0, 0, w, h);
+    c.globalAlpha = 1;
+  }
   satCarto(c, w, h);
 }
 
@@ -3663,8 +3754,14 @@ function satCarto(c, w, h) {
   c.stroke();
 }
 
+/* Direct navigation — a button, the scrubber, a key, a deep link. No dissolve:
+   the reader asked for one particular scan, not for a transition into it, and
+   a blend on the way would put two timestamps' weather under the one they
+   picked. */
 function satSetIndex(i) {
   satState.i = Math.max(0, Math.min(satMax(), Math.round(i)));
+  satState.prev = null;
+  satState.fade = 1;
   satSync();
   satDraw();
 }
@@ -3753,15 +3850,146 @@ function satTicks() {
   });
 }
 
+/* Pacing. A step is a still hold on the frame in view, then a dissolve into
+   the next one; the two together are the old 420 ms, so the loop runs at the
+   speed it always did. Holding first matters — a picture permanently in
+   motion never resolves into anything a reader can look at.
+
+   Two steps get more than that. The change of instrument, because dusk and
+   dawn replace a photograph with a temperature map and every pixel in the
+   frame changes at once: at the ordinary rate that is the one cut in the loop
+   nobody can read through, and a slow dissolve is what turns it into the sun
+   going down. And the wrap, because the step from the newest scan back to
+   yesterday morning is twenty-four hours wide, not twenty minutes. The long
+   hold there also gives the loop an ending: without it the most recent
+   picture, the one most readers came for, is on screen for the same 420 ms as
+   any other. */
+const SAT_HOLD_MS = 190;
+const SAT_FADE_MS = 230;
+const SAT_KIND_HOLD_MS = 430;    // extra stillness before true colour <-> infrared
+const SAT_KIND_FADE_MS = 1000;
+const SAT_WRAP_HOLD_MS = 1300;   // the newest scan, held, before starting over
+const SAT_WRAP_FADE_MS = 650;
+
+function satStep(from, to) {
+  const fs = SAT.frames;
+  const wrap = to < from;
+  const kind = !wrap && fs[from] && fs[to] && fs[from].kind !== fs[to].kind;
+  let hold = SAT_HOLD_MS, fade = SAT_FADE_MS;
+  if (wrap) { hold += SAT_WRAP_HOLD_MS; fade = SAT_WRAP_FADE_MS; }
+  else if (kind) { hold += SAT_KIND_HOLD_MS; fade = SAT_KIND_FADE_MS; }
+  return { hold: hold / satState.speed, fade: fade / satState.speed, synced: false };
+}
+
+/* Begins the next step. `i` becomes the incoming frame immediately and `prev`
+   the outgoing one, but `fade` starts at 0 — so the canvas still shows the
+   outgoing frame, and keeps showing it through the hold. */
+function satAdvance(ts) {
+  const from = satState.i;
+  const to = from >= satMax() ? 0 : from + 1;
+  // Never dissolve into a frame that has not decoded. That is precisely what
+  // the old loop did, and the hole it left is the flashing. Waiting a beat for
+  // the fetch is a pause; a pause is legible and a hole is not. The step is
+  // rewritten as a pure hold on the frame already up, so the tick has no
+  // dissolve to run against a picture that is not there.
+  if (!satReady(SAT.frames[to])) {
+    satPreloadAll();
+    satState.prev = null;
+    satState.fade = 1;
+    satState.step = { hold: 250 / satState.speed, fade: 0, synced: true };
+    satState.stepAt = ts;
+    return;
+  }
+  satState.step = satStep(from, to);
+  satState.prev = from;
+  satState.i = to;
+  satState.fade = 0;
+  satState.stepAt = ts;
+  satDraw();
+}
+
+function satTick(ts) {
+  if (!satState.playing) return;
+  satState.raf = requestAnimationFrame(satTick);
+  const st = satState.step;
+  if (!st) return;
+
+  let el = ts - satState.stepAt;
+  // A backgrounded tab stops firing rAF, and the gap on return can be minutes.
+  // Restarting the step beats fast-forwarding through half the loop to catch
+  // up on time the reader was not watching.
+  if (el > (st.hold + st.fade) * 6) { satState.stepAt = ts; el = 0; }
+
+  const f = st.fade > 0
+    ? (el <= st.hold ? 0 : Math.min(1, (el - st.hold) / st.fade))
+    : 1;                                    // a pure hold: nothing to dissolve
+  if (f !== satState.fade) {
+    satState.fade = f;
+    // Half way, where the picture stops being mostly one scan and starts being
+    // mostly the other. Switching at the start of the dissolve would put the
+    // incoming timestamp over a frame that is still almost entirely the one
+    // before it.
+    if (f >= 0.5 && !st.synced) { st.synced = true; satSync(); }
+    satDraw();
+  }
+  if (el >= st.hold + st.fade) satAdvance(ts);
+}
+
+/* Play holds until the loop is in hand rather than starting into a half-empty
+   cache and fetching as it goes. The whole day is about 1.5 MB, so this is a
+   second or two once, against a stutter on every pass for as long as the
+   reader watches. The progress goes on the button because the button is what
+   they just pressed; a bar elsewhere on the page would be answering a question
+   they did not ask. */
+function satBuffer() {
+  satPreloadAll();
+  satState.buffering = true;
+  const btn = $('sat-play');
+  const total = SAT.frames.length;
+  const deadline = performance.now() + 12000;
+  btn.disabled = true;
+  const poll = () => {
+    if (!satState.buffering) return;
+    const n = satHeld();
+    // The deadline is for a connection slow enough that waiting is worse than
+    // the stutter. Playback still refuses to dissolve into a frame it does not
+    // have, so the loop pauses on a picture rather than blanking.
+    if (n >= total || performance.now() > deadline) {
+      satState.buffering = false;
+      satState.buffered = true;
+      btn.disabled = false;
+      satSetPlaying(true);
+      return;
+    }
+    btn.textContent = 'Loading ' + Math.round((n / total) * 100) + '%';
+    setTimeout(poll, 120);
+  };
+  poll();
+}
+
 function satSetPlaying(on) {
+  if (on && !satState.buffered) { satBuffer(); return; }
+  satState.buffering = false;
   satState.playing = on;
-  $('sat-play').textContent = on ? 'Pause' : 'Play';
-  $('sat-play').setAttribute('aria-pressed', String(on));
-  if (satState.timer) { clearInterval(satState.timer); satState.timer = null; }
+  const btn = $('sat-play');
+  btn.disabled = false;
+  btn.textContent = on ? 'Pause' : 'Play';
+  btn.setAttribute('aria-pressed', String(on));
+  if (satState.raf) { cancelAnimationFrame(satState.raf); satState.raf = null; }
   if (on) {
-    satState.timer = setInterval(() => {
-      satSetIndex(satState.i >= satMax() ? 0 : satState.i + 1);
-    }, 420 / satState.speed);
+    satState.stepAt = performance.now();
+    // Straight into the first step: the frame on screen is one the reader has
+    // been looking at since before they pressed Play, so holding it again
+    // reads as the button having missed.
+    satAdvance(satState.stepAt);
+    satState.raf = requestAnimationFrame(satTick);
+  } else {
+    // Settling on the frame the readout names. Leaving a half-finished
+    // dissolve up would freeze two scans' weather under one timestamp.
+    satState.prev = null;
+    satState.fade = 1;
+    satState.step = null;
+    satDraw();
   }
 }
 
@@ -3845,7 +4073,9 @@ function satInit() {
     for (const x of $('sat-speeds').children) {
       x.setAttribute('aria-pressed', String(x === b));
     }
-    if (satState.playing) satSetPlaying(true);   // restart at the new interval
+    // Nothing to restart. satStep reads the speed when it builds the next
+    // step, so the change lands at the end of the one in flight — at most one
+    // frame later, and without cutting a dissolve in half to get there.
   };
 }
 
@@ -3862,7 +4092,7 @@ function showView(name) {
       (name !== 'map' || b.dataset.domain === (state.domain === 'europe' ? 'europe' : 'malta'));
     b.setAttribute('aria-pressed', String(on));
   }
-  if (name === 'sat') { syncMeta(); satResize(); satSync(); return; }
+  if (name === 'sat') { syncMeta(); satResize(); satSync(); satIdlePreload(); return; }
   if (name === 'map') { resize(); syncTime(); }
   else {
     const d = MG.data;
