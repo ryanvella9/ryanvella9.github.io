@@ -4211,6 +4211,26 @@ function satSetSource(key) {
   satSync();
 }
 
+/* The scan nearest a stamp from the URL. Nearest rather than exact, because a
+   link outlives the frame it named: the Malta loop drops anything over 24 h
+   old and the disc keeps two hours, so an exact match fails for most links
+   that are more than a day out. Landing on the closest scan still held is what
+   the reader wanted — the weather at about that time — and it degrades to the
+   oldest or newest frame rather than to nothing. */
+function satSeek(stamp) {
+  const L = satLoop();
+  if (!L || !stamp) return;
+  const t = Date.parse(stamp.slice(0, 4) + '-' + stamp.slice(4, 6) + '-' + stamp.slice(6, 8) +
+                       'T' + stamp.slice(9, 11) + ':' + stamp.slice(11, 13) + ':00Z');
+  if (Number.isNaN(t)) return;
+  let best = 0, bd = Infinity;
+  L.frames.forEach((f, i) => {
+    const d = Math.abs(Date.parse(f.t) - t);
+    if (d < bd) { bd = d; best = i; }
+  });
+  satSetIndex(best);
+}
+
 function satTicks() {
   const box = $('sat-ticks');
   const L = satLoop();
@@ -4274,14 +4294,32 @@ function satStep(from, to) {
    the outgoing one, but `fade` starts at 0 — so the canvas still shows the
    outgoing frame, and keeps showing it through the hold. */
 function satAdvance(ts) {
+  const L = satLoop();
   const from = satState.i;
-  const to = from >= satMax() ? 0 : from + 1;
+
+  /* Step over anything the fetch gave up on. SAT_BAD is permanent — a frame
+     listed in the manifest that the server does not have will not appear by
+     being asked again — so the wait below would never end and the loop would
+     sit on the frame before it for as long as the reader watched. A missing
+     scan should cost the loop a scan, not stop it.
+
+     The counter is the termination proof: if every frame is bad there is no
+     loop to run, and continuing to search would spin the whole array once per
+     step forever. */
+  let to = from >= satMax() ? 0 : from + 1;
+  let skipped = 0;
+  while (SAT_BAD.has(L.frames[to].file) && skipped < L.frames.length) {
+    to = to >= satMax() ? 0 : to + 1;
+    skipped++;
+  }
+  if (skipped >= L.frames.length) { satSetPlaying(false); return; }
+
   // Never dissolve into a frame that has not decoded. That is precisely what
   // the old loop did, and the hole it left is the flashing. Waiting a beat for
   // the fetch is a pause; a pause is legible and a hole is not. The step is
   // rewritten as a pure hold on the frame already up, so the tick has no
   // dissolve to run against a picture that is not there.
-  if (!satReady(satLoop().frames[to])) {
+  if (!satReady(L.frames[to])) {
     satPreloadAll();
     satState.prev = null;
     satState.fade = 1;
@@ -4363,8 +4401,23 @@ function satSetPlaying(on) {
   // Nothing to play. The controls are hidden whenever this is true, so this is
   // only reachable by a keypress arriving before the panel has settled.
   if (on && !satLoop()) return;
+  // A one-frame loop has nothing to animate, and the wrap would dissolve the
+  // frame into itself for as long as the reader left it running.
+  if (on && satMax() < 1) return;
+
+  /* Any press while it is loading means stop. Without this the space bar found
+     playing===false, asked to start, and re-entered satBuffer — so three
+     presses left three poll chains running and no way to call any of them off. */
+  if (satState.buffering) {
+    satState.buffering = false;
+    const b = $('sat-play');
+    b.disabled = false;
+    b.textContent = 'Play';
+    b.setAttribute('aria-pressed', 'false');
+    return;
+  }
   if (on && !satBuffered.has(satState.source)) { satBuffer(); return; }
-  satState.buffering = false;
+
   satState.playing = on;
   const btn = $('sat-play');
   btn.disabled = false;
@@ -4372,6 +4425,18 @@ function satSetPlaying(on) {
   btn.setAttribute('aria-pressed', String(on));
   if (satState.raf) { cancelAnimationFrame(satState.raf); satState.raf = null; }
   if (on) {
+    /* The panel parks on the newest scan, so Play is nearly always pressed
+       from the end of the loop — where the next step is the wrap, and the wrap
+       opens with a 1.5 s hold. That put a second and a half of nothing between
+       the button changing to Pause and the picture moving, which reads as the
+       press having missed. Starting the pass at the oldest frame instead is
+       both what the reader asked for and where a loop begins. */
+    if (satState.i >= satMax()) {
+      satState.i = 0;
+      satState.prev = null;
+      satState.fade = 1;
+      satSync();
+    }
     satState.stepAt = performance.now();
     // Straight into the first step: the frame on screen is one the reader has
     // been looking at since before they pressed Play, so holding it again
@@ -4379,11 +4444,15 @@ function satSetPlaying(on) {
     satAdvance(satState.stepAt);
     satState.raf = requestAnimationFrame(satTick);
   } else {
-    // Settling on the frame the readout names. Leaving a half-finished
-    // dissolve up would freeze two scans' weather under one timestamp.
+    /* Settling on the frame the canvas is about to show. satAdvance moves the
+       index at the *start* of a step and the readout only catches up halfway
+       through the dissolve, so pausing during the opening hold used to leave
+       the time, the scrubber and the URL naming the scan before the one that
+       then appeared. Drawing and syncing together is what keeps them agreeing. */
     satState.prev = null;
     satState.fade = 1;
     satState.step = null;
+    satSync();
     satDraw();
   }
 }
@@ -4632,16 +4701,22 @@ function applyHash() {
      scan rather than refusing the link. */
   if (/^#satellite(\/|$)/.test(BOOT_HASH)) {
     if (satLoopKeys().length || satStills().length) {
-      // #satellite/s2 and /s3 select a still, #satellite/disc the full-disc
-      // loop (with or without a timestamp after it); anything else — including
-      // the bare timestamp form and the old shading-layer links — opens the
-      // Malta loop, which is what those links have always meant.
-      const want = /^#satellite\/(s2|s3|disc|mtg)(?:\/|$)/.exec(BOOT_HASH);
+      /* #satellite/s2 and /s3 select a still; #satellite/disc the full-disc
+         loop; a bare #satellite/YYYYMMDDTHHMM the Malta loop, which is what
+         that form has always meant. A named loop may carry a stamp after it.
+
+         The stamp used to be parsed and then dropped — every link opened on
+         the newest scan, so sending someone the shower you were looking at
+         sent them the weather at the moment they clicked instead. It is now
+         honoured, which is the only reason the address bar was writing it. */
+      const want = /^#satellite\/(?:(s2|s3|disc|mtg)(?:\/(\d{8}T\d{4}))?|(\d{8}T\d{4}))$/
+        .exec(BOOT_HASH);
       // showView first: satSetSource re-lays-out the panel, and satResize is a
       // no-op while the section is still hidden and has no width.
       showView('sat');
       const key = want && want[1];
       if (key && (SAT_LOOPS[key] || satStills().some((s) => s.key === key))) satSetSource(key);
+      if (want) satSeek(want[2] || want[3]);
       return;
     }
     showView('map'); toDefaultModel(); return;
