@@ -1122,6 +1122,115 @@ const SIGMA_IDX = ladderTable(2001, (i) => (i - 1000) / 100, sigmaPos);  // -10.
 const merc = (lat) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI / 180) / 2));
 const invMerc = (y) => (2 * Math.atan(Math.exp(y)) - Math.PI / 2) * 180 / Math.PI;
 
+/* A projection is {separable, fwd, inv}. `separable` is the property the rest
+   of the viewer cares about: with it, x depends only on lon and y only on lat,
+   so a raster row needs one inverse instead of one per pixel and a grid cell is
+   an axis-aligned rectangle on screen. Without it every point needs the full
+   two-dimensional transform, and the code below branches accordingly.
+
+   Both are conformal, which is the part that matters for reading a chart: the
+   angle a trough crosses a coast at is the angle it really crosses it at. */
+const MERCATOR = {
+  separable: true,
+  fwd: (lon, lat) => [lon * Math.PI / 180, merc(lat)],
+  inv: (x, y) => [x * 180 / Math.PI, invMerc(y)],
+};
+
+/* Lambert Conformal Conic — the standard mid-latitude synoptic projection, and
+   what the rendered PNGs have always used. Meridians fan and parallels curve,
+   so the frame is a rectangle in *projected* space whose corners reach outside
+   the nominal lon/lat box: on the Europe domain the north-west corner runs past
+   60 W. That is the look, not a bug.
+
+   Not separable, and not usable where streaklines are advected in screen space
+   — which is why it is registered for the upper-air frame alone. */
+function makeLCC(lon0, lat0, sp1, sp2) {
+  const RAD = Math.PI / 180;
+  const t = (lat) => Math.tan(Math.PI / 4 + lat * RAD / 2);
+  const n = Math.log(Math.cos(sp1 * RAD) / Math.cos(sp2 * RAD))
+          / Math.log(t(sp2) / t(sp1));
+  const F = Math.cos(sp1 * RAD) * Math.pow(t(sp1), n) / n;
+  const rho0 = F / Math.pow(t(lat0), n);
+  const sign = n < 0 ? -1 : 1;
+  return {
+    separable: false,
+    fwd(lon, lat) {
+      let dl = (lon - lon0) % 360;
+      if (dl > 180) dl -= 360; else if (dl < -180) dl += 360;
+      const th = n * dl * RAD;
+      const rho = F / Math.pow(t(lat), n);
+      return [rho * Math.sin(th), rho0 - rho * Math.cos(th)];
+    },
+    inv(x, y) {
+      const dy = rho0 - y;
+      const rho = sign * Math.hypot(x, dy);
+      const th = Math.atan2(sign * x, sign * dy) / n;
+      return [lon0 + th / RAD,
+              (2 * Math.atan(Math.pow(F / rho, 1 / n)) - Math.PI / 2) / RAD];
+    },
+  };
+}
+
+/* Per domain, defaulting to Mercator. Only the upper-air frame differs, and it
+   can afford to: its payload carries geopotential height and anomaly and no
+   wind, so there are no particles to advect. */
+const DOMAIN_PROJ = {
+  europe: makeLCC(7.5, 50, 35, 65),
+};
+const projFor = (key) => DOMAIN_PROJ[key] || MERCATOR;
+
+/* The projected bounding box of a lon/lat extent, which is what the frame shows.
+   For a conic this is not the projection of the four corners: the top edge bows
+   and the widest point of the box is somewhere along an edge, not at its end.
+   Walking the boundary is what cartopy's set_extent does, and matching it is
+   what makes the browser frame agree with the rendered PNG. */
+function projectedBox(proj, box, samples = 180) {
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity;
+  const put = (lon, lat) => {
+    const p = proj.fwd(lon, lat);
+    if (p[0] < x0) x0 = p[0];
+    if (p[0] > x1) x1 = p[0];
+    if (p[1] < y0) y0 = p[1];
+    if (p[1] > y1) y1 = p[1];
+  };
+  for (let i = 0; i <= samples; i++) {
+    const f = i / samples;
+    put(box.west + (box.east - box.west) * f, box.south);
+    put(box.west + (box.east - box.west) * f, box.north);
+    put(box.west, box.south + (box.north - box.south) * f);
+    put(box.east, box.south + (box.north - box.south) * f);
+  }
+  return { x0, x1, y0, y1 };
+}
+
+/* The largest projected rectangle that still lies entirely inside the lon/lat
+   box, found by taking each curved edge's innermost point.
+
+   The rendered PNG can use the enclosing box instead, because cartopy fills its
+   corners from global coastline and land features and the pipeline pads the data
+   crop out to meet them. The payload here is exactly the domain and not one
+   grid point more, so an enclosing box leaves the corners with no data and no
+   geography — a fan floating in white. Inscribing costs the far corners and
+   fills the frame, which is what a synoptic chart looks like. */
+function inscribedBox(proj, box, samples = 180) {
+  let x0 = -Infinity, x1 = Infinity, y0 = -Infinity, y1 = Infinity;
+  for (let i = 0; i <= samples; i++) {
+    const f = i / samples;
+    const lon = box.west + (box.east - box.west) * f;
+    const lat = box.south + (box.north - box.south) * f;
+    const w = proj.fwd(box.west, lat), e = proj.fwd(box.east, lat);
+    const s = proj.fwd(lon, box.south), n = proj.fwd(lon, box.north);
+    if (w[0] > x0) x0 = w[0];
+    if (e[0] < x1) x1 = e[0];
+    if (s[1] > y0) y0 = s[1];
+    if (n[1] < y1) y1 = n[1];
+  }
+  return { x0, x1, y0, y1 };
+}
+
+const frameBox = (proj, box) =>
+  (proj.separable ? projectedBox : inscribedBox)(proj, box);
+
 /* --------------------------------------------------------- per-domain state */
 
 const state = {
@@ -1137,6 +1246,8 @@ const state = {
 };
 
 let D, GEO, NX, NY, FU, FV, FT, FP, FIELDS, CUR, BOX, ASPECT, LUTS, T_RANGE, S_RANGE;
+// The active projection and the projected frame it maps onto the canvas.
+let PROJ = MERCATOR, PBOX = null;
 let ISO_STEP, TIME_ACCEL, T_CLIP;
 let W = 0, H = 0, DPR = 1;
 
@@ -1271,7 +1382,9 @@ function loadSource(domainKey, modelKey) {
   // Geometry belongs to the domain, not the model: switching model must not
   // move the frame, or the two are not comparable.
   BOX = DOMAIN_META[domainKey].extent;
-  ASPECT = ((BOX.east - BOX.west) * Math.PI / 180) / (merc(BOX.north) - merc(BOX.south));
+  PROJ = projFor(domainKey);
+  PBOX = frameBox(PROJ, BOX);
+  ASPECT = (PBOX.x1 - PBOX.x0) / (PBOX.y1 - PBOX.y0);
 
   /* The temperature scale is fitted to the loop's 0.5th-99.5th percentile, not
      to its extremes.
@@ -1383,10 +1496,27 @@ function loadSource(domainKey, modelKey) {
 const lon2col = (lon) => (lon - D.lon0) / D.dx;
 const lat2row = (lat) => (lat - D.lat0) / D.dy;
 
-const lon2x = (lon) => (lon - BOX.west) / (BOX.east - BOX.west) * W;
-const lat2y = (lat) => (merc(BOX.north) - merc(lat)) / (merc(BOX.north) - merc(BOX.south)) * H;
-const x2lon = (x) => BOX.west + (x / W) * (BOX.east - BOX.west);
-const y2lat = (y) => invMerc(merc(BOX.north) - (y / H) * (merc(BOX.north) - merc(BOX.south)));
+/* The general transform: lon/lat to canvas pixels and back, through whichever
+   projection the domain registered. Canvas y runs downward, hence the flip. */
+const xy = (lon, lat) => {
+  const p = PROJ.fwd(lon, lat);
+  return [(p[0] - PBOX.x0) / (PBOX.x1 - PBOX.x0) * W,
+          (PBOX.y1 - p[1]) / (PBOX.y1 - PBOX.y0) * H];
+};
+const lonlat = (x, y) => PROJ.inv(
+  PBOX.x0 + (x / W) * (PBOX.x1 - PBOX.x0),
+  PBOX.y1 - (y / H) * (PBOX.y1 - PBOX.y0),
+);
+
+/* Single-axis shorthands. Valid only where the projection is separable, which
+   is every domain except the upper-air frame; the shared drawing code below
+   goes through xy()/lonlat() instead so it is correct on both. These remain for
+   the wind and particle paths, which only ever run on Mercator domains.
+   On Mercator they are algebraically identical to what they replaced. */
+const lon2x = (lon) => xy(lon, BOX.south)[0];
+const lat2y = (lat) => xy(BOX.west, lat)[1];
+const x2lon = (x) => lonlat(x, 0)[0];
+const y2lat = (y) => lonlat(0, y)[1];
 
 /* The two bracketing steps, blended into one grid per field.
 
@@ -1642,16 +1772,27 @@ function drawRaster() {
   const inv = 255 / (range[1] - range[0]);
   const field = state.field;
 
-  // Column -> grid column is the same for every row, and the inverse Mercator
-  // for the row is the same for every column. Both were being recomputed per
-  // pixel; hoisting them takes an exp() and an atan() out of ~80,000 iterations.
+  // On a separable projection the grid column is the same for every row and the
+  // inverse for the row is the same for every column. Both were being recomputed
+  // per pixel; hoisting them takes an exp() and an atan() out of ~80,000
+  // iterations. A conic separates into neither, so the upper-air frame pays for
+  // a full inverse per pixel — which it can afford, having no wind to animate:
+  // this runs on redraw, not on every frame of a loop.
+  const sep = PROJ.separable;
   const cols = new Float32Array(ow);
-  for (let i = 0; i < ow; i++) cols[i] = lon2col(x2lon(((i + 0.5) / ow) * W));
+  if (sep) for (let i = 0; i < ow; i++) cols[i] = lon2col(x2lon(((i + 0.5) / ow) * W));
 
   for (let j = 0; j < oh; j++) {
-    const row = lat2row(y2lat(((j + 0.5) / oh) * H));
+    const py = ((j + 0.5) / oh) * H;
+    const rowSep = sep ? lat2row(y2lat(py)) : 0;
     for (let i = 0; i < ow; i++) {
-      const col = cols[i];
+      let col, row;
+      if (sep) {
+        col = cols[i]; row = rowSep;
+      } else {
+        const ll = lonlat(((i + 0.5) / ow) * W, py);
+        col = lon2col(ll[0]); row = lat2row(ll[1]);
+      }
       const o = (j * ow + i) * 4;
       let k;
 
@@ -1741,7 +1882,7 @@ function tracePolys(ctx, rings) {
   ctx.beginPath();
   for (const ring of rings) {
     for (let i = 0; i < ring.length; i++) {
-      const x = lon2x(ring[i][0]), y = lat2y(ring[i][1]);
+      const [x, y] = xy(ring[i][0], ring[i][1]);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.closePath();
@@ -1753,7 +1894,7 @@ function strokeRings(ctx, rings, color, width) {
   ctx.beginPath();
   for (const ring of rings) {
     for (let i = 0; i < ring.length; i++) {
-      const x = lon2x(ring[i][0]), y = lat2y(ring[i][1]);
+      const [x, y] = xy(ring[i][0], ring[i][1]);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
   }
@@ -1851,8 +1992,31 @@ function isothermPaths(step) {
     return p;
   };
 
+  /* Where each cell corner lands on screen. On a separable projection a cell is
+     an axis-aligned rectangle, so its two x values hoist out of the row loop and
+     its two y values out of the column loop — a few hundred transforms for the
+     whole grid. A conic makes it a quadrilateral with four independent corners,
+     so the grid is projected once up front instead. That is ~19,000 transforms
+     on the upper-air frame, which is affordable there and nowhere else, and is
+     exactly why this branches rather than always taking the general path. */
+  const sep = PROJ.separable;
+  let GX = null, GY = null;
+  if (!sep) {
+    GX = new Float32Array(NX * NY);
+    GY = new Float32Array(NX * NY);
+    for (let r = 0; r < NY; r++) {
+      const lat = D.lat0 + r * D.dy;
+      for (let c = 0; c < NX; c++) {
+        const p = xy(D.lon0 + c * D.dx, lat);
+        GX[r * NX + c] = p[0];
+        GY[r * NX + c] = p[1];
+      }
+    }
+  }
+
   for (let r = 0; r < NY - 1; r++) {
-    const py0 = lat2y(D.lat0 + r * D.dy), py1 = lat2y(D.lat0 + (r + 1) * D.dy);
+    const py0 = sep ? lat2y(D.lat0 + r * D.dy) : 0;
+    const py1 = sep ? lat2y(D.lat0 + (r + 1) * D.dy) : 0;
     for (let c = 0; c < NX - 1; c++) {
       const i = r * NX + c;
       const v0 = F[i], v1 = F[i + 1], v2 = F[i + NX + 1], v3 = F[i + NX];
@@ -1865,22 +2029,32 @@ function isothermPaths(step) {
       const first = Math.ceil(lo / step) * step;
       if (first > hi) continue;
 
-      const px0 = lon2x(D.lon0 + c * D.dx), px1 = lon2x(D.lon0 + (c + 1) * D.dx);
+      // Corners in the same order as v0..v3: (c,r), (c+1,r), (c+1,r+1), (c,r+1).
+      let ax, ay, bx, by, cx, cy, dx, dy;
+      if (sep) {
+        const px0 = lon2x(D.lon0 + c * D.dx), px1 = lon2x(D.lon0 + (c + 1) * D.dx);
+        ax = px0; ay = py0; bx = px1; by = py0;
+        cx = px1; cy = py1; dx = px0; dy = py1;
+      } else {
+        const j1 = i + 1, j2 = i + NX + 1, j3 = i + NX;
+        ax = GX[i]; ay = GY[i]; bx = GX[j1]; by = GY[j1];
+        cx = GX[j2]; cy = GY[j2]; dx = GX[j3]; dy = GY[j3];
+      }
 
       for (let level = first; level <= hi; level += step) {
         const idx = (v0 > level ? 1 : 0) | (v1 > level ? 2 : 0)
                   | (v2 > level ? 4 : 0) | (v3 > level ? 8 : 0);
         if (idx === 0 || idx === 15) continue;
         // Edge crossings, in canvas coordinates: 0 top, 1 right, 2 bottom,
-        // 3 left. Interpolating in screen space is exact on the horizontal
-        // edges and within a fraction of a pixel on the vertical ones, which is
-        // all Mercator's stretch amounts to across one cell.
+        // 3 left. Interpolating along the cell edge in screen space is exact
+        // wherever the edge is straight and within a fraction of a pixel where
+        // the projection bends it, which over one grid cell is all it does.
         const ex = [0, 0, 0, 0], ey = [0, 0, 0, 0];
         let t;
-        t = (level - v0) / (v1 - v0); ex[0] = px0 + (px1 - px0) * t; ey[0] = py0;
-        t = (level - v1) / (v2 - v1); ex[1] = px1; ey[1] = py0 + (py1 - py0) * t;
-        t = (level - v3) / (v2 - v3); ex[2] = px0 + (px1 - px0) * t; ey[2] = py1;
-        t = (level - v0) / (v3 - v0); ex[3] = px0; ey[3] = py0 + (py1 - py0) * t;
+        t = (level - v0) / (v1 - v0); ex[0] = ax + (bx - ax) * t; ey[0] = ay + (by - ay) * t;
+        t = (level - v1) / (v2 - v1); ex[1] = bx + (cx - bx) * t; ey[1] = by + (cy - by) * t;
+        t = (level - v3) / (v2 - v3); ex[2] = dx + (cx - dx) * t; ey[2] = dy + (cy - dy) * t;
+        t = (level - v0) / (v3 - v0); ex[3] = ax + (dx - ax) * t; ey[3] = ay + (dy - ay) * t;
 
         // Ambiguous saddles (5, 10) are split the same way every time; at this
         // spacing the alternative resolution is a sub-cell difference.
@@ -1902,7 +2076,7 @@ function fillRings(ctx, rings, color) {
   ctx.beginPath();
   for (const ring of rings) {
     for (let i = 0; i < ring.length; i++) {
-      const x = lon2x(ring[i][0]), y = lat2y(ring[i][1]);
+      const [x, y] = xy(ring[i][0], ring[i][1]);
       if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
     }
     ctx.closePath();
@@ -1930,17 +2104,59 @@ function drawGraticule(css) {
   const ink = css.getPropertyValue('--grat-ink').trim();
   const halo = css.getPropertyValue('--label-halo').trim();
 
+  /* A conic frame is a rectangle in projected space, so its corners reach outside
+     the lon/lat box — the north-west one runs well past the western edge. The
+     enumeration is widened to match, and each line is sampled past the box at
+     both ends, so the graticule reaches the frame edge instead of stopping short
+     in a corner. Canvas clips the overshoot for free. */
+  const sep = PROJ.separable;
+  const padLon = sep ? 0 : 40, padLat = sep ? 0 : 12;
+
   const lons = [], lats = [];
-  for (let v = Math.ceil(BOX.west / dLon) * dLon; v <= BOX.east; v += dLon) lons.push(v);
-  for (let v = Math.ceil(BOX.south / dLat) * dLat; v <= BOX.north; v += dLat) lats.push(v);
+  for (let v = Math.ceil((BOX.west - padLon) / dLon) * dLon; v <= BOX.east + padLon; v += dLon) lons.push(v);
+  for (let v = Math.ceil((BOX.south - padLat) / dLat) * dLat; v <= BOX.north + padLat; v += dLat) lats.push(v);
+
+  // Sampled span for a curved line, and the point where it meets a frame edge.
+  const SEG = 72;
+  const meridian = (lon) => {
+    const pts = [];
+    for (let i = 0; i <= SEG; i++) {
+      const f = i / SEG;
+      pts.push(xy(lon, (BOX.south - padLat) + ((BOX.north + padLat) - (BOX.south - padLat)) * f));
+    }
+    return pts;
+  };
+  const parallel = (lat) => {
+    const pts = [];
+    for (let i = 0; i <= SEG; i++) {
+      const f = i / SEG;
+      pts.push(xy((BOX.west - padLon) + ((BOX.east + padLon) - (BOX.west - padLon)) * f, lat));
+    }
+    return pts;
+  };
 
   ctxG.save();
   ctxG.strokeStyle = line;
   ctxG.lineWidth = 0.7;
   ctxG.setLineDash([3, 4]);
   ctxG.beginPath();
-  for (const v of lons) { const x = lon2x(v); ctxG.moveTo(x, 0); ctxG.lineTo(x, H); }
-  for (const v of lats) { const y = lat2y(v); ctxG.moveTo(0, y); ctxG.lineTo(W, y); }
+  if (sep) {
+    for (const v of lons) { const x = lon2x(v); ctxG.moveTo(x, 0); ctxG.lineTo(x, H); }
+    for (const v of lats) { const y = lat2y(v); ctxG.moveTo(0, y); ctxG.lineTo(W, y); }
+  } else {
+    for (const v of lons) {
+      const pts = meridian(v);
+      for (let i = 0; i < pts.length; i++) {
+        if (i === 0) ctxG.moveTo(pts[i][0], pts[i][1]); else ctxG.lineTo(pts[i][0], pts[i][1]);
+      }
+    }
+    for (const v of lats) {
+      const pts = parallel(v);
+      for (let i = 0; i < pts.length; i++) {
+        if (i === 0) ctxG.moveTo(pts[i][0], pts[i][1]); else ctxG.lineTo(pts[i][0], pts[i][1]);
+      }
+    }
+  }
   ctxG.stroke();
   ctxG.setLineDash([]);
 
@@ -1952,16 +2168,46 @@ function drawGraticule(css) {
   ctxG.strokeStyle = halo;
   ctxG.fillStyle = ink;
 
+  /* On a curved graticule a label cannot sit at a fixed x or y — the meridian it
+     names arrives at the top edge somewhere that depends on latitude. These walk
+     the sampled line for the segment that crosses the edge and interpolate it.
+     A line that never reaches that edge returns null and goes unlabelled, which
+     is what should happen: it entered through a side. */
+  const crossTop = (pts) => {
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      if (a[1] !== b[1] && ((a[1] <= 0 && b[1] >= 0) || (a[1] >= 0 && b[1] <= 0))) {
+        return a[0] + (b[0] - a[0]) * ((0 - a[1]) / (b[1] - a[1]));
+      }
+    }
+    return null;
+  };
+  const crossLeft = (pts) => {
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i];
+      if (a[0] !== b[0] && ((a[0] <= 0 && b[0] >= 0) || (a[0] >= 0 && b[0] <= 0))) {
+        return a[1] + (b[1] - a[1]) * ((0 - a[0]) / (b[0] - a[0]));
+      }
+    }
+    return null;
+  };
+
+  /* Only lines the domain actually contains get labelled. The enumeration above
+     is padded so the graticule reaches the frame edge, and labelling those
+     overshoot lines would caption the upper-air frame with parallels like 20 N
+     that are nowhere in its data. */
   ctxG.textAlign = 'center'; ctxG.textBaseline = 'top';
   for (const v of lons) {
-    const x = lon2x(v);
-    if (x < 18 || x > W - 18) continue;
+    if (v < BOX.west || v > BOX.east) continue;
+    const x = sep ? lon2x(v) : crossTop(meridian(v));
+    if (x === null || x < 18 || x > W - 18) continue;
     ctxG.strokeText(fmtLon(v), x, 5); ctxG.fillText(fmtLon(v), x, 5);
   }
   ctxG.textAlign = 'left'; ctxG.textBaseline = 'middle';
   for (const v of lats) {
-    const y = lat2y(v);
-    if (y < 14 || y > H - 14) continue;
+    if (v < BOX.south || v > BOX.north) continue;
+    const y = sep ? lat2y(v) : crossLeft(parallel(v));
+    if (y === null || y < 14 || y > H - 14) continue;
     ctxG.strokeText(fmtLat(v), 5, y); ctxG.fillText(fmtLat(v), 5, y);
   }
   ctxG.restore();
@@ -2011,7 +2257,7 @@ function drawGeo() {
     ctxG.font = '600 11px ui-sans-serif, system-ui, sans-serif';
     ctxG.textBaseline = 'middle';
     for (const c of GEO.cities) {
-      const x = lon2x(c.lon), y = lat2y(c.lat);
+      const [x, y] = xy(c.lon, c.lat);
       if (x < 0 || x > W || y < 0 || y > H) continue;
       ctxG.beginPath();
       ctxG.arc(x, y, 2.4, 0, 6.284);
@@ -2391,7 +2637,7 @@ function clearReadout(msg) {
 }
 
 function readout(x, y) {
-  const lon = x2lon(x), lat = y2lat(y);
+  const [lon, lat] = lonlat(x, y);
   const col = lon2col(lon), row = lat2row(lat);
   const u = uAt(col, row), v = vAt(col, row);
 
@@ -3657,8 +3903,15 @@ function satExtent() {
    whichever domain the map is showing, so a reader who had Europe open would
    get the Malta frames letterboxed into a continental box. */
 function satAspect() {
+  // Square, and not from the extent: a geostationary frame is addressed in
+  // metres out from the sub-satellite point, so its shape is the satellite's
+  // view of a round Earth rather than anything the bounding box implies.
+  if (satProjection() === 'geos') return 1;
   const ex = satExtent();
   if (!ex) return 940 / 760;
+  // What the disc was served as before it was warped, kept so a manifest still
+  // sitting in a browser cache lays out at the wrong aspect rather than not at
+  // all.
   if (satProjection() === 'equirect') return (ex.east - ex.west) / (ex.north - ex.south);
   return ((ex.east - ex.west) * Math.PI / 180) / (merc(ex.north) - merc(ex.south));
 }
@@ -3795,6 +4048,14 @@ function satCarto(c, w, h) {
      coastline — generalised to continental scale and clipped to that box — drawn
      over Malta: the islands became a four-sided blob. The frames are always the
      Malta domain, so the geometry always is too. */
+  /* Nothing is drawn over the disc. On a geostationary projection no straight
+     line is a meridian and no straight line is a parallel — both curve, and
+     the curvature is the whole point of the picture — so the graticule every
+     other source gets would be wrong at every pixel rather than approximately
+     right. Geo Colour needs no help locating the continents anyway: they are
+     lit, green and ochre by day and city-lit by night, against black. */
+  if (satProjection() === 'geos') return;
+
   const geo = (typeof GEOALL !== 'undefined' && GEOALL.malta) || GEO;
   const ex = satExtent();
   if (!geo || !ex) return;
@@ -3933,6 +4194,12 @@ function satSetSource(key) {
     satState.fade = 1;
     satTicks();         // interval follows the window, so it is rebuilt per loop
   }
+
+  /* Black behind the disc, the panel colour behind everything else. The frame
+     is square and the stage is sized from the same aspect, so this shows only
+     in the pixel or two that rounding leaves over — but against a light theme
+     that hairline reads as a gap in the image rather than as space. */
+  $('sat-stage').style.background = satProjection() === 'geos' ? '#000' : '';
 
   const f = satStill();
   $('sat-src').textContent = still
