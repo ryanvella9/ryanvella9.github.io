@@ -642,6 +642,10 @@ title: "Forecast"
         <h2 id="mg-place">Point forecast</h2>
         <p class="mg-sub" id="mg-sub">—</p>
       </div>
+      <div class="group" style="margin-left:14px">
+        <label>Place</label>
+        <div class="btns" id="mg-places"></div>
+      </div>
       <span class="spacer"></span>
       <div class="mg-now" id="mg-now"></div>
     </div>
@@ -749,7 +753,7 @@ for (const [k, d] of Object.entries(PANEL.domains)) {
 // it is the better answer, so that is where the Malta panel starts.
 DOMAIN_META.medit.defaultModel = 'icon_eu';
 DOMAIN_META.malta.defaultModel = 'icon_2i';
-if (DOMAIN_META.zurich) DOMAIN_META.zurich.defaultModel = 'icon_eu';
+if (DOMAIN_META.zurich) DOMAIN_META.zurich.defaultModel = 'icon_2i';
 
 /* What each shading option is, independent of which source happens to offer it.
    `key` is the field in the payload; 'spd' is derived from u and v. */
@@ -774,11 +778,17 @@ const MODELS = {
     label: 'ICON-EU', domains: ['medit', 'malta', 'zurich'],
   },
   icon_2i: {
-    label: 'ICON-2I', domains: ['malta'],
+    label: 'ICON-2I', domains: ['malta', 'zurich'],
     // Loaded only when asked for. It is 3 MB — seven times ICON-EU's grid
     // density over the same box — and most readers never switch model, so
     // making everyone pay for it on first paint would be a poor trade.
-    file: 'icon2i_malta.js', global: 'ICON2I_MALTA',
+    /* One payload per close-up. The model covers both frames, but they are
+       separate crops and a reader who never opens Zurich should not pay for
+       its 11 MB. */
+    parts: {
+      malta: { file: 'icon2i_malta.js', global: 'ICON2I_MALTA' },
+      zurich: { file: 'icon2i_zurich.js', global: 'ICON2I_ZURICH' },
+    },
     // ICON-2I's domain is lon 3-22, lat 33.7-48.9. It covers Malta with room to
     // spare and stops six degrees north of the Mediterranean panel's southern
     // edge, which is why it is offered on one panel and not the other.
@@ -792,7 +802,7 @@ const MODELS = {
     // default. Its value is disagreement: where a global model run in Reading
     // and one run in Offenbach part company is a reading of how settled the
     // forecast is that neither can give alone.
-    label: 'IFS', domains: ['europe', 'medit', 'malta'],
+    label: 'IFS', domains: ['europe', 'medit', 'malta', 'zurich'],
     /* Two payloads, because IFS is asked two different questions here: the
        500 hPa frame over Europe and the surface fields over the Mediterranean
        ones. A domain names the file it needs; a model without `parts` names one
@@ -804,6 +814,7 @@ const MODELS = {
       },
       medit: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
       malta: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
+      zurich: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
     },
   },
 };
@@ -1114,6 +1125,7 @@ const state = {
   // Place labels off by default: they are an aid for finding your bearings the
   // first time, and clutter over the field every time after that.
   wind: true, clouds: false, iso: false, isoUser: false, places: false,
+  mgPlace: 'valletta',
   playing: false, speed: 1,
   hover: null,
 };
@@ -3190,9 +3202,42 @@ const MG = { data: null, layout: null, hover: null };
 const mgCanvas = $('mg-canvas');
 const mgCtx = mgCanvas.getContext('2d');
 
-function ensureMgram() {
-  if (window.MGRAM) { MG.data = window.MGRAM; return Promise.resolve(); }
-  return loadScript(`${DATA_BASE}/meteogram_icon2i.js`).then(() => { MG.data = window.MGRAM; });
+/* One meteogram per point, each its own payload so opening the page costs one
+   place rather than all of them. Keyed by the map domain the point sits in, so
+   the selector can say where each one is without a second table. */
+const MG_PLACES = {
+  valletta: { label: 'Valletta', file: 'meteogram_icon2i.js', global: 'MGRAM', domain: 'malta' },
+  zurich: { label: 'Zürich', file: 'meteogram_zurich.js', global: 'MGRAM_ZURICH', domain: 'zurich' },
+};
+
+function ensureMgram(key) {
+  key = key || state.mgPlace || 'valletta';
+  const p = MG_PLACES[key];
+  if (!p) return Promise.reject(new Error('unknown place ' + key));
+  const take = () => { MG.data = window[p.global]; state.mgPlace = key; };
+  if (window[p.global]) { take(); return Promise.resolve(); }
+  return loadScript(`${DATA_BASE}/${p.file}`).then(take);
+}
+
+function buildMgPlaceButtons() {
+  const box = $('mg-places');
+  if (!box) return;
+  box.innerHTML = '';
+  for (const [key, p] of Object.entries(MG_PLACES)) {
+    const b = document.createElement('button');
+    b.textContent = p.label;
+    b.dataset.place = key;
+    b.setAttribute('aria-pressed', String(key === (state.mgPlace || 'valletta')));
+    b.onclick = () => {
+      if (key === state.mgPlace) return;
+      setBusy(true);
+      ensureMgram(key)
+        .then(() => { buildMgPlaceButtons(); showView('mgram'); })
+        .catch((e) => console.error(e))
+        .finally(() => setBusy(false));
+    };
+    box.appendChild(b);
+  }
 }
 
 const MG_ROWS = [
@@ -3968,6 +4013,9 @@ function satBuffer() {
 }
 
 function satSetPlaying(on) {
+  // Nothing to play. The controls are hidden whenever this is true, so this is
+  // only reachable by a keypress arriving before the panel has settled.
+  if (on && !(SAT && SAT.frames.length)) return;
   if (on && !satState.buffered) { satBuffer(); return; }
   satState.buffering = false;
   satState.playing = on;
@@ -4096,11 +4144,15 @@ function showView(name) {
   if (name === 'map') { resize(); syncTime(); }
   else {
     const d = MG.data;
+    buildMgPlaceButtons();
     $('mg-place').textContent = d ? d.place : 'Point forecast';
     if (d) {
       const init = new Date(d.init);
+      const gap = d.span && d.span.length ? d.span[0] : 1;
       $('mg-sub').textContent =
-        `${d.model} · init ${fmtUTC.format(init)} UTC · hourly to +${d.steps[d.steps.length - 1]} h`;
+        `${d.model} · init ${fmtUTC.format(init)} UTC · ` +
+        `${gap === 1 ? 'hourly' : gap + '-hourly'} to +${d.steps[d.steps.length - 1]} h` +
+        (d.tailShort ? `, then ${d.tailShort}` : '');
       $('mg-now').textContent = `${d.credit} · © Ryan Vella`;
       $('mg-desc').textContent =
         `Hourly point forecast for ${d.place} at 2 km. Shaded columns are night ` +
