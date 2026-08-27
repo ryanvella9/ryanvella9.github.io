@@ -188,6 +188,10 @@ title: "Forecast"
   .mg-tip .row { display: flex; gap: 10px; line-height: 1.5; }
   .mg-tip .row span { color: var(--muted); }
   .mg-tip .row b { margin-left: auto; }
+  /* The plain-language line at the head of the readout, and the quieter
+     second line under the wind figure. */
+  .mg-tip-word { font-weight: 600; margin: 1px 0 4px; }
+  .mg-tip-sub { color: var(--faint); font-size: 11px; }
   /* The NDVI panel's two extra pieces.
 
      The chart goes *under* the map rather than beside it because the two are
@@ -2391,8 +2395,22 @@ function drawFronts() {
 
     let n = 0;
     for (const s of pipStations(pts, PIP_SPACING)) {
-      // Right-hand normal of the tangent.
-      const nx = s.ty, ny = -s.tx;
+      /* Right-hand normal of the tangent, in a frame whose y runs DOWN.
+
+         (ty, -tx) is the right-hand normal on graph paper and the left-hand one
+         here, and that sign is the whole correctness of this layer: every pip
+         was landing on the trailing side of every front, which draws a chart
+         that is perfectly plausible and meteorologically inverted.
+
+         Walk it through: heading east on screen is t = (1, 0), and north is up,
+         so the walker's right hand points south, which is +y. (-ty, tx) gives
+         (0, 1). (ty, -tx) gives (0, -1), which is north — their left.
+
+         fronts.py holds up its end: it orders each line so movement is 90
+         degrees clockwise from travel *in geographic coordinates*, where y runs
+         up. The lon/lat-to-screen map flips y and so reverses handedness, which
+         is exactly the step that was missed. */
+      const nx = -s.ty, ny = s.tx;
       // Stationary alternates both the symbol and the side it sits on, which is
       // what says "this boundary is not going anywhere".
       const isWarmPip = stationary ? (n % 2 === 0) : warm;
@@ -2402,11 +2420,11 @@ function drawFronts() {
       if (isWarmPip) {
         const cx = s.x + nx * side * 0.2, cy = s.y + ny * side * 0.2;
         const a = Math.atan2(s.ty, s.tx);
-        /* Anticlockwise when the pip belongs on the right. Canvas y runs down,
-           so a clockwise sweep from the tangent bulges towards a + 90 degrees,
-           which is the *left* normal — the semicircles came out mirrored, on the
-           trailing side of every warm front. */
-        ctxG.arc(cx, cy, PIP_SIZE, a, a + Math.PI, side > 0);
+        /* Sweep the way that puts the bulge on the same side as a triangle's
+           apex. Clockwise from the tangent passes through a + 90 degrees, which
+           in this y-down frame is (-ty, tx) — the same vector as the normal
+           above, so the semicircles and the triangles cannot disagree. */
+        ctxG.arc(cx, cy, PIP_SIZE, a, a + Math.PI, side < 0);
       } else {
         const bx = s.x - s.tx * PIP_SIZE, by = s.y - s.ty * PIP_SIZE;
         const ex = s.x + s.tx * PIP_SIZE, ey = s.y + s.ty * PIP_SIZE;
@@ -3888,13 +3906,25 @@ $('gif-go').onclick = makeGif;
 
 /* ------------------------------------------------------------- meteogram --
 
-   Four stacked panels on one shared time axis: temperature with dewpoint,
-   cloud with rain, wind with gusts, and pressure. Drawn on one canvas rather
-   than four, so the panels cannot drift out of alignment and one crosshair
-   crosses all of them.
+   Direction A: the organising unit is the DAY.
+
+   The chart opens with a header band carrying one cell per local calendar day
+   — weekday and date, a large symbol for the daylight half and a smaller one
+   for the night, and the day's high and low as a big paired number, plus the
+   rain total and peak gust when there is any. Everything below it (a sky
+   ribbon, temperature, rain, wind) is detail hung under that structure, and
+   the alternating day tint plus a rule at every local midnight carries the
+   day division all the way to the bottom of the canvas.
+
+   The point is that "what is Saturday like" should be answerable without
+   reading a single axis, and "when on Saturday" should then be one glance
+   down the same column.
+
+   Pressure is not a panel. A mean-sea-level trace is the one row here nobody
+   reads off the chart; the number stays in the hover readout.
    --------------------------------------------------------------------------- */
 
-const MG = { data: null, layout: null, hover: null };
+const MG = { data: null, layout: null, hover: null, hoverY: null };
 
 const mgCanvas = $('mg-canvas');
 const mgCtx = mgCanvas.getContext('2d');
@@ -3937,31 +3967,546 @@ function buildMgPlaceButtons() {
   }
 }
 
-const MG_ROWS = [
-  { key: 'temp', label: 'Temperature', unit: '°C', h: 1.5 },
-  { key: 'cloud', label: 'Cloud & rain', unit: '%', h: 1 },
-  { key: 'wind', label: 'Wind', unit: 'm/s', h: 1.15 },
-  { key: 'pres', label: 'Pressure', unit: 'hPa', h: 0.85 },
-];
+const TAU = Math.PI * 2;
+const MG_FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
+const mgF = (spec) => `${spec} ${MG_FONT}`;
+const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
-function mgLayout(w, h) {
+/* ------------------------------------------------------------- colouring --
+
+   Only --panel, --text, --muted, --faint and --accent are guaranteed to exist
+   on this site's :root; --grid and --night never did, which is why the old
+   chart drew near-white gridlines on the dark theme. Everything structural
+   here is therefore an alpha over the panel, derived from the panel's own
+   luminance, so it flips with the theme without a second table to maintain. */
+
+function mgHex(s) {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec((s || '').trim());
+  return m ? [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)] : null;
+}
+const mgRgba = (c, a) => `rgba(${c[0]|0},${c[1]|0},${c[2]|0},${a})`;
+const mgMix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+
+function mgPalette(css) {
+  const panel = mgHex(css.getPropertyValue('--panel')) || [255, 255, 255];
+  const dark = (0.299 * panel[0] + 0.587 * panel[1] + 0.114 * panel[2]) < 128;
+  const inkC = mgHex(css.getPropertyValue('--text')) || (dark ? [232, 234, 238] : [16, 32, 39]);
+  // On a dark panel a saturated mid-tone hue loses most of its contrast, so
+  // every data hue is lifted toward white by a fixed amount rather than a
+  // second set of literals being kept in step by hand.
+  const lift = (v, fb) => {
+    const c = mgHex(v) || mgHex(fb);
+    return dark ? mgRgba(mgMix(c, [255, 255, 255], 0.30), 1) : mgRgba(c, 1);
+  };
+  const raw = (v, fb) => mgHex(v) || mgHex(fb);
+  const tempC = dark ? mgMix(raw(css.getPropertyValue('--c-temp'), '#d84315'), [255, 255, 255], 0.30)
+    : raw(css.getPropertyValue('--c-temp'), '#d84315');
+  const coldC = dark ? mgMix(raw(css.getPropertyValue('--c-cold'), '#0277bd'), [255, 255, 255], 0.34)
+    : raw(css.getPropertyValue('--c-cold'), '#0277bd');
+  const rainC = dark ? mgMix(raw(css.getPropertyValue('--c-rain'), '#1565c0'), [255, 255, 255], 0.30)
+    : raw(css.getPropertyValue('--c-rain'), '#1565c0');
+  const windC = dark ? mgMix(raw(css.getPropertyValue('--c-wind'), '#2f7d74'), [255, 255, 255], 0.30)
+    : raw(css.getPropertyValue('--c-wind'), '#2f7d74');
+  return {
+    dark, panel,
+    ink: (a) => mgRgba(inkC, a),
+    inkC,
+    temp: mgRgba(tempC, 1), tempC,
+    cold: mgRgba(coldC, 1), coldC,
+    rain: mgRgba(rainC, 1), rainC,
+    wind: mgRgba(windC, 1), windC,
+    accent: css.getPropertyValue('--accent').trim() || '#0d47a1',
+    sun: dark ? '#ffc046' : '#f2a413',
+    moon: dark ? '#cfdcea' : '#7f97ad',
+    cloud: dark ? '#93a4b3' : '#c4d0d9',
+    cloudDim: dark ? '#6f7e8c' : '#dde5eb',
+    cloudDark: dark ? '#b4c3cf' : '#9dafbc',
+    /* Cloud after dark. Two symbols sit side by side in every day cell, one for
+       the daylight half and one for the night, and under an overcast sky they
+       would otherwise be the same grey blob twice: nothing in the glyph says
+       which half you are looking at. Night cloud is cooler and darker, which is
+       both the honest thing and the legible one. */
+    cloudN: dark ? '#6d7f90' : '#a9b7c4',
+    cloudDimN: dark ? '#55636f' : '#c6d0da',
+    cloudDarkN: dark ? '#8b9dab' : '#8395a7',
+    edge: dark ? 'rgba(20,26,33,.45)' : 'rgba(50,70,86,.30)',
+    snow: dark ? '#a5dcf7' : '#3f9ed6',
+    // Two day tones, alternating. Kept under 4% so they read as structure and
+    // never as data.
+    tintA: dark ? 'rgba(255,255,255,.016)' : 'rgba(16,32,39,.014)',
+    tintB: dark ? 'rgba(255,255,255,.052)' : 'rgba(16,32,39,.040)',
+  };
+}
+
+/* ---------------------------------------------------------------- the sun --
+
+   Solar elevation in degrees, from the low-precision NOAA/Almanac series. Good
+   to a hundredth of a degree over this century, which is a great deal better
+   than the half-degree the disc subtends — and all it is asked for here is
+   "up or down", plus which side of civil twilight. Lifted unchanged: it is
+   the one thing that lets Malta and Zürich share a renderer. */
+function mgSunElev(date, lat, lon) {
+  const rad = Math.PI / 180;
+  const n = date.getTime() / 86400000 + 2440587.5 - 2451545.0;
+  const L = (280.460 + 0.9856474 * n) % 360;
+  const g = ((357.528 + 0.9856003 * n) % 360) * rad;
+  const lam = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * rad;
+  const eps = (23.439 - 0.0000004 * n) * rad;
+  const dec = Math.asin(Math.sin(eps) * Math.sin(lam));
+  const ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam));
+  const gmst = (18.697374558 + 24.06570982441908 * n) % 24;
+  const ha = (gmst * 15 + lon) * rad - ra;
+  return Math.asin(
+    Math.sin(lat * rad) * Math.sin(dec) +
+    Math.cos(lat * rad) * Math.cos(dec) * Math.cos(ha)) / rad;
+}
+
+/* --------------------------------------------------------------- symbols --
+
+   Paths, not images: the page is one file served off Pages with its data
+   beside it. Drawn at 30–48 px here rather than 26, because at this size the
+   difference between "cloudy" and "heavy rain" has to survive being looked at
+   for a fifth of a second.
+
+   Every symbol is one sky state plus at most one precipitation state. There is
+   no thunderstorm: CAPE and lightning are not in this payload, and a symbol
+   that guessed at a storm from rainfall rate alone would be inventing the one
+   thing people most want it to be honest about. */
+
+/* 0 clear · 1 mostly clear · 2 partly cloudy · 3 cloudy · 4 overcast */
+function mgSkyClass(cloud) {
+  if (cloud < 12) return 0;
+  if (cloud < 35) return 1;
+  if (cloud < 65) return 2;
+  if (cloud < 88) return 3;
+  return 4;
+}
+
+/* 0 dry · 1 light · 2 moderate · 3 heavy, in mm/h. The tail's buckets are
+   three-hourly means, so a short heavy shower inside one reads as moderate —
+   the alternative is to scale the thresholds by bucket length, which would
+   make the same rate draw two different symbols either side of the join. */
+function mgWetClass(rate) {
+  if (rate >= 4) return 3;
+  if (rate >= 1) return 2;
+  if (rate >= 0.1) return 1;
+  return 0;
+}
+
+function mgSun(c, x, y, r, col) {
+  c.save();
+  c.strokeStyle = col; c.lineWidth = Math.max(1.6, r * 0.20); c.lineCap = 'round';
+  for (let k = 0; k < 8; k++) {
+    const a = k * TAU / 8 + Math.PI / 8;
+    const dx = Math.cos(a), dy = Math.sin(a);
+    c.beginPath();
+    c.moveTo(x + dx * r * 1.38, y + dy * r * 1.38);
+    c.lineTo(x + dx * r * 1.92, y + dy * r * 1.92);
+    c.stroke();
+  }
+  c.fillStyle = col;
+  c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+  c.restore();
+}
+
+/* A crescent cut out of a disc by a second, reversed subpath: filling with the
+   nonzero rule turns the reversed circle into a hole. Punching it with the
+   panel colour instead would leave a pale bite out of whatever the moon is
+   drawn on top of. */
+function mgMoon(c, x, y, r, col) {
+  c.save();
+  c.fillStyle = col;
+  c.beginPath();
+  c.arc(x, y, r, 0, TAU);
+  c.closePath();
+  c.moveTo(x + r * 0.44 + r * 0.84, y - r * 0.22);
+  c.arc(x + r * 0.44, y - r * 0.22, r * 0.84, 0, TAU, true);
+  c.closePath();
+  c.fill();
+  c.restore();
+}
+
+function mgCloudPath(c, x, y, w) {
+  const r = w * 0.30;
+  c.beginPath();
+  c.arc(x - w * 0.24, y + r * 0.10, r * 0.80, 0, TAU);
+  c.arc(x + w * 0.02, y - r * 0.52, r * 1.00, 0, TAU);
+  c.arc(x + w * 0.30, y + r * 0.14, r * 0.72, 0, TAU);
+  const bx = x - w * 0.44, by = y + r * 0.02, bw = w * 0.88, bh = r * 0.86;
+  if (c.roundRect) { c.moveTo(bx, by); c.roundRect(bx, by, bw, bh, r * 0.42); }
+  else c.rect(bx, by, bw, bh);
+}
+
+function mgCloud(c, x, y, w, fill, edge) {
+  c.save();
+  mgCloudPath(c, x, y, w);
+  c.fillStyle = fill; c.fill();
+  if (edge) { c.strokeStyle = edge; c.lineWidth = Math.max(1, w * 0.035); c.stroke(); }
+  c.restore();
+}
+
+/* Rain strokes long enough and thick enough to count at a glance: at 44 px
+   that is a 9 px stroke at 2.4 px, where the old symbol drew 4 px at 1 px and
+   every wet state collapsed into the same grey smudge. */
+function mgDrops(c, x, y, w, n, col) {
+  c.save();
+  c.strokeStyle = col; c.lineWidth = Math.max(1.6, w * 0.055); c.lineCap = 'round';
+  const s = w * 0.21;
+  for (let k = 0; k < n; k++) {
+    const dx = (k - (n - 1) / 2) * w * 0.24;
+    c.beginPath();
+    c.moveTo(x + dx + s * 0.34, y);
+    c.lineTo(x + dx - s * 0.34, y + s);
+    c.stroke();
+  }
+  c.restore();
+}
+
+function mgFlakes(c, x, y, w, n, col) {
+  c.save();
+  c.strokeStyle = col; c.lineWidth = Math.max(1.3, w * 0.040); c.lineCap = 'round';
+  const s = w * 0.105;
+  for (let k = 0; k < n; k++) {
+    const cx = x + (k - (n - 1) / 2) * w * 0.24, cy = y + s * 0.9;
+    for (let a = 0; a < 3; a++) {
+      const th = a * Math.PI / 3 + Math.PI / 6;
+      c.beginPath();
+      c.moveTo(cx - Math.cos(th) * s, cy - Math.sin(th) * s);
+      c.lineTo(cx + Math.cos(th) * s, cy + Math.sin(th) * s);
+      c.stroke();
+    }
+  }
+  c.restore();
+}
+
+/* One symbol, centred on (x, y) and fitting a box of side `size`. */
+function mgSymbol(c, x, y, size, sky, wet, day, snow, pal) {
+  const r = size * 0.21;
+  const cw = size * 0.80;
+  const lit = day ? pal.sun : pal.moon;
+  const orb = day ? mgSun : mgMoon;
+  // Rain has to fall from something, so anything wet is drawn at least cloudy,
+  // and heavier rain darkens the cloud as well as adding a stroke — two cues
+  // for one quantity, because one was not enough to tell three states apart.
+  if (wet) sky = Math.max(sky, wet >= 2 ? 4 : 3);
+  const body = day ? pal.cloud : pal.cloudN;
+  const dim = day ? pal.cloudDim : pal.cloudDimN;
+  const deep = day ? pal.cloudDark : pal.cloudDarkN;
+  const yTop = wet ? y - size * 0.15 : y;
+
+  if (sky === 0) {
+    orb(c, x, yTop, r * 1.20, lit);
+  } else if (sky === 1) {
+    orb(c, x - size * 0.11, yTop - size * 0.08, r, lit);
+    mgCloud(c, x + size * 0.15, yTop + size * 0.13, cw * 0.64, body, pal.edge);
+  } else if (sky === 2) {
+    orb(c, x - size * 0.19, yTop - size * 0.14, r * 0.94, lit);
+    mgCloud(c, x + size * 0.07, yTop + size * 0.06, cw * 0.84, body, pal.edge);
+  } else if (sky === 3) {
+    // Broken cloud still lets the sun or moon through at one corner.
+    orb(c, x - size * 0.20, yTop - size * 0.20, r * 0.72, lit);
+    mgCloud(c, x + size * 0.03, yTop + size * 0.02, cw * 0.94, body, pal.edge);
+  } else {
+    mgCloud(c, x - size * 0.12, yTop - size * 0.05, cw * 0.70, dim, null);
+    mgCloud(c, x + size * 0.06, yTop + size * 0.05, cw * 0.90, deep, pal.edge);
+  }
+
+  if (wet) {
+    const yw = yTop + size * 0.29;
+    if (snow) mgFlakes(c, x, yw, size, Math.min(3, wet), pal.snow);
+    else mgDrops(c, x, yw, size, Math.min(3, wet), pal.rain);
+  }
+}
+
+const MG_SKY_WORD = ['Clear', 'Mostly clear', 'Partly cloudy', 'Cloudy', 'Overcast'];
+const MG_WET_WORD = ['', 'Light', 'Moderate', 'Heavy'];
+
+function mgWeatherWord(sky, wet, day, snow) {
+  if (wet) return `${MG_WET_WORD[wet]} ${snow ? 'snow' : 'rain'}`;
+  if (sky === 0) return day ? 'Sunny' : 'Clear';
+  if (sky === 1 && day) return 'Mostly sunny';
+  return MG_SKY_WORD[sky];
+}
+
+/* ------------------------------------------------------------- readouts -- */
+
+/* Saturation vapour pressure, hPa (Magnus over water). */
+const mgEs = (t) => 6.112 * Math.exp(17.67 * t / (t + 243.5));
+const mgRH = (t, td) => Math.max(0, Math.min(100, 100 * mgEs(td) / mgEs(t)));
+
+/* Steadman's apparent temperature — the one formula that covers both ends of
+   this chart: it adds the humidity load that makes 33 °C in Valletta feel like
+   38, and subtracts the wind chill that makes 4 °C in Zürich feel like 1. */
+function mgFeels(t, td, wind) {
+  const e = mgRH(t, td) / 100 * 6.105 * Math.exp(17.27 * t / (237.7 + t));
+  return t + 0.33 * e - 0.70 * wind - 4.00;
+}
+
+const MG_BFT = [0.3, 1.6, 3.4, 5.5, 8.0, 10.8, 13.9, 17.2, 20.8, 24.5, 28.5, 32.7];
+const MG_BFT_WORD = ['Calm', 'Light air', 'Light breeze', 'Gentle breeze',
+  'Moderate breeze', 'Fresh breeze', 'Strong breeze', 'Near gale', 'Gale',
+  'Strong gale', 'Storm', 'Violent storm', 'Hurricane force'];
+function mgBeaufort(ms) {
+  let b = 0;
+  while (b < MG_BFT.length && ms >= MG_BFT[b]) b++;
+  return b;
+}
+
+const MG_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+  'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+
+/* Rain is compressed, not linear: drizzle and a cloudburst are three orders of
+   magnitude apart and both have to be visible in a 100 px lane. Anchored at
+   the three rates that mean something — 0.5 mm/h you notice, 2 mm/h you get
+   wet in, 10 mm/h is a downpour — and linear between them, so the axis can be
+   labelled honestly rather than "0 to whatever this place happens to have". */
+const MG_RAIN_ANCH = [[0, 0], [0.5, 0.30], [2, 0.62], [10, 1]];
+function mgRainF(r) {
+  if (!(r > 0)) return 0;
+  for (let k = 1; k < MG_RAIN_ANCH.length; k++) {
+    const [ax, ay] = MG_RAIN_ANCH[k - 1], [bx, by] = MG_RAIN_ANCH[k];
+    if (r <= bx) return ay + (r - ax) / (bx - ax) * (by - ay);
+  }
+  return 1;
+}
+
+/* ------------------------------------------------------------- preparing --
+
+   Everything that depends on the payload but not on the canvas size, worked
+   out once per place rather than once per frame: drawMeteogram runs on every
+   pointermove, and the day summaries alone are a few thousand solar positions
+   and a couple of hundred Intl formats. */
+function mgPrepare(d) {
+  if (MG.prepFor === d) return MG.prep;
+  const init = new Date(d.init);
+  const n = d.steps.length;
+  const at = (h) => new Date(init.getTime() + h * 3600e3);
+  const h0 = d.steps[0], h1 = d.steps[n - 1];
+  const SPAN = d.span || d.steps.map(() => 1);
+  const rate = d.precip.map((v, i) => v / (SPAN[i] || 1));
+
+  const fmtKey = new Intl.DateTimeFormat('en-GB', {
+    day: '2-digit', month: '2-digit', year: 'numeric', timeZone: d.tz });
+  const fmtWd = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: d.tz });
+  const fmtDate = new Intl.DateTimeFormat('en-GB', { day: 'numeric', month: 'short', timeZone: d.tz });
+  const fmtHM = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', minute: '2-digit', hour12: false, timeZone: d.tz });
+
+  /* Local midnights found by walking the span and watching the local date turn
+     over, not by looking for a step whose local hour is zero. Malta's midnight
+     is 22:00 UTC and the ICON-EU tail is three-hourly from 00 UTC, so no tail
+     step ever lands on it — the naive test silently stops finding days at the
+     model join. */
+  const bounds = [h0];
+  let prev = fmtKey.format(at(h0));
+  for (let h = h0 + 0.5; h <= h1 + 1e-9; h += 0.5) {
+    const k = fmtKey.format(at(h));
+    if (k !== prev) { bounds.push(h); prev = k; }
+  }
+  bounds.push(h1);
+
+  const dayOf = d.steps.map((s) => fmtKey.format(at(s)));
+  const todayKey = fmtKey.format(new Date());
+
+  const days = [];
+  for (let b = 0; b < bounds.length - 1; b++) {
+    const from = bounds[b], to = bounds[b + 1];
+    if (to - from < 1e-6) continue;
+    const mid = at((from + to) / 2);
+    const key = fmtKey.format(mid);
+    // The local midnight this day actually starts at, even when the forecast
+    // begins after it — sunrise still happened, and the header still says so.
+    const trueStart = (b === 0) ? to - 24 : from;
+    const trueEnd = (b === bounds.length - 2 && to - from < 23.5) ? from + 24 : to;
+
+    let tMax = -Infinity, tMin = Infinity, mm = 0, gust = 0, iHi = -1, iLo = -1;
+    let wPeak = 0, vx = 0, vy = 0, tailN = 0;
+    const halves = [
+      { day: true, cSum: 0, cN: 0, wet: 0, tSum: 0, tN: 0 },
+      { day: false, cSum: 0, cN: 0, wet: 0, tSum: 0, tN: 0 },
+    ];
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      const s = d.steps[i];
+      if (s < from - 1e-9 || s > to + 1e-9) continue;
+      // A bucket at the boundary belongs to the day it accumulated in.
+      if (s <= from + 1e-9 && b > 0) continue;
+      count++;
+      if (d.temp[i] > tMax) { tMax = d.temp[i]; iHi = i; }
+      if (d.temp[i] < tMin) { tMin = d.temp[i]; iLo = i; }
+      mm += d.precip[i];
+      gust = Math.max(gust, d.gust[i]);
+      wPeak = Math.max(wPeak, d.wind[i]);
+      vx += d.wind[i] * Math.sin(d.dir[i] * Math.PI / 180);
+      vy += d.wind[i] * Math.cos(d.dir[i] * Math.PI / 180);
+      if (d.tailFrom > 0 && i >= d.tailFrom) tailN++;
+      const up = mgSunElev(at(s), d.lat, d.lon) > 0;
+      const H = halves[up ? 0 : 1];
+      H.cSum += d.cloud[i]; H.cN++; H.tSum += d.temp[i]; H.tN++;
+      H.wet = Math.max(H.wet, mgWetClass(rate[i]));
+    }
+
+    // Sunrise and sunset for the whole local day, at ten-minute resolution.
+    let rise = null, set = null, wasUp = mgSunElev(at(trueStart), d.lat, d.lon) > -0.833;
+    for (let h = trueStart; h <= trueEnd + 1e-9; h += 1 / 6) {
+      const up = mgSunElev(at(h), d.lat, d.lon) > -0.833;
+      if (up && !wasUp && rise === null) rise = h;
+      if (!up && wasUp) set = h;
+      wasUp = up;
+    }
+
+    const sym = halves.map((H) => H.cN ? {
+      sky: mgSkyClass(H.cSum / H.cN), wet: H.wet,
+      day: H.day, snow: (H.tSum / H.tN) <= 1.0,
+    } : null);
+
+    days.push({
+      key, from, to, count,
+      wd: fmtWd.format(mid), date: fmtDate.format(mid),
+      // A couple of missing hours at the start of the run is not worth saying;
+      // half a day is.
+      partial: (to - from) < 20,
+      hours: to - from,
+      tMax: count ? tMax : null, tMin: count ? tMin : null, iHi, iLo,
+      mm, gust, symbols: sym, wPeak,
+      dir: MG_POINTS[Math.round(((Math.atan2(vx, vy) * 180 / Math.PI + 360) % 360) / 22.5) % 16],
+      rise: rise === null ? null : fmtHM.format(at(rise)),
+      set: set === null ? null : fmtHM.format(at(set)),
+      today: key === todayKey,
+      // Named for the model most of the day came from, not the model its first
+      // hour came from — the join rarely lands on a midnight.
+      tail: count > 0 && tailN > count / 2,
+    });
+  }
+  // "Today" and "Tomorrow" only when the run really is current.
+  const ti = days.findIndex((x) => x.today);
+  if (ti >= 0) {
+    days[ti].name = 'Today';
+    if (days[ti + 1]) days[ti + 1].name = 'Tomorrow';
+  }
+
+  /* The sky ribbon: cloud and solar elevation on a quarter-hour grid, so the
+     band's edges land on sunset rather than on the nearest forecast hour. */
+  const ribbon = [];
+  for (let h = h0; h <= h1 + 1e-9; h += 0.25) {
+    let i = 0;
+    while (i < n - 1 && d.steps[i + 1] < h) i++;
+    const a = d.steps[i], b2 = d.steps[Math.min(n - 1, i + 1)];
+    const f = b2 > a ? clamp((h - a) / (b2 - a), 0, 1) : 0;
+    const cl = d.cloud[i] + (d.cloud[Math.min(n - 1, i + 1)] - d.cloud[i]) * f;
+    ribbon.push({ h, cloud: cl, elev: mgSunElev(at(h), d.lat, d.lon) });
+  }
+
+  // Night runs, used for a light wash under the temperature row only.
+  const runs = [];
+  let run = null;
+  for (let h = h0; h <= h1 + 1e-9; h += 1 / 6) {
+    const night = mgSunElev(at(h), d.lat, d.lon) < -0.833;
+    if (!run) run = { night, from: h, to: h };
+    else if (run.night !== night) { if (run.night) runs.push(run); run = { night, from: h, to: h }; }
+    else run.to = h;
+  }
+  if (run && run.night) runs.push(run);
+
+  const dayFlag = d.steps.map((s) => mgSunElev(at(s), d.lat, d.lon) > 0);
+
+  MG.prepFor = d;
+  MG.prep = { days, dayOf, ribbon, runs, day: dayFlag, at, rate, SPAN, init, fmtHM };
+  return MG.prep;
+}
+
+/* ------------------------------------------------------------- describing -- */
+
+function mgDescribe(d) {
+  if (!d || !d.steps) return '';
+  const P = mgPrepare(d);
+  const n = d.steps.length;
+  const tHi = Math.max(...d.temp), tLo = Math.min(...d.temp);
+  const cloudMean = d.cloud.reduce((a, b) => a + b, 0) / n;
+  const mm = d.precip.reduce((a, b) => a + b, 0);
+  const gust = Math.max(...d.gust);
+  const meanW = Math.max(...d.wind);
+
+  const summer = tHi >= 30;
+  let sky;
+  if (cloudMean < 20) sky = summer ? 'Hot and sunny' : 'Sunny and settled';
+  else if (cloudMean < 45) sky = 'Bright with some cloud';
+  else if (cloudMean < 70) sky = 'Variable cloud';
+  else if (cloudMean < 88) sky = 'Mostly cloudy';
+  else sky = 'Overcast';
+
+  // Warmest day, named the way the header names it.
+  let warm = null;
+  for (const day of P.days) {
+    if (day.tMax === null || day.count < 5) continue;
+    if (!warm || day.tMax > warm.tMax) warm = day;
+  }
+  let wet = null;
+  for (const day of P.days) if (!wet || day.mm > wet.mm) wet = day;
+
+  const bft = mgBeaufort(meanW);
+  const windWord = bft <= 2 ? 'light' : bft <= 3 ? 'gentle' : bft <= 4 ? 'moderate'
+    : bft <= 5 ? 'fresh' : bft <= 6 ? 'strong' : 'gale-force';
+  // Vector-mean direction, so a wind that boxes the compass does not report as
+  // the arithmetic mean of 350° and 10°.
+  let sx = 0, sy = 0;
+  for (let i = 0; i < n; i++) {
+    const w = d.wind[i], a = d.dir[i] * Math.PI / 180;
+    sx += w * Math.sin(a); sy += w * Math.cos(a);
+  }
+  const dirDeg = (Math.atan2(sx, sy) * 180 / Math.PI + 360) % 360;
+  const dirWord = MG_POINTS[Math.round(dirDeg / 22.5) % 16];
+
+  const rainWord = mm < 0.2
+    ? 'dry throughout'
+    : `${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm in all, most of it ${wet.name ? wet.name.toLowerCase() : wet.wd}`;
+
+  const peak = warm ? `, warmest ${warm.name ? warm.name.toLowerCase() : warm.wd}` : '';
+  const gustWord = gust * 3.6 >= 55 ? `, gusting ${Math.round(gust * 3.6)} km/h` : '';
+
+  return `${sky} — ${Math.round(tLo)} to ${Math.round(tHi)} °C${peak}; `
+    + `${windWord} ${dirWord} wind${gustWord}; ${rainWord}.`;
+}
+
+/* ------------------------------------------------------------------ layout -- */
+
+function mgLayout(w, h, dry) {
   const narrow = w < 620;
-  const padL = narrow ? 30 : 46, padR = narrow ? 10 : 46;
-  // padT leaves room for the first row's caption, which sits above its row.
-  const padT = 16, padB = 26;
-  // Enough air between rows that a panel's bottom axis label and the next
-  // panel's caption are not printed on top of each other.
-  const gap = narrow ? 16 : 20;
-  const total = MG_ROWS.reduce((a, r) => a + r.h, 0);
-  const avail = h - padT - padB - gap * (MG_ROWS.length - 1);
-  let y = padT;
-  const rows = MG_ROWS.map((r) => {
-    const rh = avail * r.h / total;
-    const box = { ...r, y, h: rh };
-    y += rh + gap;
-    return box;
-  });
-  return { padL, padR, padT, padB, x0: padL, x1: w - padR, rows, w, h };
+  const compact = w < 900;
+  // Left gutter carries axis numbers; the right one carries the wind row's
+  // secondary m/s scale and nothing else.
+  const padL = narrow ? 34 : 48;
+  const padR = narrow ? 12 : 46;
+  const padT = 8;
+  const padB = narrow ? 24 : 28;
+  const headH = narrow ? 94 : compact ? 106 : 118;
+  const ribH = narrow ? 13 : 16;
+  const gapHead = narrow ? 9 : 12;   // header rule -> sky ribbon
+  const gapCap = narrow ? 23 : 24;   // ribbon -> first row (room for a caption)
+  const gap = narrow ? 22 : 27;
+
+  const headY = padT;
+  const ribY = headY + headH + gapHead;
+  const rowsTop = ribY + ribH + gapCap;
+  const plotBot = h - padB;
+  let avail = plotBot - rowsTop - gap * 2;
+  // A dry week does not deserve a hundred pixels of empty rain box. It gets a
+  // slim lane that says so, and temperature gets the difference.
+  const rainH = dry ? (narrow ? 26 : 30) : avail * 1.02 / 4.90;
+  const rest = avail - rainH;
+  const tempH = rest * 2.62 / 3.87;
+  const windH = rest - tempH;
+
+  const rows = {
+    temp: { y: rowsTop, h: tempH, label: 'Temperature  °C' },
+    rain: { y: rowsTop + tempH + gap, h: rainH, label: 'Rain  mm/h' },
+    wind: { y: rowsTop + tempH + gap + rainH + gap, h: windH, label: 'Wind  km/h' },
+  };
+  return {
+    narrow, compact, padL, padR, padT, padB, gap,
+    x0: padL, x1: w - padR, w, h,
+    headY, headH, ribY, ribH, rowsTop, plotBot, rows, dry,
+  };
 }
 
 /* Nice round axis bounds that always contain the data, with a little air. */
@@ -3972,21 +4517,33 @@ function mgBounds(vals, pad, step) {
   return [Math.floor(lo / step) * step, Math.ceil(hi / step) * step];
 }
 
+function mgRoundRect(c, x, y, w, h, r) {
+  if (c.roundRect) { c.beginPath(); c.roundRect(x, y, w, h, r); return; }
+  c.beginPath();
+  c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r); c.closePath();
+}
+
+/* ------------------------------------------------------------------ draw -- */
+
 function drawMeteogram() {
   const d = MG.data;
   if (!d) return;
   const wrap = $('mg-wrap');
-  const cssW = wrap.clientWidth;
-  // Fit the whole meteogram into what is left of the viewport, same rule as the
-  // map: a forecast you have to scroll to read is one you compare from memory.
-  const top = wrap.getBoundingClientRect().top + window.scrollY;
+  // Measured off the border box: clientWidth loses the border and left the old
+  // chart drawing a couple of pixels wider than its own frame.
+  const rect = wrap.getBoundingClientRect();
+  const cssW = Math.max(280, Math.round(rect.width));
+  const top = rect.top + window.scrollY;
   const bodyH = document.body.getBoundingClientRect().height;
   const below = bodyH - top - wrap.offsetHeight;
-  // Four stacked panels need a floor to stay readable; below it the page
-  // scrolls rather than the rows collapsing into each other.
+  // Fit what is left of the viewport, same rule as the map: a forecast you have
+  // to scroll to read is one you compare from memory. A floor either way, since
+  // stacked rows stop being rows below it.
   const cssH = isNarrow()
-    ? Math.max(430, Math.min(620, window.innerHeight * 0.72))
-    : Math.max(340, window.innerHeight - top - below - 12);
+    ? Math.max(560, Math.min(940, window.innerHeight - top - 16))
+    : Math.max(520, window.innerHeight - top - below - 12);
 
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   mgCanvas.width = Math.round(cssW * dpr);
@@ -3996,265 +4553,805 @@ function drawMeteogram() {
   c.setTransform(dpr, 0, 0, dpr, 0, 0);
 
   const css = getComputedStyle(document.documentElement);
-  const ink = css.getPropertyValue('--text').trim();
-  const muted = css.getPropertyValue('--muted').trim();
-  const faint = css.getPropertyValue('--faint').trim();
-  const grid = css.getPropertyValue('--grid').trim() || '#eceef2';
-  const panel = css.getPropertyValue('--panel').trim();
+  const panelHex = css.getPropertyValue('--panel').trim() || '#ffffff';
+  const pal = mgPalette(css);
+  const ink = pal.ink;
+  const P = mgPrepare(d);
 
-  const L = mgLayout(cssW, cssH);
+  const n = d.steps.length;
+  const SPAN = P.SPAN, rate = P.rate;
+  const wettest = Math.max(...rate);
+  const dry = wettest < 0.05;
+
+  const L = mgLayout(cssW, cssH, dry);
   MG.layout = L;
+
   c.clearRect(0, 0, cssW, cssH);
-  c.fillStyle = panel;
+  c.fillStyle = panelHex;
   c.fillRect(0, 0, cssW, cssH);
+  c.textBaseline = 'alphabetic';
 
   const init = new Date(d.init);
   const times = d.steps.map((s) => new Date(init.getTime() + s * 3600e3));
-  const n = times.length;
-  // Positioned by forecast hour, not by array index. The ICON-2I head is
-  // hourly and the ICON-EU tail three-hourly, so an index axis would hand the
-  // last two days the same width per point as the first three days get per
-  // hour — compressing them to a third of their span, and bending the slope of
-  // every line at the join for no meteorological reason.
+  /* Positioned by forecast hour, not by array index. The ICON-2I head is
+     hourly and the ICON-EU tail three-hourly, so an index axis would hand the
+     last two days the same width per point as the first three get per hour —
+     compressing them to a third of their span and bending every slope at the
+     join for no meteorological reason. */
   const hSpan = (d.steps[n - 1] - d.steps[0]) || 1;
-  const X = (i) => L.x0 + ((d.steps[i] - d.steps[0]) / hSpan) * (L.x1 - L.x0);
-  // Hours each rain bucket covers. Older payloads predate the field and were
-  // uniformly hourly, which is what the fallback says.
-  const SPAN = d.span || d.steps.map(() => 1);
+  const Xh = (h) => L.x0 + ((h - d.steps[0]) / hSpan) * (L.x1 - L.x0);
+  const X = (i) => Xh(d.steps[i]);
+  const pxPerH = (L.x1 - L.x0) / hSpan;
 
-  /* Night shading, computed from the local hour rather than from a solar
-     calculation: the point of the band is to say "this is the small hours",
-     which 20:00-06:00 says accurately enough at this latitude in summer. */
-  const localHour = (t) => +new Intl.DateTimeFormat('en-GB', {
-    hour: '2-digit', hour12: false, timeZone: d.tz }).format(t);
-  c.fillStyle = css.getPropertyValue('--night').trim() || 'rgba(55,71,79,.055)';
-  for (let i = 0; i < n - 1; i++) {
-    const hr = localHour(times[i]);
-    if (hr >= 20 || hr < 6) c.fillRect(X(i), L.padT, X(i + 1) - X(i), L.h - L.padT - L.padB);
-  }
+  const topAll = L.headY;                 // day tints start at the header
+  const plotTop = L.ribY;                 // ribbon downwards is "the chart"
+  // Washes stop short of the sky ribbon: the ribbon is a picture of the sky and
+  // tinting it with rain, past hours or model provenance turns it into a
+  // barcode of three unrelated things.
+  const washTop = L.ribY + L.ribH;
+  const plotBot = L.plotBot;
+  const rT = L.rows.temp, rR = L.rows.rain, rW = L.rows.wind;
 
-  // Midnight gridlines and day labels
-  const fmtD = new Intl.DateTimeFormat('en-GB', { weekday: 'short', day: '2-digit', timeZone: d.tz });
-  c.strokeStyle = grid; c.lineWidth = 1;
-  c.font = '11px ui-sans-serif, system-ui, sans-serif';
-  for (let i = 0; i < n; i++) {
-    const hr = localHour(times[i]);
-    if (hr !== 0 && i !== 0) continue;
-    const x = Math.round(X(i)) + 0.5;
-    c.beginPath(); c.moveTo(x, L.padT); c.lineTo(x, L.h - L.padB); c.stroke();
-    c.fillStyle = muted;
-    // Clamped inside the canvas, so the last day is not half-printed off the
-    // right edge on a narrow screen.
-    const lab = fmtD.format(times[i]);
-    const lw = c.measureText(lab).width;
-    c.fillText(lab, Math.min(x + 4, cssW - lw - 2), L.h - L.padB + 15);
-  }
+  /* --- 1. day tints and dividers, the whole point of this layout ---------- */
+  P.days.forEach((day, k) => {
+    const xa = Math.max(L.x0, Xh(day.from)), xb = Math.min(L.x1, Xh(day.to));
+    c.fillStyle = (k % 2) ? pal.tintB : pal.tintA;
+    c.fillRect(xa, topAll, xb - xa, plotBot - topAll);
+  });
 
-  const rowFor = (k) => L.rows.find((r) => r.key === k);
-
-  const axis = (row, lo, hi, step, fmt) => {
-    c.font = '10px ui-sans-serif, system-ui, sans-serif';
-    c.fillStyle = faint;
-    c.strokeStyle = grid;
-    for (let v = lo; v <= hi + 1e-9; v += step) {
-      const y = Math.round(row.y + row.h * (1 - (v - lo) / (hi - lo))) + 0.5;
-      c.beginPath(); c.moveTo(L.x0, y); c.lineTo(L.x1, y); c.stroke();
-      const label = fmt ? fmt(v) : String(Math.round(v * 10) / 10);
-      c.fillText(label, 6, y + 3.5);
+  /* --- 2. wet hours, washed the full height of the plot -------------------
+     "When does it rain" then answers from anywhere on the chart rather than
+     only from the rain lane, which is what forced the old version to be
+     hovered before it could answer the question at all. */
+  if (!dry) {
+    for (let i = 0; i < n; i++) {
+      if (rate[i] < 0.1) continue;
+      const xb = X(i), xa = Xh(d.steps[i] - (SPAN[i] || 1));
+      const a = rate[i] >= 2 ? 0.085 : rate[i] >= 0.5 ? 0.058 : 0.036;
+      c.fillStyle = mgRgba(pal.rainC, a);
+      c.fillRect(Math.max(L.x0, xa), washTop, Math.min(L.x1, xb) - Math.max(L.x0, xa), plotBot - washTop);
     }
-    // Caption on the right, axis numbers on the left. Both used to sit in the
-    // gap above the row, where the caption landed on the previous row's bottom
-    // label.
-    c.fillStyle = muted;
-    c.font = '10px ui-sans-serif, system-ui, sans-serif';
-    c.fillText(row.label, L.x1 - c.measureText(row.label).width, row.y - 3);
+  }
+
+  /* --- 3. the tail, where a second model takes over ----------------------- */
+  let xJoin = null;
+  if (d.tailFrom > 0 && d.tailFrom < n) {
+    xJoin = Xh(d.steps[d.tailFrom] - (d.steps[d.tailFrom] - d.steps[d.tailFrom - 1]) / 2);
+    c.fillStyle = ink(pal.dark ? 0.035 : 0.026);
+    c.fillRect(xJoin, washTop, L.x1 - xJoin, plotBot - washTop);
+  }
+
+  /* --- 4. the hours already gone ----------------------------------------- */
+  const nowH = (Date.now() - init.getTime()) / 3600e3;
+  const nowInRange = nowH > d.steps[0] + 0.05 && nowH < d.steps[n - 1];
+  if (nowInRange) {
+    c.fillStyle = ink(pal.dark ? 0.055 : 0.045);
+    c.fillRect(L.x0, washTop, Xh(nowH) - L.x0, plotBot - washTop);
+  }
+
+  /* --- 5. the day header ------------------------------------------------- */
+  drawMgHeader(c, d, P, L, pal, xJoin);
+
+  /* --- 6. the sky ribbon --------------------------------------------------
+     Cloud cover and daylight in one 16 px strip: this is where day and night
+     live now. The old chart washed the whole column instead, which made every
+     panel look striped and, on the dark theme, made night read as lit. */
+  {
+    const y = L.ribY, hh = L.ribH;
+    // Night is dark and cool, day is bright and cool-to-grey, in both themes:
+    // the ribbon is the one object here that is a picture rather than a plot,
+    // so it keeps its own colour and does not invert with the panel.
+    const dayClear = [138, 189, 230], dayGrey = [171, 181, 190];
+    const nightClear = [64, 84, 110], nightGrey = [104, 114, 128];
+    const R = P.ribbon;
+    for (let k = 0; k < R.length; k++) {
+      const s = R[k];
+      const xa = Xh(s.h), xb = k + 1 < R.length ? Xh(R[k + 1].h) : L.x1;
+      if (xb <= L.x0 || xa >= L.x1) continue;
+      const f = clamp(s.cloud / 100, 0, 1);
+      const t = clamp((s.elev + 6) / 12, 0, 1);
+      const col = mgMix(mgMix(nightClear, nightGrey, f), mgMix(dayClear, dayGrey, f), t);
+      c.fillStyle = mgRgba(col, 1);
+      c.fillRect(Math.max(L.x0, xa) - 0.4, y, Math.min(L.x1, xb) - Math.max(L.x0, xa) + 0.8, hh);
+    }
+    c.strokeStyle = ink(0.14); c.lineWidth = 1;
+    c.strokeRect(L.x0 + 0.5, y + 0.5, L.x1 - L.x0 - 1, hh - 1);
+    c.font = mgF('600 11px');
+    c.fillStyle = ink(0.62);
+    c.textAlign = 'right';
+    c.fillText('Sky', L.x0 - 8, y + hh / 2 + 4);
+    c.textAlign = 'left';
+  }
+
+  /* --- 7. gridlines and captions ----------------------------------------- */
+  const caption = (row) => {
+    c.font = mgF('700 11px');
+    c.fillStyle = ink(0.70);
+    if (c.letterSpacing !== undefined) c.letterSpacing = '0.05em';
+    c.fillText(row.label.toUpperCase(), L.x0, row.y - 8);
+    if (c.letterSpacing !== undefined) c.letterSpacing = '0px';
+  };
+  const gridline = (y) => {
+    const yy = Math.round(y) + 0.5;
+    c.strokeStyle = ink(0.10); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(L.x0, yy); c.lineTo(L.x1, yy); c.stroke();
+  };
+  const tickLabel = (y, s) => {
+    c.font = mgF('500 12px');
+    c.fillStyle = ink(0.58);
+    c.textAlign = 'right';
+    c.fillText(s, L.x0 - 8, Math.round(y) + 4);
+    c.textAlign = 'left';
   };
 
-  const line = (row, vals, lo, hi, color, width, dash) => {
+  /* --- 8. temperature ----------------------------------------------------- */
+  const [tLo, tHi] = mgBounds(d.temp.concat(d.dew), 0.8, 2);
+  const tY = (v) => rT.y + rT.h * (1 - (v - tLo) / (tHi - tLo));
+  caption(rT);
+  {
+    // A faint wash for the night hours, but only here — this is the row where
+    // the diurnal cycle is the story, and the ribbon carries the rest.
+    for (const r of P.runs) {
+      const xa = Math.max(L.x0, Xh(r.from)), xb = Math.min(L.x1, Xh(r.to));
+      if (xb <= xa) continue;
+      c.fillStyle = pal.dark ? 'rgba(0,0,0,.15)' : 'rgba(24,44,70,.034)';
+      c.fillRect(xa, rT.y, xb - xa, rT.h);
+    }
+    const step = Math.max(2, Math.round((tHi - tLo) / 5 / 2) * 2);
+    for (let v = tLo; v <= tHi + 1e-9; v += step) {
+      const y = tY(v);
+      if (Math.abs(v) < 1e-9 && tLo < 0) {
+        c.strokeStyle = ink(0.26); c.lineWidth = 1.2;
+        c.beginPath(); c.moveTo(L.x0, Math.round(y) + 0.5); c.lineTo(L.x1, Math.round(y) + 0.5); c.stroke();
+      } else gridline(y);
+      tickLabel(y, String(Math.round(v)));
+    }
+  }
+  // A soft fill under the temperature curve. Temperature is the subject of this
+  // chart, and until it had some area behind it every row weighed the same.
+  {
+    const g = c.createLinearGradient(0, rT.y, 0, rT.y + rT.h);
+    g.addColorStop(0, mgRgba(pal.tempC, pal.dark ? 0.22 : 0.16));
+    g.addColorStop(1, mgRgba(pal.tempC, 0));
     c.save();
     c.beginPath();
-    vals.forEach((v, i) => {
-      const y = row.y + row.h * (1 - (v - lo) / (hi - lo));
+    c.moveTo(X(0), rT.y + rT.h);
+    for (let i = 0; i < n; i++) c.lineTo(X(i), tY(d.temp[i]));
+    c.lineTo(X(n - 1), rT.y + rT.h);
+    c.closePath();
+    c.fillStyle = g; c.fill();
+    c.restore();
+  }
+  const trace = (vals, yFn, color, width, dash) => {
+    c.save();
+    c.beginPath();
+    for (let i = 0; i < n; i++) {
+      const y = yFn(vals[i]);
       if (i === 0) c.moveTo(X(i), y); else c.lineTo(X(i), y);
-    });
+    }
     c.strokeStyle = color; c.lineWidth = width;
+    c.lineJoin = 'round'; c.lineCap = 'round';
     if (dash) c.setLineDash(dash);
-    c.lineJoin = 'round';
     c.stroke();
     c.restore();
   };
+  trace(d.dew, tY, mgRgba(pal.coldC, 0.60), 1.8, [5, 4]);
+  trace(d.temp, tY, pal.temp, 3.0);
 
-  // --- temperature + dewpoint ------------------------------------------
-  const rT = rowFor('temp');
-  const [tLo, tHi] = mgBounds(d.temp.concat(d.dew), 1, 2);
-  axis(rT, tLo, tHi, Math.max(2, Math.round((tHi - tLo) / 5 / 2) * 2));
-  line(rT, d.dew, tLo, tHi, css.getPropertyValue('--c-cold').trim() || '#0277bd', 1.4, [4, 3]);
-  line(rT, d.temp, tLo, tHi, css.getPropertyValue('--c-temp').trim() || '#d84315', 2);
-
-  // --- cloud (area) + rain (bars) ---------------------------------------
-  const rC = rowFor('cloud');
-  axis(rC, 0, 100, 50, (v) => v + '%');
-  c.beginPath();
-  c.moveTo(X(0), rC.y + rC.h);
-  d.cloud.forEach((v, i) => c.lineTo(X(i), rC.y + rC.h * (1 - v / 100)));
-  c.lineTo(X(n - 1), rC.y + rC.h);
-  c.closePath();
-  c.fillStyle = 'rgba(120,140,160,.30)';
-  c.fill();
-  // Rate, not depth. A three-hour ICON-EU bucket holds three times the rain of
-  // an hourly ICON-2I one at the same intensity, so plotting depth would put a
-  // step change at the join that the weather does not have — and the caption
-  // underneath says mm/h.
-  const rate = d.precip.map((v, i) => v / (SPAN[i] || 1));
-  const rainMax = Math.max(1, Math.ceil(Math.max(...rate)));
-  const pxPerH = (L.x1 - L.x0) / hSpan;
-  c.fillStyle = css.getPropertyValue('--c-rain').trim() || '#1565c0';
-  rate.forEach((v, i) => {
-    if (v <= 0) return;
-    // Drawn across the hours the bucket actually accumulated over, which end
-    // at this step rather than straddling it: rain recorded at 15:00 fell
-    // before 15:00, and a three-hour bar centred on its endpoint would put
-    // half of itself in the future.
-    const bw = Math.max(1.5, SPAN[i] * pxPerH - 1);
-    const hh = rC.h * Math.min(1, v / rainMax);
-    c.fillRect(X(i) - bw, rC.y + rC.h - hh, bw, hh);
-  });
-  c.fillStyle = muted;
-  c.font = '10px ui-sans-serif, system-ui, sans-serif';
-  const rainNote = `rain 0–${rainMax} mm/h`;
-  c.fillText(rainNote, L.x0 + 2, rC.y + rC.h - 3);
-
-  // --- wind + gusts + direction -----------------------------------------
-  const rW = rowFor('wind');
-  const [wLo, wHi] = mgBounds([0].concat(d.gust), 0, 2);
-  axis(rW, 0, wHi, Math.max(2, Math.round(wHi / 4 / 2) * 2));
-  line(rW, d.gust, 0, wHi, css.getPropertyValue('--c-wind').trim() || '#00695c', 1.2, [3, 3]);
-  line(rW, d.wind, 0, wHi, css.getPropertyValue('--c-wind').trim() || '#00695c', 2);
-  // Direction arrows along the top of the wind panel, every few hours so they
-  // stay legible; each points the way the wind is blowing TO. Spaced along the
-  // axis rather than along the array — the tail's points are three hours apart
-  // where the head's are one, so stepping by index would crowd the near days
-  // and thin out the far ones.
-  const minGap = (L.x1 - L.x0) / 26;
-  c.strokeStyle = muted; c.fillStyle = muted; c.lineWidth = 1.1;
-  let lastArrow = -Infinity;
-  for (let i = 0; i < n; i++) {
-    if (X(i) - lastArrow < minGap) continue;
-    lastArrow = X(i);
-    const a = (d.dir[i] + 180) * Math.PI / 180;
-    const x = X(i), y = rW.y + 9;
-    const dx = Math.sin(a) * 5, dy = -Math.cos(a) * 5;
-    c.beginPath(); c.moveTo(x - dx, y - dy); c.lineTo(x + dx, y + dy); c.stroke();
-    c.beginPath();
-    c.moveTo(x + dx, y + dy);
-    c.lineTo(x + dx - dx * 0.6 - dy * 0.4, y + dy - dy * 0.6 + dx * 0.4);
-    c.lineTo(x + dx - dx * 0.6 + dy * 0.4, y + dy - dy * 0.6 - dx * 0.4);
-    c.closePath(); c.fill();
+  /* Each day's high and low, printed where they happen. The header already
+     says what they are; this says when, which is the half the header cannot. */
+  {
+    c.font = mgF('700 11.5px');
+    c.textAlign = 'center';
+    for (const day of P.days) {
+      if (day.count < 5 || day.iHi < 0 || day.iHi === day.iLo) continue;
+      for (const [i, dy, col] of [[day.iHi, -15, pal.tempC], [day.iLo, 19, pal.coldC]]) {
+        const lab = Math.round(d.temp[i]) + '°';
+        const wlab = c.measureText(lab).width;
+        const x = clamp(X(i), L.x0 + wlab / 2 + 3, L.x1 - wlab / 2 - 3);
+        const yv = tY(d.temp[i]), y = yv + dy;
+        // A rounded plate instead of a stroked halo: the halo used to punch a
+        // white nick straight through the dewpoint trace behind it.
+        mgRoundRect(c, x - wlab / 2 - 4, y - 11, wlab + 8, 15, 3);
+        c.fillStyle = mgRgba(pal.panel, 0.86); c.fill();
+        c.fillStyle = mgRgba(col, 1);
+        c.fillText(lab, x, y);
+        c.beginPath(); c.arc(X(i), yv, 2.6, 0, TAU); c.fill();
+      }
+    }
+    c.textAlign = 'left';
   }
 
-  // --- pressure ----------------------------------------------------------
-  const rP = rowFor('pres');
-  const [pLo, pHi] = mgBounds(d.pres, 0.5, 2);
-  axis(rP, pLo, pHi, Math.max(2, Math.round((pHi - pLo) / 3 / 2) * 2));
-  line(rP, d.pres, pLo, pHi, ink, 1.6);
+  /* --- 9. rain ------------------------------------------------------------ */
+  if (dry) {
+    /* No box, no axis, no empty hundred pixels of white. A dry week gets a slim
+       lane that says so in words, and the height goes to temperature. */
+    const y = rR.y + rR.h / 2;
+    mgRoundRect(c, L.x0, rR.y, L.x1 - L.x0, rR.h, 4);
+    c.fillStyle = ink(0.035); c.fill();
+    c.font = mgF('700 11px');
+    if (c.letterSpacing !== undefined) c.letterSpacing = '0.05em';
+    c.fillStyle = ink(0.70);
+    c.fillText('RAIN', L.x0 + 10, y + 4);
+    if (c.letterSpacing !== undefined) c.letterSpacing = '0px';
+    const off = c.measureText('RAIN').width + 20;
+    c.font = mgF('500 12px');
+    c.fillStyle = ink(0.48);
+    c.fillText('none anywhere in this forecast', L.x0 + off, y + 4);
+  } else {
+    caption(rR);
+    const base = rR.y + rR.h;
+    const rY = (r) => base - mgRainF(r) * rR.h;
+    for (const v of [0.5, 2, 10]) {
+      const y = rY(v);
+      if (y < rR.y - 1) continue;
+      gridline(y);
+      tickLabel(y, v === 0.5 ? '0.5' : String(v));
+    }
+    c.strokeStyle = ink(0.16); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(L.x0, Math.round(base) + 0.5); c.lineTo(L.x1, Math.round(base) + 0.5); c.stroke();
 
-  // --- model change ------------------------------------------------------
-  // Where ICON-2I runs out and ICON-EU takes over. Two models disagree a
-  // little even about the same hour, so the lines can step at this point;
-  // marking it says the step is a change of source, not of weather. Drawn last
-  // of the data layers so it sits over the traces rather than under them.
-  if (d.tailFrom > 0 && d.tailFrom < n) {
-    const xj = Math.round(X(d.tailFrom) - (X(d.tailFrom) - X(d.tailFrom - 1)) / 2) + 0.5;
+    /* One continuous stepped area over the bucket edges rather than a bar per
+       step. A six-hour event then reads as one object, and the change from
+       hourly to three-hourly buckets alters the width of a step but never the
+       apparent magnitude of the rain in it. */
     c.save();
-    c.strokeStyle = muted;
-    c.lineWidth = 1;
-    c.setLineDash([3, 3]);
-    c.beginPath(); c.moveTo(xj, L.padT); c.lineTo(xj, L.h - L.padB); c.stroke();
-    c.setLineDash([]);
-    c.fillStyle = muted;
-    c.font = '10px ui-sans-serif, system-ui, sans-serif';
-    const lab = d.tailShort || 'ICON-EU';
-    // Left of the rule if the tail is too narrow to hold the label.
-    const lw = c.measureText(lab).width;
-    c.fillText(lab, Math.min(xj + 4, L.x1 - lw), L.padT + 9);
+    c.beginPath();
+    c.rect(L.x0, rR.y - 6, L.x1 - L.x0, rR.h + 6);
+    c.clip();
+    c.beginPath();
+    let started = false;
+    for (let i = 0; i < n; i++) {
+      const xa = Xh(d.steps[i] - (SPAN[i] || 1)), xb = X(i);
+      const y = rY(Math.min(rate[i], 10));
+      if (!started) { c.moveTo(xa, base); started = true; }
+      c.lineTo(xa, y); c.lineTo(xb, y);
+    }
+    c.lineTo(X(n - 1), base);
+    c.closePath();
+    c.fillStyle = mgRgba(pal.rainC, 0.80);
+    c.fill();
+    /* The wet blocks get an outline so that drizzle is still an object rather
+       than a smear — but only the wet ones. Stroking the dry buckets too drew
+       a saturated blue rule from one end of the chart to the other along the
+       zero line, which read as the loudest thing on the panel. */
+    c.beginPath();
+    let pen = false;
+    for (let i = 0; i < n; i++) {
+      const xa = Xh(d.steps[i] - (SPAN[i] || 1)), xb = X(i);
+      const y = rY(Math.min(rate[i], 10));
+      if (rate[i] > 0) {
+        if (!pen) { c.moveTo(xa, base); pen = true; }
+        c.lineTo(xa, y); c.lineTo(xb, y);
+      } else if (pen) { c.lineTo(xa, base); pen = false; }
+    }
+    if (pen) c.lineTo(X(n - 1), base);
+    c.strokeStyle = mgRgba(pal.rainC, 1); c.lineWidth = 1.6;
+    c.lineJoin = 'miter';
+    c.stroke();
     c.restore();
+
+    /* Over the top of the scale, the bar is notched rather than the axis being
+       rescaled: 20 mm/h in one place must not silently redraw 2 mm/h in
+       another as the same height. */
+    for (let i = 0; i < n; i++) {
+      if (rate[i] <= 10) continue;
+      const xa = Math.max(L.x0, Xh(d.steps[i] - (SPAN[i] || 1))), xb = Math.min(L.x1, X(i));
+      c.save();
+      c.strokeStyle = panelHex; c.lineWidth = 2;
+      c.beginPath();
+      for (let x = xa; x < xb; x += 4) {
+        c.moveTo(x, rR.y + 3.5); c.lineTo(Math.min(xb, x + 2), rR.y + 0.5);
+        c.lineTo(Math.min(xb, x + 4), rR.y + 3.5);
+      }
+      c.stroke();
+      c.restore();
+    }
   }
 
-  MG.scales = { tLo, tHi, wHi, pLo, pHi, rainMax, X, n, times, rate, SPAN, hSpan };
+  /* --- 10. wind ----------------------------------------------------------- */
+  caption(rW);
+  const gustSorted = d.gust.slice().sort((a, b) => a - b);
+  const p90 = gustSorted[Math.floor(gustSorted.length * 0.9)];
+  const maxMean = Math.max(...d.wind);
+  /* The axis follows the body of the distribution, not its single worst point.
+     One 25 m/s gust used to set the ceiling for three days and pin the mean —
+     the thing you actually stand in — flat against the floor. */
+  let wKmh = Math.max(p90, maxMean * 1.6, 4.5) * 3.6;
+  const kStep = wKmh <= 44 ? 10 : wKmh <= 88 ? 20 : 30;
+  wKmh = Math.ceil(wKmh / kStep) * kStep;
+  const wHi = wKmh / 3.6;
+  const wY = (v) => rW.y + rW.h * (1 - clamp(v / wHi, 0, 1));
+  for (let k = 0; k <= wKmh + 1e-9; k += kStep) {
+    const y = wY(k / 3.6);
+    if (k === 0) {
+      c.strokeStyle = ink(0.16); c.lineWidth = 1;
+      c.beginPath(); c.moveTo(L.x0, Math.round(y) + 0.5); c.lineTo(L.x1, Math.round(y) + 0.5); c.stroke();
+    } else gridline(y);
+    tickLabel(y, String(k));
+  }
+  // m/s up the right margin, because that is the unit every other wind number
+  // on this site is in — but km/h is the one a person decides with, so km/h
+  // owns the labelled scale now and m/s is the gloss.
+  if (!L.narrow) {
+    c.font = mgF('500 11px');
+    c.fillStyle = ink(0.42);
+    for (let v = 0; v <= wHi + 1e-9; v += (wHi > 16 ? 5 : wHi > 8 ? 4 : 2)) {
+      const y = wY(v);
+      c.fillText(Math.round(v) + (v === 0 ? ' m/s' : ''), L.x1 + 7, Math.round(y) + 4);
+    }
+  }
+  {
+    // Mean-to-gust as a band. Two lines of the same colour separated only by a
+    // dash pattern was asking the reader to remember which was which.
+    c.save();
+    c.beginPath();
+    c.rect(L.x0, rW.y, L.x1 - L.x0, rW.h + 1);
+    c.clip();
+    c.beginPath();
+    for (let i = 0; i < n; i++) { const y = wY(d.gust[i]); if (i === 0) c.moveTo(X(i), y); else c.lineTo(X(i), y); }
+    for (let i = n - 1; i >= 0; i--) c.lineTo(X(i), wY(d.wind[i]));
+    c.closePath();
+    c.fillStyle = mgRgba(pal.windC, pal.dark ? 0.26 : 0.20);
+    c.fill();
+    trace(d.gust, wY, mgRgba(pal.windC, 0.62), 1.4);
+    trace(d.wind, wY, pal.wind, 2.6);
+    c.restore();
+    // The clipped-off peak, named rather than allowed to own the axis.
+    let gi = 0;
+    for (let i = 1; i < n; i++) if (d.gust[i] > d.gust[gi]) gi = i;
+    if (d.gust[gi] > wHi) {
+      const x = clamp(X(gi), L.x0 + 18, L.x1 - 18);
+      c.fillStyle = mgRgba(pal.windC, 1);
+      c.beginPath();
+      c.moveTo(x, rW.y - 1); c.lineTo(x - 4.5, rW.y + 5.5); c.lineTo(x + 4.5, rW.y + 5.5);
+      c.closePath(); c.fill();
+      c.font = mgF('700 11px');
+      c.textAlign = 'center';
+      const lab = Math.round(d.gust[gi] * 3.6) + '';
+      const lw = c.measureText(lab).width;
+      mgRoundRect(c, x - lw / 2 - 4, rW.y - 16, lw + 8, 14, 3);
+      c.fillStyle = mgRgba(pal.panel, 0.9); c.fill();
+      c.fillStyle = mgRgba(pal.windC, 1);
+      c.fillText(lab, x, rW.y - 5);
+      c.textAlign = 'left';
+    }
+    // One Beaufort reference inside the lane, so "windy" can be read as a
+    // position rather than decoded from a number.
+    for (const [ms, name] of [[8.0, 'F5'], [13.9, 'F7']]) {
+      const y = wY(ms);
+      // Clear of the direction arrows along the top of the lane, and clear of
+      // the floor: a reference line nobody can read is just another gridline.
+      if (y < rW.y + 24 || y > rW.y + rW.h - 12) continue;
+      c.save();
+      c.setLineDash([2, 4]);
+      c.strokeStyle = ink(0.22); c.lineWidth = 1;
+      c.beginPath(); c.moveTo(L.x0, Math.round(y) + 0.5); c.lineTo(L.x1, Math.round(y) + 0.5); c.stroke();
+      c.restore();
+      c.font = mgF('700 11px');
+      c.fillStyle = ink(0.45);
+      c.fillText(name, L.x0 + 4, y - 3);
+    }
+  }
+  // Direction arrows along the top of the lane; each points the way the wind is
+  // blowing TO. Spaced along the axis rather than along the array, so the
+  // three-hourly tail is not thinned out relative to the hourly head.
+  {
+    const minGap = L.narrow ? 26 : 34;
+    c.strokeStyle = ink(0.55); c.fillStyle = ink(0.55); c.lineWidth = 1.4;
+    c.lineCap = 'round';
+    let last = -Infinity;
+    for (let i = 0; i < n; i++) {
+      // Kept clear of both frame edges: half an arrow hanging outside the
+      // panel reads as a rendering fault rather than as a wind direction.
+      if (X(i) - last < minGap || X(i) > L.x1 - 8 || X(i) < L.x0 + 8) continue;
+      last = X(i);
+      const a = (d.dir[i] + 180) * Math.PI / 180;
+      const x = X(i), y = rW.y + 10;
+      const dx = Math.sin(a) * 5.5, dy = -Math.cos(a) * 5.5;
+      c.beginPath(); c.moveTo(x - dx, y - dy); c.lineTo(x + dx, y + dy); c.stroke();
+      c.beginPath();
+      c.moveTo(x + dx * 1.05, y + dy * 1.05);
+      c.lineTo(x + dx * 0.35 - dy * 0.42, y + dy * 0.35 + dx * 0.42);
+      c.lineTo(x + dx * 0.35 + dy * 0.42, y + dy * 0.35 - dx * 0.42);
+      c.closePath(); c.fill();
+    }
+  }
 
-  // --- crosshair ---------------------------------------------------------
-  if (MG.hover !== null) {
+  /* --- 11. midnight dividers, over the data ------------------------------- */
+  for (let k = 1; k < P.days.length; k++) {
+    const x = Math.round(Xh(P.days[k].from)) + 0.5;
+    if (x <= L.x0 + 1 || x >= L.x1 - 1) continue;
+    c.strokeStyle = ink(0.20); c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x, topAll); c.lineTo(x, plotBot); c.stroke();
+  }
+  c.strokeStyle = ink(0.16); c.lineWidth = 1;
+  c.strokeRect(L.x0 + 0.5, plotTop + 0.5, L.x1 - L.x0 - 1, plotBot - plotTop - 1);
+
+  /* --- 12. the model join ------------------------------------------------- */
+  if (xJoin !== null) {
+    const x = Math.round(xJoin) + 0.5;
+    c.strokeStyle = ink(0.34); c.lineWidth = 2;
+    c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
+    const lab = (d.tailShort || 'ICON-EU') + (L.narrow ? '' : ' · 3-hourly');
+    c.font = mgF('600 11px');
+    const lw = c.measureText(lab).width;
+    // Inside the temperature panel rather than on the sky ribbon, and saying
+    // what actually changes at the rule: the step from hourly to three-hourly
+    // buckets, not merely that a different model's name applies.
+    const bx = Math.min(x + 6, L.x1 - lw - 14);
+    mgRoundRect(c, bx, rT.y + 6, lw + 12, 18, 9);
+    c.fillStyle = panelHex; c.fill();
+    c.strokeStyle = ink(0.22); c.lineWidth = 1; c.stroke();
+    c.fillStyle = ink(0.66);
+    c.fillText(lab, bx + 6, rT.y + 19);
+  }
+
+  /* --- 13. the hour ruler ------------------------------------------------- */
+  {
+    const marks = L.narrow || pxPerH * 6 < 30 ? [12] : [6, 12, 18];
+    c.font = mgF('500 11px');
+    c.textAlign = 'center';
+    for (const day of P.days) {
+      // The day's local midnight, which is where its cell begins; the first
+      // day's is before the run starts, so it is reconstructed backwards.
+      const mid0 = day.hours >= 23.4 || day.from > d.steps[0] ? day.from : day.to - 24;
+      for (const hh of marks) {
+        const h = mid0 + hh;
+        if (h < d.steps[0] + 0.5 || h > d.steps[n - 1] - 0.5) continue;
+        const x = Xh(h);
+        c.strokeStyle = ink(0.22); c.lineWidth = 1;
+        c.beginPath(); c.moveTo(Math.round(x) + 0.5, plotBot);
+        c.lineTo(Math.round(x) + 0.5, plotBot + 4); c.stroke();
+        c.fillStyle = ink(0.52);
+        c.fillText(String(hh).padStart(2, '0'), x, plotBot + 16);
+      }
+    }
+    c.textAlign = 'left';
+  }
+
+  /* --- 14. now ------------------------------------------------------------ */
+  if (nowInRange) {
+    const x = Math.round(Xh(nowH)) + 0.5;
+    c.strokeStyle = pal.accent; c.lineWidth = 2;
+    c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
+    c.font = mgF('700 11px');
+    const lw = c.measureText('NOW').width;
+    // On the ribbon lane: the only band on the chart with no numbers in it, so
+    // the one place a chip can sit without covering something that is read.
+    const cy = plotTop + L.ribH / 2;
+    mgRoundRect(c, x - lw / 2 - 6, cy - 8, lw + 12, 16, 8);
+    c.fillStyle = pal.accent; c.fill();
+    c.fillStyle = pal.dark ? '#0f1216' : '#ffffff';
+    c.textAlign = 'center';
+    c.fillText('NOW', x, cy + 4);
+    c.textAlign = 'left';
+  }
+
+  MG.scales = { tLo, tHi, tY, wHi, wY, rainY: (r) => (dry ? null : rR.y + rR.h - mgRainF(r) * rR.h),
+    X, Xh, n, times, rate, SPAN, hSpan, day: P.day, dry, plotTop, plotBot };
+
+  /* --- 15. crosshair ------------------------------------------------------ */
+  if (MG.hover !== null && MG.hover >= 0 && MG.hover < n) {
     const i = MG.hover;
     const x = Math.round(X(i)) + 0.5;
     c.save();
-    c.strokeStyle = css.getPropertyValue('--accent').trim();
-    c.lineWidth = 1;
-    c.beginPath(); c.moveTo(x, L.padT); c.lineTo(x, L.h - L.padB); c.stroke();
-    for (const [row, val, lo, hi] of [
-      [rT, d.temp[i], tLo, tHi], [rW, d.wind[i], 0, wHi], [rP, d.pres[i], pLo, pHi],
-    ]) {
-      c.beginPath();
-      c.arc(X(i), row.y + row.h * (1 - (val - lo) / (hi - lo)), 3, 0, 6.284);
-      c.fillStyle = css.getPropertyValue('--accent').trim();
-      c.fill();
-    }
+    c.strokeStyle = pal.accent; c.lineWidth = 1;
+    c.setLineDash([3, 3]);
+    c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
+    c.setLineDash([]);
+    const dot = (y) => {
+      c.beginPath(); c.arc(X(i), y, 3.6, 0, TAU);
+      c.fillStyle = panelHex; c.fill();
+      c.lineWidth = 2; c.strokeStyle = pal.accent; c.stroke();
+    };
+    dot(tY(d.temp[i]));
+    dot(wY(Math.min(d.wind[i], wHi)));
+    if (!dry && rate[i] > 0) dot(rR.y + rR.h - mgRainF(Math.min(rate[i], 10)) * rR.h);
+    // The hour under the cursor, printed on the ruler.
+    const lab = P.fmtHM.format(times[i]);
+    c.font = mgF('700 11px');
+    const lw = c.measureText(lab).width;
+    const bx = clamp(X(i) - lw / 2 - 5, L.x0, L.x1 - lw - 10);
+    mgRoundRect(c, bx, plotBot + 3, lw + 10, 16, 3);
+    c.fillStyle = pal.accent; c.fill();
+    c.fillStyle = pal.dark ? '#0f1216' : '#ffffff';
+    c.fillText(lab, bx + 5, plotBot + 15);
     c.restore();
   }
 }
 
+/* ------------------------------------------------------------- the header --
+
+   One cell per local calendar day. This is the layer the whole design is for:
+   weekday and date, a large symbol for the daylight half and a smaller one for
+   the night, the day's high and low as a paired number, and — only when they
+   are worth a line — the rain total and the peak gust.
+
+   Partial days are the awkward case and are handled rather than hidden. The
+   first day usually starts a couple of hours after midnight, which is fine; a
+   trailing sliver of two or three hours is too narrow to summarise honestly,
+   so it is merged into the previous cell's content and keeps only its tint and
+   its midnight rule. */
+function drawMgHeader(c, d, P, L, pal, xJoin) {
+  const ink = pal.ink;
+  const hy = L.headY, hh = L.headH;
+  const n = d.steps.length;
+  const hSpan = (d.steps[n - 1] - d.steps[0]) || 1;
+  const Xh = (h) => L.x0 + ((h - d.steps[0]) / hSpan) * (L.x1 - L.x0);
+
+  // Merge slivers into a neighbour for the purposes of content only.
+  const cells = [];
+  P.days.forEach((day, k) => {
+    const xa = Math.max(L.x0, Xh(day.from)), xb = Math.min(L.x1, Xh(day.to));
+    const w = xb - xa;
+    if (w < 58 && cells.length) { cells[cells.length - 1].xb = xb; return; }
+    if (w < 58 && P.days[k + 1]) { cells.push({ day: P.days[k + 1], xa, xb, skipNext: true }); return; }
+    if (cells.length && cells[cells.length - 1].skipNext) {
+      cells[cells.length - 1].xb = xb; cells[cells.length - 1].skipNext = false; return;
+    }
+    cells.push({ day, xa, xb });
+  });
+
+  c.strokeStyle = ink(0.18); c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(L.x0, Math.round(hy + hh) + 0.5); c.lineTo(L.x1, Math.round(hy + hh) + 0.5);
+  c.stroke();
+
+  /* Sunrise and sunset go on every title line or on none of them. Deciding it
+     cell by cell means the widest days carry a clock and the others do not,
+     which reads as a rendering accident rather than a layout. */
+  const sunOf = (day) => `↑${day.rise}  ↓${day.set}`;
+  let showSun = !L.narrow;
+  if (showSun) {
+    for (const cell of cells) {
+      const day = cell.day, cw = cell.xb - cell.xa;
+      if (cw < 196 || !day.rise || !day.set) { showSun = false; break; }
+      c.font = mgF('700 14px');
+      let need = c.measureText(day.name || day.wd).width;
+      if (!day.name) { c.font = mgF('500 11.5px'); need += 7 + c.measureText(day.date).width; }
+      c.font = mgF('500 11px');
+      if (24 + need + 16 + c.measureText(sunOf(day)).width > cw) { showSun = false; break; }
+    }
+  }
+
+  for (const cell of cells) {
+    const day = cell.day, cw = cell.xb - cell.xa;
+    if (cw < 34) continue;
+    c.save();
+    c.beginPath();
+    c.rect(cell.xa, hy, cw, hh);
+    c.clip();
+
+    const title = day.name || day.wd;
+
+    /* Which of the three cell layouts fits, decided by measuring rather than by
+       a width threshold. The threshold version held for a 00 UTC run, where
+       every cell is a whole day of equal width. A 12 UTC run puts a half-day
+       cell at each end, and those cells cleared the threshold while being far
+       too narrow for the layout it selected: the symbols are laid out from the
+       left and the numbers from the right, so the two ran straight through each
+       other and the last day printed its high on top of its own cloud. */
+    const hasNum = day.tMax !== null && day.count >= 3;
+    const hiTxt = hasNum ? Math.round(day.tMax) + '°' : '';
+    const loTxt = hasNum ? Math.round(day.tMin) + '°' : '';
+    const numW = (hiPx, loPx) => {
+      if (!hasNum) return 0;
+      c.font = mgF(`700 ${hiPx}px`);
+      const w = c.measureText(hiTxt).width;
+      c.font = mgF(`600 ${loPx}px`);
+      return w + 8 + c.measureText(loTxt).width;
+    };
+    // 12 px of padding each side, then symbols, a 12 px minimum gutter, numbers.
+    const fits = (big, small, hiPx, loPx) =>
+      cw - 24 >= big + 6 + small + 12 + numW(hiPx, loPx);
+    const mode = (cw >= 196 && fits(46, 30, 27, 18)) ? 2
+               : fits(38, 25, 22, 15) ? 1 : 0;
+
+    if (mode === 0) {
+      /* Narrow: one column, centred. Weekday, both symbols side by side, then
+         the paired numbers. Nothing else fits and nothing else is needed. */
+      const cx = cell.xa + cw / 2;
+      c.textAlign = 'center';
+      c.font = mgF('700 12px');
+      c.fillStyle = ink(0.92);
+      c.fillText(title, cx, hy + 15);
+      c.font = mgF('500 11px');
+      c.fillStyle = ink(0.50);
+      c.fillText(day.date, cx, hy + 28);
+      c.textAlign = 'left';
+      const s0 = day.symbols[0], s1 = day.symbols[1];
+      if (s0) mgSymbol(c, cx - (s1 ? 15 : 0), hy + 51, 30, s0.sky, s0.wet, true, s0.snow, pal);
+      if (s1) mgSymbol(c, cx + (s0 ? 17 : 0), hy + 53, 21, s1.sky, s1.wet, false, s1.snow, pal);
+      if (day.tMax !== null && day.count >= 3) {
+        c.textAlign = 'center';
+        const hiS = Math.round(day.tMax) + '°', loS = Math.round(day.tMin) + '°';
+        c.font = mgF('700 17px');
+        const hw = c.measureText(hiS).width;
+        c.font = mgF('600 13px');
+        const lw = c.measureText(loS).width;
+        const tot = hw + 6 + lw;
+        c.textAlign = 'left';
+        c.font = mgF('700 17px');
+        c.fillStyle = mgRgba(pal.tempC, 1);
+        c.fillText(hiS, cx - tot / 2, hy + 84);
+        c.font = mgF('600 13px');
+        c.fillStyle = mgRgba(pal.coldC, 1);
+        c.fillText(loS, cx - tot / 2 + hw + 6, hy + 84);
+      }
+      c.restore();
+      continue;
+    }
+
+    const px = cell.xa + 12;
+    const pr = cell.xb - 12;
+
+    /* Title line: the day, and on a wide cell the sunrise and sunset that were
+       already being computed for the shading and then thrown away. */
+    c.font = mgF('700 14px');
+    c.fillStyle = ink(0.93);
+    c.fillText(title, px, hy + 19);
+    const tw = c.measureText(title).width;
+    // "Today" and "Tomorrow" do not also need their date spelled out; the day
+    // after that does, and gets the room the other two gave back.
+    if (!day.name) {
+      c.font = mgF('500 11.5px');
+      c.fillStyle = ink(0.52);
+      c.fillText(day.date, px + tw + 7, hy + 19);
+    }
+    if (showSun) {
+      c.textAlign = 'right';
+      c.font = mgF('500 11px');
+      c.fillStyle = ink(0.46);
+      c.fillText(sunOf(day), pr, hy + 19);
+      c.textAlign = 'left';
+    }
+
+    /* Symbols. Big one is the daylight half; the small one is the night, which
+       is genuinely the less informative cell and is drawn as such. */
+    const bigS = mode === 2 ? 46 : 38;
+    const smallS = mode === 2 ? 30 : 25;
+    const symY = hy + (mode === 2 ? 62 : 58);
+    const s0 = day.symbols[0], s1 = day.symbols[1];
+    let sx = px + bigS / 2;
+    if (s0) { mgSymbol(c, sx, symY, bigS, s0.sky, s0.wet, true, s0.snow, pal); sx += bigS / 2 + 6; }
+    if (s1) {
+      mgSymbol(c, sx + smallS / 2, symY + 3, smallS, s1.sky, s1.wet, false, s1.snow, pal);
+      sx += smallS + 6;
+    }
+
+    /* The numbers, right-aligned so the eye can run down a column of highs. */
+    if (day.tMax !== null && day.count >= 3) {
+      const hiS = Math.round(day.tMax) + '°', loS = Math.round(day.tMin) + '°';
+      const hiPx = mode === 2 ? 27 : 22, loPx = mode === 2 ? 18 : 15;
+      c.font = mgF(`600 ${loPx}px`);
+      const lw = c.measureText(loS).width;
+      c.font = mgF(`700 ${hiPx}px`);
+      const hw = c.measureText(hiS).width;
+      const yN = hy + (mode === 2 ? 70 : 65);
+      c.fillStyle = mgRgba(pal.tempC, 1);
+      c.fillText(hiS, pr - lw - 8 - hw, yN);
+      c.font = mgF(`600 ${loPx}px`);
+      c.fillStyle = mgRgba(pal.coldC, 1);
+      c.fillText(loS, pr - lw, yN);
+    } else if (day.count) {
+      c.textAlign = 'right';
+      c.font = mgF('500 11px');
+      c.fillStyle = ink(0.40);
+      c.fillText('part day', pr, hy + (mode === 2 ? 62 : 58));
+      c.textAlign = 'left';
+    }
+
+    /* The bottom line of the cell. Wind is always there, so every cell has the
+       same shape; rain only when there is any, because a "0.0 mm" printed on
+       five consecutive days is five lines of chart saying nothing. Provenance
+       and short days are notes, in ink rather than in a hue. */
+    const yC = hy + hh - 12;
+    const chips = [];
+    if (day.mm >= 0.05) {
+      chips.push([mgRgba(pal.rainC, 1), `${day.mm < 10 ? day.mm.toFixed(1) : Math.round(day.mm)} mm`]);
+    }
+    if (day.wPeak) {
+      chips.push([mgRgba(pal.windC, 1),
+        day.gust * 3.6 >= 45
+          ? `${day.dir} ${Math.round(day.wPeak * 3.6)}, gust ${Math.round(day.gust * 3.6)} km/h`
+          : `${day.dir} ${Math.round(day.wPeak * 3.6)} km/h`]);
+    }
+    if (day.partial) chips.push([ink(0.44), 'part day']);
+    if (day.tail) chips.push([ink(0.44), '3-hourly']);
+
+    c.font = mgF('600 11px');
+    let x = px;
+    chips.forEach(([col, text], ci) => {
+      const w = c.measureText(text).width;
+      if (x + w > pr) return;
+      if (ci && x > px) {
+        c.fillStyle = ink(0.24);
+        c.beginPath(); c.arc(x - 7, yC - 4, 1.3, 0, TAU); c.fill();
+      }
+      c.fillStyle = col;
+      c.fillText(text, x, yC);
+      x += w + 13;
+    });
+    c.restore();
+  }
+}
+
+/* ------------------------------------------------------------------ hover -- */
+
 function mgTip(i) {
   const d = MG.data, L = MG.layout;
-  if (!d || !L) return;
+  if (!d || !L || !MG.scales) return;
   const t = MG.scales.times[i];
   const sp = (MG.scales.SPAN || [])[i] || 1;
+  const rate = MG.scales.rate[i];
   const fmtT = new Intl.DateTimeFormat('en-GB', {
     weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false, timeZone: d.tz });
-  const pts = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+
+  const temp = d.temp[i], dew = d.dew[i], wind = d.wind[i];
+  const rh = Math.round(mgRH(temp, dew));
+  const feels = mgFeels(temp, dew, wind);
+  const bft = mgBeaufort(wind);
+  const wet = mgWetClass(rate);
+  const word = mgWeatherWord(mgSkyClass(d.cloud[i]), wet, MG.scales.day[i], temp <= 1.0);
+
+  const row = (k, v) => `<div class="row"><span>${k}</span><b>${v}</b></div>`;
   const tip = $('mg-tip');
   tip.innerHTML =
     `<div class="row"><b>${fmtT.format(t)}</b></div>` +
-    `<div class="row"><span>Temp</span><b>${d.temp[i].toFixed(1)} °C</b></div>` +
-    `<div class="row"><span>Dewpoint</span><b>${d.dew[i].toFixed(1)} °C</b></div>` +
-    `<div class="row"><span>Wind</span><b>${d.wind[i].toFixed(1)} m/s ${pts[Math.round(d.dir[i] / 22.5) % 16]}</b></div>` +
-    `<div class="row"><span>Gust</span><b>${d.gust[i].toFixed(1)} m/s</b></div>` +
-    `<div class="row"><span>Cloud</span><b>${d.cloud[i]}%</b></div>` +
-    `<div class="row"><span>Rain</span><b>${d.precip[i] > 0 ? d.precip[i].toFixed(1) + ' mm' + (sp > 1 ? ` / ${sp} h` : '') : '—'}</b></div>` +
-    `<div class="row"><span>Pressure</span><b>${d.pres[i].toFixed(1)} hPa</b></div>` +
-    // Which model this hour came from. Only worth the line once there are two
-    // of them, and only named in short form — the full string is in the header.
-    (d.tailFrom ? `<div class="row"><span>Model</span><b>${i >= d.tailFrom ? (d.tailShort || 'ICON-EU') : 'ICON-2I'}</b></div>` : '');
+    `<div class="mg-tip-word">${word}</div>` +
+    row('Temperature', `${temp.toFixed(1)} °C`) +
+    (Math.abs(feels - temp) >= 1 ? row('Feels like', `${feels.toFixed(0)} °C`) : '') +
+    row('Humidity', `${rh}%  ·  dew ${dew.toFixed(1)} °C`) +
+    row('Wind', `${Math.round(wind * 3.6)} km/h ${MG_POINTS[Math.round(d.dir[i] / 22.5) % 16]}`) +
+    row('', `<span class="mg-tip-sub">${MG_BFT_WORD[bft]} · force ${bft} · gust ${Math.round(d.gust[i] * 3.6)} km/h</span>`) +
+    row('Cloud', `${Math.round(d.cloud[i])}%`) +
+    row('Rain', d.precip[i] > 0
+      ? `${rate.toFixed(1)} mm/h${sp > 1 ? ` (${d.precip[i].toFixed(1)} mm / ${sp} h)` : ''}`
+      : '—') +
+    row('Pressure', `${d.pres[i].toFixed(1)} hPa`) +
+    (d.tailFrom ? row('Model', i >= d.tailFrom ? (d.tailShort || 'ICON-EU') : 'ICON-2I') : '');
   tip.style.opacity = '1';
+
   const x = MG.scales.X(i);
-  // Flip the tip to the other side of the crosshair near the right edge, so it
-  // is never clipped by the panel it lives in.
-  const tw = tip.offsetWidth;
-  tip.style.left = (x + 12 + tw > L.w ? x - 12 - tw : x + 12) + 'px';
-  tip.style.top = '10px';
+  const tw = tip.offsetWidth, th = tip.offsetHeight;
+  // Flip to the other side of the crosshair near the right edge, and follow the
+  // pointer down the chart rather than sitting permanently on the traces at the
+  // top — which is where it used to cover the one row it was describing.
+  tip.style.left = (x + 14 + tw > L.w ? x - 14 - tw : x + 14) + 'px';
+  const wantY = (MG.hoverY === null ? MG.scales.plotTop + 20 : MG.hoverY + 16);
+  tip.style.top = clamp(wantY, MG.layout.headY + MG.layout.headH + 6, L.h - th - 8) + 'px';
 }
 
-$('mg-wrap').addEventListener('pointermove', (e) => {
+function mgPick(e) {
   if (!MG.data || !MG.layout) return;
-  const r = $('mg-wrap').getBoundingClientRect();
+  const wrap = $('mg-wrap');
+  const r = wrap.getBoundingClientRect();
   const x = e.clientX - r.left;
+  MG.hoverY = e.clientY - r.top;
   const L = MG.layout, steps = MG.data.steps, n = steps.length;
   const f = (x - L.x0) / (L.x1 - L.x0);
-  // The axis is hours, and hours are no longer evenly spaced across the array,
-  // so the pointer is converted to a forecast hour and the nearest step to it
-  // is picked. Scaling the fraction by n - 1 would land on the wrong point
-  // anywhere past the model join. Derived here rather than read back off
-  // MG.scales so the hover does not depend on a draw having completed.
+  /* The axis is hours, and hours are not evenly spaced across the array, so the
+     pointer is converted to a forecast hour and the nearest step to it is
+     picked. Scaling the fraction by n - 1 lands on the wrong point anywhere
+     past the model join. */
   const hSpan = (steps[n - 1] - steps[0]) || 1;
-  const hour = steps[0] + Math.max(0, Math.min(1, f)) * hSpan;
+  const hour = steps[0] + clamp(f, 0, 1) * hSpan;
   let best = 0;
   for (let i = 1; i < n; i++) {
     if (Math.abs(steps[i] - hour) < Math.abs(steps[best] - hour)) best = i;
   }
   MG.hover = best;
   drawMeteogram();
-  mgTip(MG.hover);
-});
+  mgTip(best);
+}
+
+$('mg-wrap').addEventListener('pointermove', mgPick);
+// Touch has no hover, so a tap has to do the same job.
+$('mg-wrap').addEventListener('pointerdown', mgPick);
 $('mg-wrap').addEventListener('pointerleave', () => {
   MG.hover = null;
+  MG.hoverY = null;
   $('mg-tip').style.opacity = '0';
   drawMeteogram();
 });
@@ -5365,9 +6462,9 @@ function showView(name) {
         `${gap === 1 ? 'hourly' : gap + '-hourly'} to +${d.steps[d.steps.length - 1]} h` +
         (d.tailShort ? `, then ${d.tailShort}` : '');
       $('mg-now').textContent = `${d.credit} · © Ryan Vella`;
-      $('mg-desc').textContent =
-        `Hourly point forecast for ${d.place} at 2 km. Shaded columns are night ` +
-        '(20:00–06:00 local). Dashed lines are dewpoint and gusts. Hover for exact values.';
+      // Written by the renderer, which is the only thing that knows what
+      // this particular run actually says.
+      $('mg-desc').textContent = mgDescribe(d);
     }
     drawMeteogram();
   }
