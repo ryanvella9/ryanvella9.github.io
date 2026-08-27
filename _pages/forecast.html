@@ -80,6 +80,33 @@ title: "Forecast"
     --land-mask: rgba(126, 134, 145, .26);
     --grat: rgba(226, 232, 238, .18); --grat-ink: rgba(226, 232, 238, .60);
   }
+  /* The NDVI chart's ink, and the one token that has to be picked twice rather
+     than derived. The map above it is a photograph's worth of fixed colour that
+     does not follow the theme — it cannot, the ramp means something — so the
+     line underneath has to carry the same green into two very different
+     backgrounds on its own: dark enough to hold 4.6:1 on white, light enough
+     for 6.5:1 on the dark panel. All four cases in one block, because the three
+     token blocks above are already three places to forget. */
+  :root { --c-ndvi: #3d7a33; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --c-ndvi: #8fc96f; }
+  }
+  :root[data-theme="dark"] { --c-ndvi: #8fc96f; }
+  :root[data-theme="light"] { --c-ndvi: #3d7a33; }
+
+  /* --grid was only ever a fallback inside drawMeteogram — the token itself was
+     never declared, so both charts drew a near-white #eceef2 rule whatever the
+     theme, and in the dark one the gridlines came out brighter than the lines
+     they were behind. The light value here is the old fallback exactly, so
+     nothing changes in the light theme; the dark one is a shade off the panel,
+     which is what a grid is for. */
+  :root { --grid: #eceef2; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --grid: #262c35; }
+  }
+  :root[data-theme="dark"] { --grid: #262c35; }
+  :root[data-theme="light"] { --grid: #eceef2; }
+
   :root[data-theme="light"] { color-scheme: light; }
   :root[data-theme="dark"] { color-scheme: dark; }
 
@@ -161,6 +188,37 @@ title: "Forecast"
   .mg-tip .row { display: flex; gap: 10px; line-height: 1.5; }
   .mg-tip .row span { color: var(--muted); }
   .mg-tip .row b { margin-left: auto; }
+  /* The NDVI panel's two extra pieces.
+
+     The chart goes *under* the map rather than beside it because the two are
+     one measurement seen twice — across the islands, and across the year — and
+     a reader moves between them by looking down. Same frame, border, radius and
+     tooltip as the meteogram, so it reads as the same kind of object rather
+     than as a widget bolted onto a picture. */
+  .ndvi-wrap {
+    position: relative; background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden; margin: 8px auto 0;
+    max-width: var(--panelw, 100%);
+  }
+  .ndvi-wrap[hidden] { display: none; }
+  .ndvi-wrap canvas { display: block; width: 100%; }
+
+  /* Pushed to the right of the attribution, which is what the satellite
+     infobar holds for every other source. */
+  .sat-key { margin-left: auto; }
+  .sat-key[hidden] { display: none; }
+  #ndvi-cap-lo { left: -7px; border-right-width: 7px; border-right-style: solid; }
+  #ndvi-cap-hi { right: -7px; border-left-width: 7px; border-left-style: solid; }
+
+  /* Cloud and sea are not low NDVI, they are no NDVI, so they are named
+     swatches beside the ramp rather than colours on it. The cloud swatch is
+     striped because the map's cloud is: a sequential ramp covers every
+     lightness there is, so the one fill that cannot be mistaken for a value on
+     it is the one that is not a fill. */
+  .swatches { display: flex; align-items: center; gap: 4px 12px; flex-wrap: wrap; font-size: 10px; color: var(--muted); }
+  .swatches[hidden] { display: none; }
+  .swatches i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 4px; vertical-align: -1px; }
+
   #theme svg { width: 16px; height: 16px; display: block; }
 
   /* The figure and the timeline are held to the map's own width, set in JS.
@@ -629,15 +687,40 @@ title: "Forecast"
       </div>
       <div class="stage" id="sat-stage"><canvas id="sat-canvas"></canvas></div>
       <!-- Same strip the map puts its colour scale in, so the two views have
-           the same silhouette. There is no scale to draw here — a photograph
-           has no palette — so the strip carries the attribution instead of
-           sitting empty. -->
-      <div class="infobar"><div class="cbar-title" id="sat-src"></div></div>
+           the same silhouette. A photograph has no palette, so for every source
+           but one this strip carries the attribution and nothing else. NDVI is
+           not a photograph — it is a measurement rendered as colour, and a
+           measurement rendered as colour is unreadable without the scale that
+           rendered it, so there the strip does what the map's does. -->
+      <div class="infobar">
+        <div class="cbar-title" id="sat-src"></div>
+        <div class="cbar sat-key" id="ndvi-key" hidden>
+          <div class="cbar-title">NDVI</div>
+          <div class="cbar-strip">
+            <canvas id="ndvi-cbar" width="512" height="1"></canvas>
+            <div class="cbar-cap" id="ndvi-cap-lo"></div>
+            <div class="cbar-cap" id="ndvi-cap-hi"></div>
+          </div>
+          <div class="cbar-ticks" id="ndvi-cbar-ticks"></div>
+        </div>
+        <div class="swatches" id="ndvi-off" hidden>
+          <span><i id="ndvi-sw-cloud"></i>Cloud</span>
+          <span><i id="ndvi-sw-sea"></i>Sea</span>
+        </div>
+      </div>
     </figure>
 
     <div class="timeline" id="sat-timeline">
       <input type="range" id="sat-scrub" min="0" max="0" value="0" step="1" />
       <div class="ticks" id="sat-ticks"></div>
+    </div>
+    <!-- The year behind the picture, for the one source that has one. A single
+         pass says how green Malta is this morning and says nothing at all about
+         whether that is a lot — which is the only question anyone actually has
+         about a vegetation index. -->
+    <div class="ndvi-wrap" id="ndvi-wrap" hidden>
+      <canvas id="ndvi-canvas"></canvas>
+      <div class="mg-tip" id="ndvi-tip"></div>
     </div>
     <p class="desc" id="sat-desc"></p>
   </section>
@@ -710,6 +793,7 @@ title: "Forecast"
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_malta.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_disc.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sentinel_malta.js"></script>
+<script src="https://ryanvella9.github.io/malta-forecast-charts/sat/ndvi_malta.js"></script>
 <script>
 /* ---------------------------------------------------------------------------
    Interactive forecast panels.
@@ -955,6 +1039,8 @@ function adoptSource(modelKey, g, domainKey) {
       // chart is a field of closed curves and the reader has to work out which
       // way each one turns.
       centres: true,
+      // Geometry, one list per step, derived in the pipeline — see fronts.py.
+      fronts: g.fronts,
       scales: { msl: g.mslScale },
       data: { msl: d.msl },
     };
@@ -2230,6 +2316,110 @@ function pressureCentres() {
   return kept;
 }
 
+/* Fronts, in the symbology every surface chart uses: triangles for cold,
+   semicircles for warm, both on the side the front is advancing towards, and a
+   quasi-stationary front as the two alternating on opposite sides.
+
+   Which side that is arrives already decided. pipeline/fronts.py orders each
+   polyline so the direction of movement is 90 degrees clockwise from the
+   direction of travel along it, so "the leading side" is always the right-hand
+   one here and this code never has to know a normal from a tangent. */
+const FRONT_COLD = '#1565c0';
+const FRONT_WARM = '#c62828';
+const PIP_SPACING = 54;          // px between symbols along the line
+const PIP_SIZE = 6.5;            // px
+
+function currentFronts() {
+  if (!D.fronts) return null;
+  // Geometry does not interpolate — a front is where it is at a given hour, and
+  // a half-way blend of two polylines is a line that was never analysed. The
+  // nearer frame is the honest answer.
+  return D.fronts[state.w < 0.5 ? state.ia : state.ib] || null;
+}
+
+/* Positions and unit tangents at even arc-length intervals along a screen-space
+   polyline. Even in *distance*, not per vertex: the vertices arrive from a
+   contour tracer and are bunched where the line curves, so spacing symbols by
+   vertex crowds them exactly where they are hardest to read. */
+function pipStations(pts, spacing) {
+  const out = [];
+  let carry = spacing * 0.5;
+  for (let i = 1; i < pts.length; i++) {
+    const ax = pts[i - 1][0], ay = pts[i - 1][1];
+    const bx = pts[i][0], by = pts[i][1];
+    const dx = bx - ax, dy = by - ay;
+    const len = Math.hypot(dx, dy);
+    if (len < 1e-6) continue;
+    const tx = dx / len, ty = dy / len;
+    let d = carry;
+    while (d <= len) {
+      out.push({ x: ax + tx * d, y: ay + ty * d, tx, ty });
+      d += spacing;
+    }
+    carry = d - len;
+  }
+  return out;
+}
+
+function drawFronts() {
+  const list = currentFronts();
+  if (!list || !list.length) return;
+
+  ctxG.save();
+  ctxG.lineJoin = 'round';
+  ctxG.lineCap = 'butt';
+
+  for (const fr of list) {
+    const pts = fr.points.map((p) => xy(p[0], p[1]));
+    // Wholly outside the frame: the payload covers the widened data box, which
+    // reaches well beyond what the projection actually shows.
+    if (!pts.some((p) => p[0] > -60 && p[0] < W + 60 && p[1] > -60 && p[1] < H + 60)) {
+      continue;
+    }
+    const stationary = fr.type === 'stationary';
+    const warm = fr.type === 'warm';
+
+    ctxG.beginPath();
+    ctxG.moveTo(pts[0][0], pts[0][1]);
+    for (let i = 1; i < pts.length; i++) ctxG.lineTo(pts[i][0], pts[i][1]);
+    ctxG.lineWidth = 2.6;
+    // A quasi-stationary front is drawn as neither one thing nor the other; the
+    // alternating pips below carry the meaning, and a single-hue line under them
+    // reads more clearly at this size than alternating the stroke as well.
+    ctxG.strokeStyle = stationary ? '#6a1b9a' : (warm ? FRONT_WARM : FRONT_COLD);
+    ctxG.stroke();
+
+    let n = 0;
+    for (const s of pipStations(pts, PIP_SPACING)) {
+      // Right-hand normal of the tangent.
+      const nx = s.ty, ny = -s.tx;
+      // Stationary alternates both the symbol and the side it sits on, which is
+      // what says "this boundary is not going anywhere".
+      const isWarmPip = stationary ? (n % 2 === 0) : warm;
+      const side = stationary && n % 2 ? -1 : 1;
+      ctxG.fillStyle = isWarmPip ? FRONT_WARM : FRONT_COLD;
+      ctxG.beginPath();
+      if (isWarmPip) {
+        const cx = s.x + nx * side * 0.2, cy = s.y + ny * side * 0.2;
+        const a = Math.atan2(s.ty, s.tx);
+        ctxG.arc(cx, cy, PIP_SIZE, a, a + Math.PI, side < 0);
+      } else {
+        const bx = s.x - s.tx * PIP_SIZE, by = s.y - s.ty * PIP_SIZE;
+        const ex = s.x + s.tx * PIP_SIZE, ey = s.y + s.ty * PIP_SIZE;
+        const apx = s.x + nx * side * PIP_SIZE * 1.5;
+        const apy = s.y + ny * side * PIP_SIZE * 1.5;
+        ctxG.moveTo(bx, by);
+        ctxG.lineTo(apx, apy);
+        ctxG.lineTo(ex, ey);
+      }
+      ctxG.closePath();
+      ctxG.fill();
+      n++;
+    }
+  }
+  ctxG.restore();
+}
+
 function drawCentres(css) {
   const halo = css.getPropertyValue('--label-halo').trim();
   ctxG.save();
@@ -2444,6 +2634,10 @@ function drawGeo() {
 
   // After the coastlines so a centre sitting on a shore is not drawn through,
   // and only where the source says it has them.
+  /* Fronts under the centres, so an H or an L never has a pip drawn through it,
+     and independent of the isobar toggle: turning the contours off is a request
+     for a cleaner background, not for a chart with its air masses removed. */
+  drawFronts();
   if (D.centres && state.iso) drawCentres(css);
 
   if (state.places) {
@@ -3204,12 +3398,16 @@ function syncMeta() {
       `${src} · init ${fmtUTC.format(new Date(MG.data.init))} UTC`;
     return;
   }
-  if (state.view === 'sat' && (satLoop() || SENTINEL)) {
+  if (state.view === 'sat' && (satLoop() || satStills().length)) {
     const still = satStill();
     if (still) {
-      $('cycles').textContent =
-        `${still.label} · single pass, ${still.res}`;
-      $('attrib').textContent = `${SENTINEL.credit} · © Ryan Vella`;
+      // "Single pass" is true of a photograph and false of NDVI, which is one
+      // pass drawn and a year of them plotted.
+      $('cycles').textContent = still.count
+        ? `${still.label} · ${still.count} clear passes plotted, newest drawn`
+        : `${still.label} · single pass, ${still.res}`;
+      $('attrib').textContent =
+        `${still.credit || (SENTINEL && SENTINEL.credit)} · © Ryan Vella`;
       return;
     }
     const L = satLoop();
@@ -4113,7 +4311,32 @@ const satBuffered = new Set();
    selecting one hides the animation controls instead of leaving a scrubber
    that addresses nothing. */
 const SENTINEL = window.SENTINEL_MALTA || null;
-const satStills = () => (SENTINEL && SENTINEL.images) || [];
+
+/* And one still that is not a photograph at all.
+
+   NDVI is the normalised difference between the near-infrared and the red a
+   Sentinel-2 pass measured — a ratio, so unlike a picture it means the same
+   thing in February and in August, which is the entire reason for computing it.
+   Rendered here as a map of the islands and a chart of the year behind it.
+
+   It belongs in this view rather than one of its own because a reader arrives
+   at it the same way they arrive at the Sentinel-2 frame beside it: they want
+   to know what Malta looks like from orbit, and how green it is is one of the
+   things it looks like. What it needs that no photograph needs is a scale, and
+   a second panel — see the two hidden boxes satSetSource reveals below. */
+const NDVI = window.NDVI_MALTA || null;
+
+/* The stills, from both producers. Concatenated rather than read out of one
+   manifest, for the same reason SAT_LOOPS above is a registry rather than a
+   pair of globals: the Sentinel pair and the NDVI panel are fetched by
+   different modules on different schedules, and either has to be able to be
+   missing without taking the other with it. */
+const satStills = () => {
+  const out = (SENTINEL && SENTINEL.images) ? SENTINEL.images.slice() : [];
+  // Last, so the source row runs coarse, fine, then derived-from-fine.
+  if (NDVI && NDVI.file) out.push(NDVI);
+  return out;
+};
 const satStill = () => satStills().find((s) => s.key === satState.source) || null;
 // A still is now "not one of the loops" rather than "not mtg" — the test has to
 // survive a second loop being added beside the first.
@@ -4223,13 +4446,22 @@ function satResize() {
   if (!cv || section.hidden || section.clientWidth === 0) return;
   const ar = satAspect();
   const col = section.clientWidth;
+  /* Room for the chart, when there is a chart. Every other source fills the
+     viewport with its picture, which is right when the picture is the whole
+     answer; NDVI's is half of one, and a map sized to the window put the year
+     underneath it below the fold — where a reader who never scrolled would take
+     "the islands are 0.17" to be a fact about Malta rather than a fact about
+     late August. The two have to be on screen together or the second one may as
+     well not exist. */
+  const below = (satState.source === 'ndvi' && ndviPoints().length >= 2)
+    ? ndviChartH() + 18 : 0;
   let w, h;
   if (isNarrow()) {
     w = col;
-    h = Math.min(w / ar, window.innerHeight * 0.62);
+    h = Math.min(w / ar, window.innerHeight * 0.62 - below * 0.9);
     w = h * ar > col ? col : h * ar;
   } else {
-    h = Math.max(MIN_MAP_H, Math.min(window.innerHeight - 250, col / ar));
+    h = Math.max(MIN_MAP_H, Math.min(window.innerHeight - 250 - below, col / ar));
     w = h * ar;
     if (w > col) { w = col; h = w / ar; }
     // Same floor as the map: below this the source line and the description
@@ -4245,6 +4477,12 @@ function satResize() {
   cv.height = Math.round(h * dpr);
   cv.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
   satDraw();
+  /* The chart is width-matched to the panel above it, which the --panelw set a
+     few lines up has just decided, so it is redrawn from here. Deliberately not
+     from satDraw: that runs on every dissolve tick of the MTG loop, and
+     re-laying-out a year of measurements sixty times a second to animate a
+     cloud somewhere else would be a waste of a Raspberry Pi. */
+  if (satState.source === 'ndvi') drawNdvi();
 }
 
 function satDraw() {
@@ -4386,9 +4624,14 @@ function satSync() {
   $('sat-time').textContent = fmtLocal.format(d);
   $('sat-day').textContent = fmtDay.format(d);
   if (satIsStill()) {
-    // Resolution rather than waveband: both stills are true colour, so what
-    // distinguishes them — and the reason both are offered — is the pixel size.
-    $('sat-kind').textContent = 'True colour · ' + f.res +
+    /* What the frame is, then how fine it is. For the two photographs the
+       waveband says nothing — both are true colour — so resolution is what
+       distinguishes them and the reason both are offered. NDVI is not a
+       photograph, so it says what it is instead, and carries the one number the
+       map is a map of: nobody can read an island's average off a picture of it,
+       and that average is what the chart below is plotting. */
+    $('sat-kind').textContent = (f.product || 'True colour') + ' · ' + f.res +
+      (f.mean === undefined ? '' : ' · islands mean ' + f.mean.toFixed(2)) +
       (f.cloud === undefined ? '' : ' · ' + Math.round(f.cloud) + '% cloud');
   } else if (satLoop().product) {
     // A loop that names one product for every frame — the full disc, which is
@@ -4444,10 +4687,21 @@ function satSetSource(key) {
   $('sat-stage').style.background = satProjection() === 'geos' ? '#000' : '';
 
   const f = satStill();
+  // The still's own credit where it has one. Reaching into SENTINEL for it was
+  // safe while every still came out of that one manifest; it is not now, and a
+  // page with the Sentinel fetcher down would have thrown here rather than
+  // simply showing the source that did publish.
   $('sat-src').textContent = still
-    ? f.label + ' · ' + SENTINEL.credit + ' · © Ryan Vella'
+    ? f.label + ' · ' + (f.credit || (SENTINEL && SENTINEL.credit)) + ' · © Ryan Vella'
     : L.model + ' · ' + L.credit + ' · every ' + L.cadenceMin + ' min · © Ryan Vella';
   $('sat-desc').textContent = still ? f.note : (SAT_DESCS[key] || '');
+  // .desc is one clipped line, so the rest of the sentence has to be reachable
+  // somehow; the map's syncDesc does the same.
+  $('sat-desc').title = $('sat-desc').textContent;
+  /* Keyed on the source rather than on `still`, because s2 and s3 are stills
+     too and neither has a scale or a series. Hidden for them rather than left
+     showing NDVI's furniture over a photograph. */
+  ndviShow(key === 'ndvi');
   syncMeta();
   satResize();          // aspect differs between sources; this redraws too
   satSync();
@@ -4764,7 +5018,11 @@ function satInit() {
   for (const s of stills) {
     const b = document.createElement('button');
     b.dataset.source = s.key;
-    b.textContent = s.label.replace(' OLCI', '').replace(' MSI', '');
+    // The manifest's own short form where it gives one. Stripping the
+    // instrument off the mission name is the right rule for "Sentinel-2 MSI"
+    // and the wrong one for "Sentinel-2 NDVI", where the redundant half is the
+    // mission — the two Sentinels are already named to the left of it.
+    b.textContent = s.short || s.label.replace(' OLCI', '').replace(' MSI', '');
     b.title = s.label + ' · ' + s.res;
     b.setAttribute('aria-pressed', 'false');
     box.appendChild(b);
@@ -4792,6 +5050,281 @@ function satInit() {
     // step, so the change lands at the end of the one in flight — at most one
     // frame later, and without cutting a dissolve in half to get there.
   };
+}
+
+/* ----------------------------------------------------------------- NDVI -- */
+
+/* The scale and the year, the two things the NDVI source has that a photograph
+   does not. Both live here rather than inside the satellite block above because
+   neither is about satellites: one is a colour bar and one is a line chart, and
+   the satellite code should not grow a second personality to hold them. */
+
+const ndviState = { hover: null, scales: null };
+const ndviPoints = () => (NDVI && NDVI.series) || [];
+
+/* How tall the chart is. Named rather than inlined because satResize has to
+   know it before the chart is drawn — it sizes the map above from what is left
+   of the window — and two copies of this expression would drift into a map that
+   overlapped its own chart by a few pixels on some screen nobody tested.
+
+   Short: it is the second panel under a picture, not the page's subject. Tall
+   enough that 0.05 of NDVI is a visible step rather than a wobble. */
+const ndviChartH = () =>
+  Math.max(122, Math.min(180, Math.round(window.innerHeight * 0.18)));
+
+/* The scale, painted from the ramp the renderer published rather than from a
+   copy written down here. The image and the bar under it have to be the same
+   ramp, and two hand-kept lists of seventeen colours do not stay the same
+   list — the first time the stops moved in ndvi.py, this page would have gone
+   on labelling the old ones and no test would have caught it. */
+function drawNdviBar() {
+  if (!NDVI || !NDVI.ramp) return;
+  const cv = $('ndvi-cbar');
+  const c = cv.getContext('2d');
+  const g = c.createLinearGradient(0, 0, cv.width, 0);
+  NDVI.ramp.forEach((hex, i) => g.addColorStop(i / (NDVI.ramp.length - 1), hex));
+  c.fillStyle = g;
+  c.fillRect(0, 0, cv.width, cv.height);
+
+  /* Both ends carry the arrow the map's colour bars use. Neither is decorative:
+     a car park reads below the bottom of this scale and a watered field in
+     February above the top of it, and a bar that stopped square at each end
+     would be saying those pixels do not exist. */
+  $('ndvi-cap-lo').style.display = 'block';
+  $('ndvi-cap-lo').style.borderRightColor = NDVI.ramp[0];
+  $('ndvi-cap-hi').style.display = 'block';
+  $('ndvi-cap-hi').style.borderLeftColor = NDVI.ramp[NDVI.ramp.length - 1];
+
+  const ticks = $('ndvi-cbar-ticks');
+  ticks.innerHTML = '';
+  // Counted in tenths rather than accumulated in floats, which after eight
+  // additions of 0.1 labels the 0.8 end "0.7999999999999999".
+  for (let k = 0; k <= 10; k++) {
+    const v = k / 10;
+    const f = (v - NDVI.lo) / (NDVI.hi - NDVI.lo);
+    if (f < 0.001 || f > 1.001) continue;
+    const el = document.createElement('span');
+    el.textContent = v.toFixed(1);
+    el.style.left = Math.min(1, f) * 100 + '%';
+    if (f > 0.999) el.style.transform = 'translateX(-100%)';
+    ticks.appendChild(el);
+  }
+
+  // Striped exactly as the map stripes it, so the swatch shows the thing it
+  // labels instead of an approximation of it.
+  $('ndvi-sw-cloud').style.background = NDVI.cloudAlt
+    ? `repeating-linear-gradient(45deg, ${NDVI.cloudColor} 0 2px, ${NDVI.cloudAlt} 2px 4px)`
+    : NDVI.cloudColor;
+  $('ndvi-sw-sea').style.background = NDVI.sea;
+}
+
+/* The year behind the map. Same canvas idioms as the meteogram — device pixel
+   ratio, tokens read off the root, one clear-and-repaint — because it is the
+   same kind of chart and should not look like a different hand drew it.
+
+   The x axis is time, not the index of the pass, and that is the whole
+   argument for drawing it rather than listing the numbers. Sentinel-2's usable
+   passes over Malta arrive every two to five days when the sky allows and not
+   for seven weeks when it does not: on an index axis January's one measurement
+   would be spaced exactly as widely as July's six, and the chart would draw a
+   flat winter and a busy summer straight out of the cloud record. Every
+   measurement is marked, so where the record is thin a reader can see that it
+   is thin rather than reading the line across the gap as data. */
+function drawNdvi() {
+  const cv = $('ndvi-canvas'), wrap = $('ndvi-wrap');
+  const pts = ndviPoints();
+  if (!cv || wrap.hidden || !wrap.clientWidth || pts.length < 2) return;
+
+  const cssW = wrap.clientWidth;
+  const cssH = ndviChartH();
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  cv.width = Math.round(cssW * dpr);
+  cv.height = Math.round(cssH * dpr);
+  cv.style.height = cssH + 'px';
+  const c = cv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const css = getComputedStyle(document.documentElement);
+  const muted = css.getPropertyValue('--muted').trim();
+  const faint = css.getPropertyValue('--faint').trim();
+  const grid = css.getPropertyValue('--grid').trim() || '#eceef2';
+  const panel = css.getPropertyValue('--panel').trim();
+  const ink = css.getPropertyValue('--c-ndvi').trim() || '#3d7a33';
+
+  const L = { padL: 28, padR: 12, padT: 15, padB: 19, w: cssW, h: cssH };
+  L.x0 = L.padL; L.x1 = cssW - L.padR;
+  c.clearRect(0, 0, cssW, cssH);
+  c.fillStyle = panel;
+  c.fillRect(0, 0, cssW, cssH);
+
+  const ts = pts.map((p) => Date.parse(p.t));
+  const t0 = ts[0], t1 = ts[ts.length - 1];
+  // A little air at each end, so the first and last markers are not cut in half
+  // by the frame they sit in.
+  const span = (t1 - t0) || 1;
+  const air = span * 0.025;
+  const X = (t) => L.x0 + ((t - t0 + air) / (span + 2 * air)) * (L.x1 - L.x0);
+
+  const all = [];
+  for (const p of pts) all.push(p.lo, p.hi, p.v);
+  let lo = Math.floor(Math.min(...all) * 10) / 10;
+  let hi = Math.ceil(Math.max(...all) * 10) / 10;
+  if (hi - lo < 0.3) hi = lo + 0.3;
+  const Y = (v) => L.padT + (L.h - L.padT - L.padB) * (1 - (v - lo) / (hi - lo));
+
+  // Rules at every tenth, numbered on the left, exactly as the meteogram
+  // numbers its rows.
+  c.font = '10px ui-sans-serif, system-ui, sans-serif';
+  c.lineWidth = 1;
+  for (let k = Math.round(lo * 10); k <= Math.round(hi * 10); k++) {
+    const y = Math.round(Y(k / 10)) + 0.5;
+    c.strokeStyle = grid;
+    c.beginPath(); c.moveTo(L.x0, y); c.lineTo(L.x1, y); c.stroke();
+    c.fillStyle = faint;
+    c.fillText((k / 10).toFixed(1), 4, y + 3.5);
+  }
+
+  /* Month rules, stepped from the first of each month rather than from the
+     data. The axis is the calendar; if it were drawn from the observations it
+     would be the overpass schedule, which is the one thing on this chart that
+     is not about Malta. */
+  const fmtMon = new Intl.DateTimeFormat('en-GB', { month: 'short', timeZone: 'Europe/Malta' });
+  const mark = new Date(t0);
+  mark.setUTCDate(1); mark.setUTCHours(0, 0, 0, 0);
+  while (mark.getTime() <= t1) {
+    const t = mark.getTime();
+    const inside = t >= t0;
+    // The month the record opens in has its first day off the left of the axis,
+    // but it is still the month the leftmost points are in — so it keeps its
+    // name, pinned to the edge, and loses only the rule it would have drawn
+    // outside the plot. Without this the first stretch of the line is the one
+    // stretch a reader cannot date.
+    const x = inside ? Math.round(X(t)) + 0.5 : L.x0;
+    if (inside) {
+      c.strokeStyle = grid;
+      c.beginPath(); c.moveTo(x, L.padT); c.lineTo(x, L.h - L.padB); c.stroke();
+    }
+    c.fillStyle = muted;
+    const lab = fmtMon.format(mark);
+    c.fillText(lab, Math.min(x + 3, L.x1 - c.measureText(lab).width), L.h - L.padB + 13);
+    mark.setUTCMonth(mark.getUTCMonth() + 1);
+  }
+
+  /* The middle half of the islands, pass by pass. The mean on its own would say
+     the archipelago is one number, and it is not — an irrigated valley floor
+     and a limestone plateau are both inside it, and how far apart the two run
+     is itself seasonal: the band is three times wider in February than in
+     August. Drawn under the line rather than as whiskers on it because what it
+     shows is a width, not an error. */
+  c.beginPath();
+  pts.forEach((p, i) => (i ? c.lineTo(X(ts[i]), Y(p.hi)) : c.moveTo(X(ts[i]), Y(p.hi))));
+  for (let i = pts.length - 1; i >= 0; i--) c.lineTo(X(ts[i]), Y(pts[i].lo));
+  c.closePath();
+  c.save();
+  c.globalAlpha = 0.15;
+  c.fillStyle = ink;
+  c.fill();
+  c.restore();
+
+  c.beginPath();
+  pts.forEach((p, i) => (i ? c.lineTo(X(ts[i]), Y(p.v)) : c.moveTo(X(ts[i]), Y(p.v))));
+  c.strokeStyle = ink; c.lineWidth = 2; c.lineJoin = 'round';
+  c.stroke();
+
+  // Every pass marked, ringed in the panel colour so two passes three days
+  // apart stay two dots rather than merging into a blob.
+  for (let i = 0; i < pts.length; i++) {
+    c.beginPath();
+    c.arc(X(ts[i]), Y(pts[i].v), 2.6, 0, 6.284);
+    c.fillStyle = ink; c.fill();
+    c.lineWidth = 1.5; c.strokeStyle = panel; c.stroke();
+  }
+
+  /* The newest pass, named. It is the one the map above is showing and the one
+     a reader came for; every other point on the chart is context for it. The
+     only number printed, because a value on every point is a table drawn badly. */
+  const n = pts.length - 1;
+  const lx = X(ts[n]), ly = Y(pts[n].v);
+  c.beginPath(); c.arc(lx, ly, 4, 0, 6.284);
+  c.fillStyle = ink; c.fill();
+  c.lineWidth = 2; c.strokeStyle = panel; c.stroke();
+  c.font = '600 11px ui-sans-serif, system-ui, sans-serif';
+  const val = pts[n].v.toFixed(2);
+  const vw = c.measureText(val).width;
+  c.fillStyle = ink;
+  c.fillText(val, Math.min(lx + 7, L.x1 - vw), Math.max(L.padT + 9, ly - 6));
+
+  // Caption where the meteogram puts its row labels: right-aligned, above the
+  // plot. One series, so it is a title rather than a legend.
+  c.font = '10px ui-sans-serif, system-ui, sans-serif';
+  c.fillStyle = muted;
+  const cap = 'Islands mean NDVI · middle half shaded';
+  c.fillText(cap, L.x1 - c.measureText(cap).width, L.padT - 4);
+
+  if (ndviState.hover !== null && pts[ndviState.hover]) {
+    const i = ndviState.hover;
+    const x = Math.round(X(ts[i])) + 0.5;
+    const accent = css.getPropertyValue('--accent').trim();
+    c.save();
+    c.strokeStyle = accent; c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x, L.padT); c.lineTo(x, L.h - L.padB); c.stroke();
+    c.beginPath(); c.arc(X(ts[i]), Y(pts[i].v), 3.5, 0, 6.284);
+    c.fillStyle = accent; c.fill();
+    c.restore();
+  }
+
+  ndviState.scales = { X, Y, ts, L };
+}
+
+function ndviTip(i) {
+  const pts = ndviPoints(), s = ndviState.scales;
+  if (!s || !pts[i]) return;
+  const p = pts[i];
+  const fmtT = new Intl.DateTimeFormat('en-GB', {
+    weekday: 'short', day: '2-digit', month: 'short', timeZone: 'Europe/Malta' });
+  const tip = $('ndvi-tip');
+  tip.innerHTML =
+    `<div class="row"><b>${fmtT.format(new Date(s.ts[i]))}</b></div>` +
+    `<div class="row"><span>Mean NDVI</span><b>${p.v.toFixed(3)}</b></div>` +
+    `<div class="row"><span>Middle half</span><b>${p.lo.toFixed(2)}–${p.hi.toFixed(2)}</b></div>` +
+    `<div class="row"><span>Cloud</span><b>${p.cloud < 0.05 ? 'none' : p.cloud.toFixed(1) + '%'}</b></div>`;
+  tip.style.opacity = '1';
+  const x = s.X(s.ts[i]);
+  const tw = tip.offsetWidth;
+  // Flipped to the other side of the crosshair near the right edge, so it is
+  // never clipped by the panel it lives in — same rule as the meteogram's.
+  tip.style.left = (x + 12 + tw > s.L.w ? x - 12 - tw : x + 12) + 'px';
+  tip.style.top = '8px';
+}
+
+$('ndvi-wrap').addEventListener('pointermove', (e) => {
+  const pts = ndviPoints(), s = ndviState.scales;
+  if (!s || !pts.length) return;
+  const x = e.clientX - $('ndvi-wrap').getBoundingClientRect().left;
+  // Nearest in x, not nearest by index: the passes are unevenly spaced in time
+  // and the pointer is somewhere in between two of them, which is exactly the
+  // case an index lookup gets wrong.
+  let best = 0;
+  for (let i = 1; i < pts.length; i++) {
+    if (Math.abs(s.X(s.ts[i]) - x) < Math.abs(s.X(s.ts[best]) - x)) best = i;
+  }
+  if (best !== ndviState.hover) { ndviState.hover = best; drawNdvi(); }
+  ndviTip(best);
+});
+$('ndvi-wrap').addEventListener('pointerleave', () => {
+  ndviState.hover = null;
+  $('ndvi-tip').style.opacity = '0';
+  drawNdvi();
+});
+
+/* Reveal or hide the two boxes that belong to NDVI alone. Called from
+   satSetSource, which is the one place that knows which source is showing. */
+function ndviShow(on) {
+  const has = on && !!NDVI;
+  $('ndvi-key').hidden = !has;
+  $('ndvi-off').hidden = !has;
+  $('ndvi-wrap').hidden = !has || ndviPoints().length < 2;
+  if (has) { drawNdviBar(); drawNdvi(); }
 }
 
 /* ---------------------------------------------------------------- views -- */
@@ -4869,7 +5402,12 @@ function paintTheme() {
   $('theme').innerHTML = isDark() ? SUN : MOON;
   // The whole map, not just the cartography: the two share a canvas, so
   // repainting the strokes alone would leave them doubled over the old ones.
-  if (state.view === 'sat') satDraw();
+  if (state.view === 'sat') {
+    satDraw();
+    // The NDVI map is fixed colour and ignores the theme — its ramp means
+    // something — but the chart and the scale under it are drawn from tokens.
+    if (satState.source === 'ndvi') { drawNdviBar(); drawNdvi(); }
+  }
   else if (state.view === 'mgram') drawMeteogram();
   else drawMap();
 }
@@ -4950,7 +5488,7 @@ function applyHash() {
      scan rather than refusing the link. */
   if (/^#satellite(\/|$)/.test(BOOT_HASH)) {
     if (satLoopKeys().length || satStills().length) {
-      /* #satellite/s2 and /s3 select a still; #satellite/disc the full-disc
+      /* #satellite/s2, /s3 and /ndvi select a still; #satellite/disc the full-disc
          loop; a bare #satellite/YYYYMMDDTHHMM the Malta loop, which is what
          that form has always meant. A named loop may carry a stamp after it.
 
@@ -4958,7 +5496,7 @@ function applyHash() {
          the newest scan, so sending someone the shower you were looking at
          sent them the weather at the moment they clicked instead. It is now
          honoured, which is the only reason the address bar was writing it. */
-      const want = /^#satellite\/(?:(s2|s3|disc|mtg)(?:\/(\d{8}T\d{4}))?|(\d{8}T\d{4}))$/
+      const want = /^#satellite\/(?:(s2|s3|ndvi|disc|mtg)(?:\/(\d{8}T\d{4}))?|(\d{8}T\d{4}))$/
         .exec(BOOT_HASH);
       // showView first: satSetSource re-lays-out the panel, and satResize is a
       // no-op while the section is still hidden and has no width.
