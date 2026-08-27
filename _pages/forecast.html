@@ -2326,8 +2326,8 @@ function pressureCentres() {
    one here and this code never has to know a normal from a tangent. */
 const FRONT_COLD = '#1565c0';
 const FRONT_WARM = '#c62828';
-const PIP_SPACING = 54;          // px between symbols along the line
-const PIP_SIZE = 6.5;            // px
+const PIP_SPACING = 42;          // px between symbols along the line
+const PIP_SIZE = 7;              // px
 
 function currentFronts() {
   if (!D.fronts) return null;
@@ -2402,7 +2402,11 @@ function drawFronts() {
       if (isWarmPip) {
         const cx = s.x + nx * side * 0.2, cy = s.y + ny * side * 0.2;
         const a = Math.atan2(s.ty, s.tx);
-        ctxG.arc(cx, cy, PIP_SIZE, a, a + Math.PI, side < 0);
+        /* Anticlockwise when the pip belongs on the right. Canvas y runs down,
+           so a clockwise sweep from the tangent bulges towards a + 90 degrees,
+           which is the *left* normal — the semicircles came out mirrored, on the
+           trailing side of every warm front. */
+        ctxG.arc(cx, cy, PIP_SIZE, a, a + Math.PI, side > 0);
       } else {
         const bx = s.x - s.tx * PIP_SIZE, by = s.y - s.ty * PIP_SIZE;
         const ex = s.x + s.tx * PIP_SIZE, ey = s.y + s.ty * PIP_SIZE;
@@ -3134,7 +3138,7 @@ const DESCS = {
   spd: '10 m wind speed shaded, with the flow itself drawn as advected streaklines over it.',
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
-  msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending. No fronts: they are analysed by a forecaster, not carried by a model.',
+  msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. Fronts are derived, not analysed: no model carries a fronts field, so these come from the thermal front parameter on 850 hPa wet-bulb potential temperature, typed by which way the wind is advecting it. Expect them to disagree with a hand analysis — occlusions are not separated out, and neither are upper fronts, troughs or convergence lines. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending.',
   c: 'Total cloud cover through the whole depth of the atmosphere, so a thin cirrus sheet and a deep thunderstorm both read as overcast. Blue is clear sky, white is complete cover.',
   sat: 'MTG FCI from EUMETSAT, 20-minutely over the last 24 hours, resampled onto this frame. True colour by day; after sunset there is no visible light to photograph, so night falls back to the 10.5 µm infrared window. The scan nearest the selected time is shown, and past the newest scan the most recent one is held — there is no satellite picture of a forecast.',
   none: 'The wind field alone, as advected streaklines over land and sea.',
@@ -3148,7 +3152,7 @@ function syncDesc() {
      is no wind to be left with: turning the shading off leaves the isobars, and
      saying otherwise describes a layer the source does not carry. */
   const lead = (state.field === 'none' && D.keys.includes('msl'))
-    ? 'Isobars alone, without the pressure shading behind them.'
+    ? 'Isobars and fronts, without the pressure shading behind them.'
     : DESCS[state.field];
   $('desc').textContent = `${lead} ${MODELS[state.model].label} at ~${km} km, ` +
     `${gap}-hourly to +${SRC.steps[SRC.steps.length - 1]} h, interpolated between steps. ` +
