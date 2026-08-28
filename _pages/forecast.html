@@ -1034,7 +1034,11 @@ function adoptSource(modelKey, g, domainKey) {
       flowFields: [],
       // 4 hPa is the interval the Met Office and every other surface analysis
       // uses, and the one a reader will have calibrated their eye to.
-      contour: { key: 'msl', label: 'Pressure', unit: 'hPa', step: 4, always: true },
+      // labelLines: the isobar carries its own value, as on a surface analysis.
+      // Only here — an isotherm overlay on the surface panels is a guide, not
+      // the subject, and numbering every one of them would bury the field.
+      contour: { key: 'msl', label: 'Pressure', unit: 'hPa', step: 4,
+                 always: true, labelLines: true },
       // The pressure field is a property of the atmosphere, not of the ground,
       // so the continents are subdued to be read *through* it — same reasoning
       // as the height anomaly.
@@ -2146,13 +2150,24 @@ const MS_TABLE = {
    smooth field is nearly always zero or one. That, plus emitting straight into
    a Path2D instead of arrays of coordinate pairs, took the isotherm layer from
    the most expensive thing on the page to a rounding error. */
-function isothermPaths(step) {
+function isothermPaths(step, wantMarks) {
   const F = smoothT();
   const paths = new Map();
   const pathFor = (lev) => {
     let p = paths.get(lev);
     if (!p) { p = new Path2D(); paths.set(lev, p); }
     return p;
+  };
+  /* Somewhere to hang a label. A Path2D is write-only — it will happily be
+     stroked and can tell you nothing about where it went — so the positions and
+     angles a contour label needs have to be collected here, as the segments are
+     emitted, or not at all. Only when asked: the surface panels' isotherms are
+     unlabelled and would pay for the array for nothing. */
+  const marks = wantMarks ? new Map() : null;
+  const marksFor = (lev) => {
+    let m = marks.get(lev);
+    if (!m) { m = []; marks.set(lev, m); }
+    return m;
   };
 
   /* Where each cell corner lands on screen. On a separable projection a cell is
@@ -2225,11 +2240,86 @@ function isothermPaths(step) {
         for (const [a, b] of MS_TABLE[idx]) {
           p.moveTo(ex[a], ey[a]);
           p.lineTo(ex[b], ey[b]);
+          if (marks) {
+            marksFor(level).push({
+              x: (ex[a] + ex[b]) / 2, y: (ey[a] + ey[b]) / 2,
+              ang: Math.atan2(ey[b] - ey[a], ex[b] - ex[a]),
+            });
+          }
         }
       }
     }
   }
-  return paths;
+  return { paths, marks };
+}
+
+/* Isobar labels, the way a surface analysis carries them: the value written
+   along the line with the line broken behind it.
+
+   The candidates arrive as one per cell crossing, which is thousands per level,
+   so they are thinned greedily against a coarse spatial hash — accept a label,
+   then reject every candidate within MIN px of it, including those belonging to
+   other levels. Doing it per level instead would let a 1008 and a 1012 label
+   collide wherever two contours run close, which over a tight gradient is
+   exactly where they run close.
+
+   The line is "broken" by a halo rather than by actually splitting the path:
+   the same trick the place names use, and indistinguishable at this size. */
+const ISOBAR_LABEL_MIN_PX = 155;   // along a level, and between levels
+const ISOBAR_LABEL_CELL = 70;      // spatial-hash bucket, px
+
+function drawContourLabels(marks, css) {
+  if (!marks) return;
+  const ink = css.getPropertyValue('--grat-ink').trim();
+  const halo = css.getPropertyValue('--label-halo').trim();
+  const taken = new Map();
+  const key = (x, y) => `${Math.floor(x / ISOBAR_LABEL_CELL)},${Math.floor(y / ISOBAR_LABEL_CELL)}`;
+  const clashes = (x, y) => {
+    const cx = Math.floor(x / ISOBAR_LABEL_CELL), cy = Math.floor(y / ISOBAR_LABEL_CELL);
+    const r = Math.ceil(ISOBAR_LABEL_MIN_PX / ISOBAR_LABEL_CELL);
+    for (let i = cx - r; i <= cx + r; i++) {
+      for (let j = cy - r; j <= cy + r; j++) {
+        const bucket = taken.get(`${i},${j}`);
+        if (!bucket) continue;
+        for (const p of bucket) {
+          if (Math.hypot(p[0] - x, p[1] - y) < ISOBAR_LABEL_MIN_PX) return true;
+        }
+      }
+    }
+    return false;
+  };
+
+  ctxG.save();
+  ctxG.font = '600 10px ui-sans-serif, system-ui, sans-serif';
+  ctxG.textAlign = 'center';
+  ctxG.textBaseline = 'middle';
+  ctxG.lineWidth = 3.5;
+  ctxG.lineJoin = 'round';
+  ctxG.strokeStyle = halo;
+  ctxG.fillStyle = ink;
+
+  for (const [lev, list] of marks) {
+    const text = String(lev);
+    for (const m of list) {
+      if (m.x < 26 || m.x > W - 26 || m.y < 16 || m.y > H - 16) continue;
+      if (clashes(m.x, m.y)) continue;
+      // Keep the number the right way up: a contour running east-to-west would
+      // otherwise print it upside down half the time.
+      let a = m.ang;
+      if (a > Math.PI / 2) a -= Math.PI;
+      else if (a < -Math.PI / 2) a += Math.PI;
+      ctxG.save();
+      ctxG.translate(m.x, m.y);
+      ctxG.rotate(a);
+      ctxG.strokeText(text, 0, 0);
+      ctxG.fillText(text, 0, 0);
+      ctxG.restore();
+      const k = key(m.x, m.y);
+      if (!taken.has(k)) taken.set(k, []);
+      taken.get(k).push([m.x, m.y]);
+    }
+  }
+  ctxG.restore();
 }
 
 /* The highs and lows a surface chart is read by.
@@ -2649,7 +2739,7 @@ function drawGeo() {
     ctxG.save();
     ctxG.strokeStyle = cont.always ? 'rgba(16,20,24,.85)' : 'rgba(20,26,31,.42)';
     ctxG.lineWidth = cont.always ? 1.0 : 0.8;
-    const paths = isothermPaths(cont.step || ISO_STEP);
+    const { paths, marks } = isothermPaths(cont.step || ISO_STEP, !!cont.labelLines);
     for (const [lev, path] of paths) {
       // The 552 dam line is the one forecasters read the pattern off, so it is
       // drawn heavier — the same emphasis the rendered chart gives it.
@@ -2664,6 +2754,8 @@ function drawGeo() {
       }
     }
     ctxG.restore();
+    // After the strokes, so the halo cuts the line rather than being cut by it.
+    if (cont.labelLines) drawContourLabels(marks, css);
   }
 
   strokeRings(ctxG, GEO.borders, css.getPropertyValue('--border-line').trim(), 0.8);
@@ -4168,9 +4260,28 @@ const MG_MOON_R = 0.86;         // bite radius
 
 function mgMoon(c, x, y, r, col) {
   const base = mgHex(col) || [95, 119, 137];
+  const bx = r * MG_MOON_D, by = -r * 0.06, br = r * MG_MOON_R;
   c.save();
   c.translate(x, y);
   c.rotate(-0.30);
+  /* Clipped to the disc before the crescent is filled, and that clip is the
+     whole correctness of this shape.
+
+     The crescent is drawn as the disc with the bite as a reversed subpath, so
+     the nonzero rule turns the overlap into a hole. But a bite big enough to
+     give the crescent horns necessarily reaches past the disc's rim — 0.44 r
+     out with a radius of 0.86 r extends to 1.30 r — and out there the reversed
+     subpath is not cutting anything: it is a closed path of its own with a
+     winding of -1, which is non-zero, so it fills. What gets painted without
+     this clip is the symmetric difference of the two circles: the crescent,
+     plus a second crescent outside it, which is precisely what it looked like.
+
+     Clipping to the disc first throws that outer lune away and leaves
+     disc-minus-bite, which is the moon. */
+  c.beginPath();
+  c.arc(0, 0, r, 0, TAU);
+  c.clip();
+
   const g = c.createLinearGradient(-r * 0.8, -r, r * 0.5, r);
   g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.26), 1));
   g.addColorStop(1, mgRgba(base, 1));
@@ -4178,8 +4289,8 @@ function mgMoon(c, x, y, r, col) {
   c.beginPath();
   c.arc(0, 0, r, 0, TAU);
   c.closePath();
-  c.moveTo(r * MG_MOON_D + r * MG_MOON_R, -r * 0.06);
-  c.arc(r * MG_MOON_D, -r * 0.06, r * MG_MOON_R, 0, TAU, true);
+  c.moveTo(bx + br, by);
+  c.arc(bx, by, br, 0, TAU, true);
   c.closePath();
   c.fill();
   c.restore();
