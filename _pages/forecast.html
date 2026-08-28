@@ -4145,49 +4145,42 @@ function mgSun(c, x, y, r, col) {
 
 /* The moon.
 
-   A crescent is the conventional night glyph and it is the wrong shape for the
-   size this is drawn at. The first version cut a disc with a circle of 0.80 r
-   offset by 0.46 r, which leaves a band about a third of the disc across: fine
-   at 48 px, a pale hairline ring at the 21 px the night half of a day cell
-   actually gets. The cut is now shallower and pushed further out, which keeps
-   an obvious crescent while leaving it enough body to survive being small, and
-   the whole thing carries the same outline the clouds do so it has an edge
-   against a white panel rather than dissolving into one.
+   Two things had to be got right, and the first attempt got neither.
+
+   The shape. A crescent has long pointed horns only when the bite circle is
+   very nearly as big as the disc it is taken out of. A bite much smaller than
+   the disc leaves a ball with a chip in it however far out it is pushed —
+   which is exactly what 0.72 r at 0.64 r produced, and it read as a grey
+   marble. 0.86 r at 0.44 r leaves a proper crescent with enough body to hold
+   together at the 21 px the night half of a narrow day cell gets.
+
+   The outline. The clouds are pale and need one. The moon must not have one:
+   growing the disc while shrinking the bite offsets BOTH boundaries, so the
+   edge is drawn around the outside of the crescent and around the inside of
+   its bite at once, and at 21 px those two lines close up into a ring with a
+   crescent floating in it. Contrast here comes from the colour instead.
 
    Built as one path: the disc, then the bite as a reversed subpath, which the
    nonzero fill rule turns into a hole. Punching it with the panel colour
    instead would leave a pale scoop out of whatever the moon sits on. */
-const MG_MOON_D = 0.64;         // bite offset, in radii
-const MG_MOON_R = 0.72;         // bite radius
+const MG_MOON_D = 0.44;         // bite offset, in radii
+const MG_MOON_R = 0.86;         // bite radius
 
-function mgMoonPath(c, r, grow) {
-  const g = grow || 0;
-  // Growing the disc and shrinking the bite by the same amount offsets the
-  // crescent outward on both of its edges at once.
-  c.beginPath();
-  c.arc(0, 0, r + g, 0, TAU);
-  c.closePath();
-  const rc = Math.max(r * 0.12, r * MG_MOON_R - g);
-  c.moveTo(r * MG_MOON_D + rc, -r * 0.10);
-  c.arc(r * MG_MOON_D, -r * 0.10, rc, 0, TAU, true);
-  c.closePath();
-}
-
-function mgMoon(c, x, y, r, col, edge) {
-  const base = mgHex(col) || [109, 130, 150];
+function mgMoon(c, x, y, r, col) {
+  const base = mgHex(col) || [95, 119, 137];
   c.save();
   c.translate(x, y);
-  c.rotate(-0.28);
-  if (edge) {
-    mgMoonPath(c, r, Math.max(0.7, r * 0.075));
-    c.fillStyle = edge;
-    c.fill();
-  }
+  c.rotate(-0.30);
   const g = c.createLinearGradient(-r * 0.8, -r, r * 0.5, r);
-  g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.30), 1));
+  g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.26), 1));
   g.addColorStop(1, mgRgba(base, 1));
   c.fillStyle = g;
-  mgMoonPath(c, r, 0);
+  c.beginPath();
+  c.arc(0, 0, r, 0, TAU);
+  c.closePath();
+  c.moveTo(r * MG_MOON_D + r * MG_MOON_R, -r * 0.06);
+  c.arc(r * MG_MOON_D, -r * 0.06, r * MG_MOON_R, 0, TAU, true);
+  c.closePath();
   c.fill();
   c.restore();
 }
