@@ -4033,7 +4033,7 @@ function mgPalette(css) {
     wind: mgRgba(windC, 1), windC,
     accent: css.getPropertyValue('--accent').trim() || '#0d47a1',
     sun: dark ? '#ffc046' : '#f2a413',
-    moon: dark ? '#cfdcea' : '#7f97ad',
+    moon: dark ? '#cfe0f0' : '#6d8296',
     cloud: dark ? '#93a4b3' : '#c4d0d9',
     cloudDim: dark ? '#6f7e8c' : '#dde5eb',
     cloudDark: dark ? '#b4c3cf' : '#9dafbc',
@@ -4045,7 +4045,7 @@ function mgPalette(css) {
     cloudN: dark ? '#6d7f90' : '#a9b7c4',
     cloudDimN: dark ? '#55636f' : '#c6d0da',
     cloudDarkN: dark ? '#8b9dab' : '#8395a7',
-    edge: dark ? 'rgba(20,26,33,.45)' : 'rgba(50,70,86,.30)',
+    edge: dark ? 'rgba(226,236,245,.30)' : 'rgba(56,78,96,.38)',
     snow: dark ? '#a5dcf7' : '#3f9ed6',
     // Two day tones, alternating. Kept under 4% so they read as structure and
     // never as data.
@@ -4109,18 +4109,36 @@ function mgWetClass(rate) {
   return 0;
 }
 
+/* Tapered rays and a disc with a little depth in it. Eight identical strokes
+   of constant width around a flat circle is what a sun looks like when it is
+   drawn by someone counting pixels; a ray that is wider where it leaves the
+   disc than at its tip is what it looks like when someone draws light. */
 function mgSun(c, x, y, r, col) {
+  const base = mgHex(col) || [242, 164, 19];
   c.save();
-  c.strokeStyle = col; c.lineWidth = Math.max(1.6, r * 0.20); c.lineCap = 'round';
+  c.fillStyle = mgRgba(base, 1);
   for (let k = 0; k < 8; k++) {
     const a = k * TAU / 8 + Math.PI / 8;
-    const dx = Math.cos(a), dy = Math.sin(a);
+    const ux = Math.cos(a), uy = Math.sin(a);
+    const px = -uy, py = ux;                        // the ray's own normal
+    const r0 = r * 1.30, r1 = r * 1.92;
+    const hb = Math.max(0.8, r * 0.155);            // half-width at the root
+    const ht = Math.max(0.5, r * 0.075);            // and at the tip
+    const tx = x + ux * r1, ty = y + uy * r1;
     c.beginPath();
-    c.moveTo(x + dx * r * 1.38, y + dy * r * 1.38);
-    c.lineTo(x + dx * r * 1.92, y + dy * r * 1.92);
-    c.stroke();
+    c.moveTo(x + ux * r0 + px * hb, y + uy * r0 + py * hb);
+    c.lineTo(tx + px * ht, ty + py * ht);
+    // Round the tip by sweeping the short way across it rather than the long.
+    c.arc(tx, ty, ht, a + Math.PI / 2, a - Math.PI / 2, true);
+    c.lineTo(x + ux * r0 - px * hb, y + uy * r0 - py * hb);
+    c.closePath();
+    c.fill();
   }
-  c.fillStyle = col;
+  // Lit from the upper left, like everything else in the symbol set.
+  const g = c.createRadialGradient(x - r * 0.35, y - r * 0.40, r * 0.10, x, y, r * 1.06);
+  g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.42), 1));
+  g.addColorStop(1, mgRgba(mgMix(base, [0, 0, 0], 0.06), 1));
+  c.fillStyle = g;
   c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
   c.restore();
 }
@@ -4128,68 +4146,147 @@ function mgSun(c, x, y, r, col) {
 /* A crescent cut out of a disc by a second, reversed subpath: filling with the
    nonzero rule turns the reversed circle into a hole. Punching it with the
    panel colour instead would leave a pale bite out of whatever the moon is
-   drawn on top of. */
+   drawn on top of.
+
+   Tilted, because an upright crescent reads as a bracket. */
 function mgMoon(c, x, y, r, col) {
+  const base = mgHex(col) || [159, 179, 200];
   c.save();
-  c.fillStyle = col;
+  c.translate(x, y);
+  c.rotate(-0.38);
+  const g = c.createLinearGradient(-r, -r, r * 0.6, r);
+  g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.38), 1));
+  g.addColorStop(1, mgRgba(base, 1));
+  c.fillStyle = g;
   c.beginPath();
-  c.arc(x, y, r, 0, TAU);
+  c.arc(0, 0, r, 0, TAU);
   c.closePath();
-  c.moveTo(x + r * 0.44 + r * 0.84, y - r * 0.22);
-  c.arc(x + r * 0.44, y - r * 0.22, r * 0.84, 0, TAU, true);
+  c.moveTo(r * 0.46 + r * 0.80, -r * 0.14);
+  c.arc(r * 0.46, -r * 0.14, r * 0.80, 0, TAU, true);
   c.closePath();
   c.fill();
   c.restore();
 }
 
-function mgCloudPath(c, x, y, w) {
-  const r = w * 0.30;
+/* The cloud silhouette: three lobes over a rounded base, every lobe kept inside
+   the base's own width so the outline closes as one shape.
+
+   `grow` inflates each lobe and the base by the same amount, which for a union
+   of discs and a rounded rectangle is an exact outward offset — so the edge is
+   drawn by filling the grown path in the edge colour and the plain path over
+   it. The previous version stroked the path instead, and a stroke follows every
+   subpath it is given, including the arcs buried inside the union: each cloud
+   came out as a visible clump of overlapping circles with seams across it,
+   which is what made them read as bubbles rather than as cloud. */
+const MG_CLOUD_TOP = 0.38;      // silhouette extent above the anchor, in w
+const MG_CLOUD_BOT = 0.26;      // and below it
+
+function mgCloudPath(c, x, y, w, grow) {
+  const g = grow || 0;
+  // Five lobes, no two the same size, riding a shallow stadium base. Three
+  // equal bumps read as three circles however cleanly the union is outlined —
+  // what makes a shape read as cloud is a top edge that never repeats itself.
+  const L = [
+    [-0.335, 0.055, 0.125],
+    [-0.185, -0.030, 0.180],
+    [ 0.005, -0.120, 0.245],
+    [ 0.195, -0.045, 0.190],
+    [ 0.350, 0.040, 0.135],
+  ];
   c.beginPath();
-  c.arc(x - w * 0.24, y + r * 0.10, r * 0.80, 0, TAU);
-  c.arc(x + w * 0.02, y - r * 0.52, r * 1.00, 0, TAU);
-  c.arc(x + w * 0.30, y + r * 0.14, r * 0.72, 0, TAU);
-  const bx = x - w * 0.44, by = y + r * 0.02, bw = w * 0.88, bh = r * 0.86;
-  if (c.roundRect) { c.moveTo(bx, by); c.roundRect(bx, by, bw, bh, r * 0.42); }
-  else c.rect(bx, by, bw, bh);
+  for (const [lx, ly, lr] of L) c.arc(x + w * lx, y + w * ly, w * lr + g, 0, TAU);
+  const bh = w * 0.20 + 2 * g;
+  const bx = x - w * 0.47 - g, by = y + w * 0.06 - g;
+  if (c.roundRect) c.roundRect(bx, by, w * 0.94 + 2 * g, bh, bh / 2);
+  else c.rect(bx, by, w * 0.94 + 2 * g, bh);
 }
 
+/* Filled with a shallow top-to-bottom gradient. This is the one piece of
+   shading in the symbol that is not decoration: a flat grey blob at 30 px
+   reads as a hole punched in the chart, where a cloud lit from above reads as
+   an object even when it is the size of a full stop.
+
+   Shallow is the operative word. A first attempt ramped 34% toward white and
+   13% toward black with a stop in the middle, and the clouds came out looking
+   like polished metal — the eye reads a strong vertical ramp on a small solid
+   shape as a specular highlight, not as diffuse light. Sixteen and seven per
+   cent, with nothing in between, is enough to say "lit from above" and not
+   enough to say "chrome". */
 function mgCloud(c, x, y, w, fill, edge) {
+  const base = mgHex(fill) || [176, 190, 200];
   c.save();
+  if (edge) {
+    mgCloudPath(c, x, y, w, Math.max(0.8, w * 0.030));
+    c.fillStyle = edge;
+    c.fill();
+  }
+  // The colour passed in is the SHADOW tone, at the base. The top is lifted
+  // most of the way to white, which is what makes these read as cloud lit from
+  // above rather than as grey shapes: a cloud is a white object in shadow, and
+  // drawing it as a uniform grey is why the first two attempts looked dead.
+  const g = c.createLinearGradient(0, y - w * MG_CLOUD_TOP, 0, y + w * MG_CLOUD_BOT);
+  g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.60), 1));
+  g.addColorStop(1, mgRgba(base, 1));
   mgCloudPath(c, x, y, w);
-  c.fillStyle = fill; c.fill();
-  if (edge) { c.strokeStyle = edge; c.lineWidth = Math.max(1, w * 0.035); c.stroke(); }
+  c.fillStyle = g;
+  c.fill();
   c.restore();
 }
 
-/* Rain strokes long enough and thick enough to count at a glance: at 44 px
-   that is a 9 px stroke at 2.4 px, where the old symbol drew 4 px at 1 px and
-   every wet state collapsed into the same grey smudge. */
+/* Teardrops rather than tally marks. The slashes this replaces were legible
+   but they were punctuation, not weather — and three of them under a cloud
+   read as a strikethrough. A drop is a bulb with a point pulled off the top of
+   it, which is both what one looks like and what reads at 20 px. */
 function mgDrops(c, x, y, w, n, col) {
+  const h = w * 0.235, rr = h * 0.40;
   c.save();
-  c.strokeStyle = col; c.lineWidth = Math.max(1.6, w * 0.055); c.lineCap = 'round';
-  const s = w * 0.21;
+  c.fillStyle = col;
   for (let k = 0; k < n; k++) {
-    const dx = (k - (n - 1) / 2) * w * 0.24;
+    const dx = (k - (n - 1) / 2) * w * 0.235;
+    const cx = x + dx, cy = y + h - rr * 0.9;      // bulb centre
     c.beginPath();
-    c.moveTo(x + dx + s * 0.34, y);
-    c.lineTo(x + dx - s * 0.34, y + s);
-    c.stroke();
+    c.moveTo(cx, y - h * 0.10);
+    c.bezierCurveTo(cx + rr * 0.62, cy - h * 0.52, cx + rr, cy - rr * 0.52, cx + rr, cy);
+    c.arc(cx, cy, rr, 0, Math.PI);                 // the bulb's lower half
+    c.bezierCurveTo(cx - rr, cy - rr * 0.52, cx - rr * 0.62, cy - h * 0.52, cx, y - h * 0.10);
+    c.closePath();
+    c.fill();
   }
   c.restore();
 }
 
+/* Six arms with a pair of barbs on each, which is the thing everyone draws
+   when asked for a snowflake — and, unlike three crossed lines, does not turn
+   into an asterisk the moment it is set below about 14 px. The barbs are
+   dropped at small sizes rather than being drawn as sub-pixel fuzz. */
 function mgFlakes(c, x, y, w, n, col) {
+  const s = w * 0.100;
   c.save();
-  c.strokeStyle = col; c.lineWidth = Math.max(1.3, w * 0.040); c.lineCap = 'round';
-  const s = w * 0.105;
+  c.strokeStyle = col;
+  c.lineWidth = Math.max(1.0, w * 0.032);
+  c.lineCap = 'round';
+  const barbs = s > 3.6;
   for (let k = 0; k < n; k++) {
-    const cx = x + (k - (n - 1) / 2) * w * 0.24, cy = y + s * 0.9;
+    const cx = x + (k - (n - 1) / 2) * w * 0.250, cy = y + s * 1.05;
     for (let a = 0; a < 3; a++) {
       const th = a * Math.PI / 3 + Math.PI / 6;
+      const ux = Math.cos(th), uy = Math.sin(th);
       c.beginPath();
-      c.moveTo(cx - Math.cos(th) * s, cy - Math.sin(th) * s);
-      c.lineTo(cx + Math.cos(th) * s, cy + Math.sin(th) * s);
+      c.moveTo(cx - ux * s, cy - uy * s);
+      c.lineTo(cx + ux * s, cy + uy * s);
       c.stroke();
+      if (!barbs) continue;
+      // A barb each side of both arm tips, at 45 degrees back along the arm.
+      for (const sgn of [1, -1]) {
+        const bx = cx + ux * s * sgn * 0.62, by = cy + uy * s * sgn * 0.62;
+        for (const rot of [0.9, -0.9]) {
+          const vx = Math.cos(th + rot) * s * 0.36, vy = Math.sin(th + rot) * s * 0.36;
+          c.beginPath();
+          c.moveTo(bx, by);
+          c.lineTo(bx + vx * sgn, by + vy * sgn);
+          c.stroke();
+        }
+      }
     }
   }
   c.restore();
