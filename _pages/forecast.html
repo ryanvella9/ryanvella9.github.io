@@ -2330,6 +2330,9 @@ function pressureCentres() {
    one here and this code never has to know a normal from a tangent. */
 const FRONT_COLD = '#1565c0';
 const FRONT_WARM = '#c62828';
+// Neither warm nor cold, so neither red nor blue: a trough is a pressure
+// feature and takes the ink the isobars are drawn in, one weight heavier.
+const FRONT_TROUGH = '#37474f';
 const PIP_SPACING = 42;          // px between symbols along the line
 const PIP_SIZE = 7;              // px
 
@@ -2380,6 +2383,19 @@ function drawFronts() {
     if (!pts.some((p) => p[0] > -60 && p[0] < W + 60 && p[1] > -60 && p[1] < H + 60)) {
       continue;
     }
+    /* A trough carries no symbols — it is an elongated area of low pressure,
+       not an air-mass boundary, so there is no cold or warm side and nothing to
+       point at. A heavy plain line is the whole convention. */
+    if (fr.type === 'trough') {
+      ctxG.beginPath();
+      ctxG.moveTo(pts[0][0], pts[0][1]);
+      for (let i = 1; i < pts.length; i++) ctxG.lineTo(pts[i][0], pts[i][1]);
+      ctxG.strokeStyle = FRONT_TROUGH;
+      ctxG.lineWidth = 3.2;
+      ctxG.stroke();
+      continue;
+    }
+
     const stationary = fr.type === 'stationary';
     const warm = fr.type === 'warm';
 
@@ -3156,7 +3172,7 @@ const DESCS = {
   spd: '10 m wind speed shaded, with the flow itself drawn as advected streaklines over it.',
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
-  msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. Fronts are derived, not analysed: no model carries a fronts field, so these come from the thermal front parameter on 850 hPa wet-bulb potential temperature, typed by which way the wind is advecting it. Expect them to disagree with a hand analysis — occlusions are not separated out, and neither are upper fronts, troughs or convergence lines. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending.',
+  msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. Fronts are derived, not analysed: no model carries a fronts field, so these come from the thermal front parameter on 850 hPa wet-bulb potential temperature, typed by which way the wind is advecting it. Troughs are the valley lines of the pressure field itself, drawn as a plain heavy line and only where no front is already marking the same feature. Expect all of it to disagree with a hand analysis — occlusions are not separated out, and neither are upper fronts, upper troughs or convergence lines. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending.',
   c: 'Total cloud cover through the whole depth of the atmosphere, so a thin cirrus sheet and a deep thunderstorm both read as overcast. Blue is clear sky, white is complete cover.',
   sat: 'MTG FCI from EUMETSAT, 20-minutely over the last 24 hours, resampled onto this frame. True colour by day; after sunset there is no visible light to photograph, so night falls back to the 10.5 µm infrared window. The scan nearest the selected time is shown, and past the newest scan the most recent one is held — there is no satellite picture of a forecast.',
   none: 'The wind field alone, as advected streaklines over land and sea.',
