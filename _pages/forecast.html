@@ -4033,7 +4033,7 @@ function mgPalette(css) {
     wind: mgRgba(windC, 1), windC,
     accent: css.getPropertyValue('--accent').trim() || '#0d47a1',
     sun: dark ? '#ffc046' : '#f2a413',
-    moon: dark ? '#cfe0f0' : '#6d8296',
+    moon: dark ? '#d5e3f2' : '#5f7789',
     cloud: dark ? '#93a4b3' : '#c4d0d9',
     cloudDim: dark ? '#6f7e8c' : '#dde5eb',
     cloudDark: dark ? '#b4c3cf' : '#9dafbc',
@@ -4143,27 +4143,51 @@ function mgSun(c, x, y, r, col) {
   c.restore();
 }
 
-/* A crescent cut out of a disc by a second, reversed subpath: filling with the
-   nonzero rule turns the reversed circle into a hole. Punching it with the
-   panel colour instead would leave a pale bite out of whatever the moon is
-   drawn on top of.
+/* The moon.
 
-   Tilted, because an upright crescent reads as a bracket. */
-function mgMoon(c, x, y, r, col) {
-  const base = mgHex(col) || [159, 179, 200];
+   A crescent is the conventional night glyph and it is the wrong shape for the
+   size this is drawn at. The first version cut a disc with a circle of 0.80 r
+   offset by 0.46 r, which leaves a band about a third of the disc across: fine
+   at 48 px, a pale hairline ring at the 21 px the night half of a day cell
+   actually gets. The cut is now shallower and pushed further out, which keeps
+   an obvious crescent while leaving it enough body to survive being small, and
+   the whole thing carries the same outline the clouds do so it has an edge
+   against a white panel rather than dissolving into one.
+
+   Built as one path: the disc, then the bite as a reversed subpath, which the
+   nonzero fill rule turns into a hole. Punching it with the panel colour
+   instead would leave a pale scoop out of whatever the moon sits on. */
+const MG_MOON_D = 0.64;         // bite offset, in radii
+const MG_MOON_R = 0.72;         // bite radius
+
+function mgMoonPath(c, r, grow) {
+  const g = grow || 0;
+  // Growing the disc and shrinking the bite by the same amount offsets the
+  // crescent outward on both of its edges at once.
+  c.beginPath();
+  c.arc(0, 0, r + g, 0, TAU);
+  c.closePath();
+  const rc = Math.max(r * 0.12, r * MG_MOON_R - g);
+  c.moveTo(r * MG_MOON_D + rc, -r * 0.10);
+  c.arc(r * MG_MOON_D, -r * 0.10, rc, 0, TAU, true);
+  c.closePath();
+}
+
+function mgMoon(c, x, y, r, col, edge) {
+  const base = mgHex(col) || [109, 130, 150];
   c.save();
   c.translate(x, y);
-  c.rotate(-0.38);
-  const g = c.createLinearGradient(-r, -r, r * 0.6, r);
-  g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.38), 1));
+  c.rotate(-0.28);
+  if (edge) {
+    mgMoonPath(c, r, Math.max(0.7, r * 0.075));
+    c.fillStyle = edge;
+    c.fill();
+  }
+  const g = c.createLinearGradient(-r * 0.8, -r, r * 0.5, r);
+  g.addColorStop(0, mgRgba(mgMix(base, [255, 255, 255], 0.30), 1));
   g.addColorStop(1, mgRgba(base, 1));
   c.fillStyle = g;
-  c.beginPath();
-  c.arc(0, 0, r, 0, TAU);
-  c.closePath();
-  c.moveTo(r * 0.46 + r * 0.80, -r * 0.14);
-  c.arc(r * 0.46, -r * 0.14, r * 0.80, 0, TAU, true);
-  c.closePath();
+  mgMoonPath(c, r, 0);
   c.fill();
   c.restore();
 }
@@ -4308,16 +4332,16 @@ function mgSymbol(c, x, y, size, sky, wet, day, snow, pal) {
   const yTop = wet ? y - size * 0.15 : y;
 
   if (sky === 0) {
-    orb(c, x, yTop, r * 1.20, lit);
+    orb(c, x, yTop, r * 1.20, lit, pal.edge);
   } else if (sky === 1) {
-    orb(c, x - size * 0.11, yTop - size * 0.08, r, lit);
+    orb(c, x - size * 0.11, yTop - size * 0.08, r, lit, pal.edge);
     mgCloud(c, x + size * 0.15, yTop + size * 0.13, cw * 0.64, body, pal.edge);
   } else if (sky === 2) {
-    orb(c, x - size * 0.19, yTop - size * 0.14, r * 0.94, lit);
+    orb(c, x - size * 0.19, yTop - size * 0.14, r * 0.94, lit, pal.edge);
     mgCloud(c, x + size * 0.07, yTop + size * 0.06, cw * 0.84, body, pal.edge);
   } else if (sky === 3) {
     // Broken cloud still lets the sun or moon through at one corner.
-    orb(c, x - size * 0.20, yTop - size * 0.20, r * 0.72, lit);
+    orb(c, x - size * 0.20, yTop - size * 0.20, r * 0.72, lit, pal.edge);
     mgCloud(c, x + size * 0.03, yTop + size * 0.02, cw * 0.94, body, pal.edge);
   } else {
     mgCloud(c, x - size * 0.12, yTop - size * 0.05, cw * 0.70, dim, null);
