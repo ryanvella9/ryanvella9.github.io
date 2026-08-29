@@ -2310,10 +2310,13 @@ function drawSatOverlay() {
   const frame = ovlFrameAt(validAt(state.tf).date);
   if (!frame) return;
   const src = ovlPixels(frame.file);
-  const mask = box.mask ? ovlPixels(box.mask) : undefined;
+  // The limb belongs to the frame, not the box: a picture blended from two
+  // satellites reaches further west than one taken when only Meteosat answered,
+  // and the wrong limb would black out the ocean the composite exists to show.
+  const mask = frame.mask ? ovlPixels(frame.mask) : undefined;
   // Both have to be decoded before anything is drawn: painting the picture and
   // then the mask a frame later would flash the off-disc corner.
-  if (!src || (box.mask && !mask)) return;
+  if (!src || (frame.mask && !mask)) return;
 
   const ow = Math.max(2, Math.ceil(W / RASTER_STEP));
   const oh = Math.max(2, Math.ceil(H / RASTER_STEP));
@@ -3765,9 +3768,10 @@ function syncDesc() {
      than to whether this particular hour has a picture, so that scrubbing does
      not rewrite the paragraph under the reader every frame — and so this stays
      out of syncTime, which runs at frame rate. */
-  const sat = state.satOvl && ovlBox()
-    ? ` Observed cloud from ${OVL.model} over the past hours, nearest scan to the`
-      + ' frame shown: true colour by day, infrared and city lights after dark.'
+  const ovl = state.satOvl ? ovlBox() : null;
+  const sat = ovl
+    ? ` Observed cloud over the past hours, nearest scan to the frame shown: `
+      + `${ovl.label}.`
     : '';
   $('desc').textContent = `${lead} ${MODELS[state.model].label} at ~${km} km, ` +
     `${gap}-hourly to +${st[st.length - 1]} h, interpolated between steps.${pastText}${sat} ` +
@@ -4027,7 +4031,9 @@ function syncSatToggle() {
   btn.setAttribute('aria-pressed', String(state.satOvl && ok));
   btn.title = !box
     ? 'No observed imagery is published for this frame'
-    : ok ? `Observed cloud — ${OVL.model}, ${OVL.credit}`
+    // Named from the box, not the manifest: a close-up is sharp grey imagery
+    // and a wide frame is Geo Colour, and the reader is told which.
+    : ok ? `Observed cloud — ${box.label}. ${box.credit || OVL.credit}`
       : 'Observation only: this is a forecast hour, and there is no satellite picture of one';
 }
 
@@ -4126,7 +4132,16 @@ function syncMeta() {
     return;
   }
   $('cycles').textContent = `${SRC.model} · init ${fmtUTC.format(INIT)} UTC`;
-  $('attrib').textContent = (SRC.credit === 'DWD' ? 'DWD ICON-EU' : SRC.credit) + ' · © Ryan Vella';
+  /* Both sources, whenever both are on screen. The model's credit alone was a
+     licence problem as soon as the satellite overlay existed: the panel was
+     drawing EUMETSAT and NOAA imagery under a line naming only ECMWF, and both
+     of those are attribution-required. Keyed to the toggle rather than to
+     whether this particular hour has a picture, so the credit does not flicker
+     as the reader scrubs across the end of the imagery. */
+  const ovl = state.satOvl ? ovlBox() : null;
+  const base = SRC.credit === 'DWD' ? 'DWD ICON-EU' : SRC.credit;
+  $('attrib').textContent =
+    (ovl ? `${base} · ${ovl.credit || OVL.credit}` : base) + ' · © Ryan Vella';
 }
 
 $('play').onclick = () => setPlaying(!state.playing);
@@ -4178,6 +4193,7 @@ $('tg-sat').onclick = () => {
   satToggleState = null;        // force syncSatToggle to repaint the button
   syncSatToggle();
   syncDesc();
+  syncMeta();                   // the imagery credit goes with the imagery
   drawAll();
 };
 
