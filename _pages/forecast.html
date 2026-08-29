@@ -364,6 +364,16 @@ title: "Forecast"
     position: absolute; transform: translateX(-50%); font-size: 10px;
     color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap;
   }
+  /* The present marker. Accent-coloured and with a stem up to the track, so it
+     reads as a position on the timeline rather than as another day label. */
+  .ticks b.now {
+    position: absolute; transform: translateX(-50%); font-size: 10px;
+    font-weight: 600; color: var(--accent); white-space: nowrap;
+  }
+  .ticks b.now::before {
+    content: ''; position: absolute; left: 50%; top: -6px;
+    width: 1px; height: 5px; background: var(--accent);
+  }
 
   .desc {
     font-size: 11.5px; color: var(--muted); margin: 5px auto 0; line-height: 1.5;
@@ -459,6 +469,7 @@ title: "Forecast"
       <button data-view="mgram" aria-pressed="false">Meteogram</button>
       <button data-view="map" data-domain="europe" aria-pressed="false">500 hPa</button>
       <button data-view="map" data-domain="europe_sfc" aria-pressed="false">Surface pressure</button>
+      <button data-view="map" data-domain="europe_ivt" aria-pressed="false">Vapour transport</button>
       <button data-view="sat" aria-pressed="false">Satellite</button>
     </nav>
     <small id="cycles">loading…</small>
@@ -612,7 +623,7 @@ title: "Forecast"
       <div class="readout" id="readout">
         <span class="r-pos" id="r-pos">Hover the map</span>
         <span class="r-row"><span id="r-temp-label">Temp</span><b id="r-temp">—</b></span>
-        <span class="r-row"><span>Wind</span><b id="r-wind">—</b></span>
+        <span class="r-row"><span id="r-wind-label">Wind</span><b id="r-wind">—</b></span>
         <span class="r-row"><span>Dir</span><b id="r-dir">—</b></span>
         <span class="r-row"><span id="r-prec-label">Rain 3 h</span><b id="r-prec">—</b></span>
       </div>
@@ -757,7 +768,7 @@ title: "Forecast"
         0.25° over the Central Mediterranean; ItaliaMeteo-Arpae ICON-2I
         0.025 × 0.02° (CC BY 4.0), hourly to +72 h, Malta only — its domain
         stops at 33.7 °N; ECMWF IFS 0.25° open data (CC BY 4.0), 6-hourly, on
-        every frame — the 500 hPa chart over Europe, out to +144 h, and the
+        every frame — the three Europe charts, out to +144 h, and the
         surface fields over the other two, held to ICON-EU's +120 h so that
         switching model on a frame lands on the same day rather than dragging
         the timeline back a day. IFS is offered there as a second opinion
@@ -768,7 +779,17 @@ title: "Forecast"
         the rendered Malta charts use. Precipitation is the total over each step
         interval, differenced from the model's accumulation — six hours on IFS
         against three on ICON-EU and one on ICON-2I, which is why the same
-        shower shades deeper on the coarser model.
+        shower shades deeper on the coarser model.<br />
+        <b>Vapour transport.</b> Derived here rather than downloaded: specific
+        humidity and wind on the 1000, 925, 850, 700, 600 and 500 hPa surfaces,
+        integrated over pressure and divided by <i>g</i>. The column is cut off
+        at the model's own surface pressure, so the levels that lie inside the
+        Alps or under the Greenland ice — which the model fills by
+        extrapolation — contribute nothing. Stopping at 500 hPa rather than the
+        conventional 300 leaves out under 5% of a typical transport and saves
+        roughly a third of what is already the heaviest download in this
+        pipeline. Contours are 700 hPa geopotential height, the level the plume
+        is steered at.
         Mercator, unlike the Lambert used by the rendered PNGs — a conformal
         projection is what lets the streaklines be advected in screen space
         without distorting direction.<br />
@@ -859,6 +880,10 @@ const FIELD_SPECS = {
   c: { slug: 'cloud', label: 'Cloud cover', unit: ' %' },
   sig: { slug: '500g_anom', label: 'Height anomaly', unit: ' σ' },
   msl: { slug: 'mslp', label: 'Pressure', unit: ' hPa' },
+  // Derived from u and v exactly as 'spd' is — the payload carries the two
+  // components and the magnitude is the hypotenuse. What differs is what the
+  // components are: a flux, not a wind.
+  ivt: { slug: 'ivt', label: 'Vapour transport', unit: ' kg/m/s' },
   none: { slug: 'flow', label: 'None' },
 };
 const SLUG_TO_FIELD = Object.fromEntries(
@@ -898,11 +923,12 @@ const MODELS = {
     // default. Its value is disagreement: where a global model run in Reading
     // and one run in Offenbach part company is a reading of how settled the
     // forecast is that neither can give alone.
-    label: 'IFS', domains: ['europe', 'europe_sfc', 'medit', 'malta', 'zurich'],
-    /* Two payloads, because IFS is asked two different questions here: the
-       500 hPa frame over Europe and the surface fields over the Mediterranean
-       ones. A domain names the file it needs; a model without `parts` names one
-       file for all of them, which is every other model. */
+    label: 'IFS',
+    domains: ['europe', 'europe_sfc', 'europe_ivt', 'medit', 'malta', 'zurich'],
+    /* Several payloads, because IFS is asked several different questions here:
+       three levels of the Europe frame and the surface fields over the
+       Mediterranean ones. A domain names the file it needs; a model without
+       `parts` names one file for all of them, which is every other model. */
     parts: {
       europe: {
         file: 'upper_europe.js', global: 'UPPER',
@@ -912,6 +938,11 @@ const MODELS = {
       // so opening both pages downloads the coastlines once.
       europe_sfc: {
         file: 'sfc_europe.js', global: 'SFC',
+        geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
+      },
+      // And a third on the same frame, sharing the same coastlines again.
+      europe_ivt: {
+        file: 'ivt_europe.js', global: 'IVT',
         geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
       },
       medit: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
@@ -948,6 +979,22 @@ DOMAIN_META.europe_sfc = {
   label: 'Europe / North Atlantic',
   extent: { west: -60, east: 45, south: 28, north: 72 },
   lazy: true,
+  // Reached by its own tab. Listing it in the domain row as well would put two
+  // buttons reading "Europe / North Atlantic" side by side with nothing to tell
+  // them apart — the choice between levels belongs in the tab bar.
+  tabOnly: true,
+};
+
+/* Vapour transport, the third level of the same frame and a third lazy
+   download for the same reason. It is also the heaviest of the three, so a
+   reader who only ever opens the 500 hPa page must not be made to pay for it:
+   what a moisture plume looks like is a question you go and ask, not one every
+   visitor is answered whether they asked or not. */
+DOMAIN_META.europe_ivt = {
+  label: 'Europe / North Atlantic',
+  extent: { west: -60, east: 45, south: 28, north: 72 },
+  lazy: true,
+  tabOnly: true,
 };
 
 const srcKey = (dom, mod) => dom + '|' + mod;
@@ -992,6 +1039,54 @@ function adoptSource(modelKey, g, domainKey) {
      model shipped it. IFS is now both, and the model-name test this replaced
      would have adopted its 2 m temperature as a geopotential height chart —
      shading a sigma ladder over degrees Celsius, with no error anywhere. */
+  /* Integrated vapour transport. Tested before the height branch below, because
+     this payload carries a height field too — a 700 hPa one, drawn over the
+     shading exactly as the 500 hPa panel draws its own. What distinguishes it
+     is the vector: `iu`/`iv` are a moisture flux in kg m⁻¹ s⁻¹, not a wind in
+     m/s, and the `vector` block below is how every path that would otherwise
+     say "m/s" and mean it finds out. */
+  if (Array.isArray(d.iu)) {
+    return {
+      ...common, accumHours: null,
+      // Adopted into the u/v slots the engine already advects, shades the
+      // magnitude of and reads under the cursor. The components are what the
+      // payload carries and the magnitude is derived, which is the same deal
+      // the wind panels make.
+      keys: ['u', 'v', 'gh'],
+      shading: ['ivt', 'none'],
+      /* Streaklines are the vectors. The reference charts draw arrows on a
+         fixed grid; a streakline is the same statement animated, and it is the
+         one the rest of this page is already built to make. Left on the
+         reader's toggle rather than restricted to one shading, because unlike
+         the height anomaly — where the contours already state the flow — the
+         direction here is genuinely a second variable: an 800 kg/m/s plume
+         aimed at Sicily and one aimed at Biscay shade identically. */
+      contour: { key: 'gh', label: 'Height', unit: 'dam', step: 6, always: true },
+      // Grey wash over land, as on the upper-air panel and for the same reason:
+      // transport is a property of the atmosphere and is shaded over sea and
+      // land alike, so the continents have to be legible through it.
+      landmask: true,
+      vector: {
+        unit: 'kg m⁻¹ s⁻¹', short: 'kg/m/s', label: 'IVT',
+        // Transport is drawn the way it is going, not the way wind is said to
+        // come from. A moisture flux is read as an arrow pointing downstream —
+        // that is what "atmospheric river" describes — and reporting it in the
+        // meteorological from-convention would reverse every plume on the map.
+        toward: true,
+        /* Streaklines advect at the vector's own magnitude, and this one is in
+           the hundreds where a wind is in the tens. Left alone the parcels
+           cross the Atlantic in about a second, which reads as static rather
+           than as fast. Divided so a typical 500 kg/m/s plume moves like a
+           12 m/s wind: the *pattern* of the flow is what a streakline is for
+           here, and the magnitude is already the shading. */
+        flowDivisor: 40,
+      },
+      level: g.level,
+      levels: g.levels,
+      scales: { gh: g.ghScale, u: g.ivtScale, v: g.ivtScale },
+      data: { u: d.iu, v: d.iv, gh: d.gh },
+    };
+  }
   if (Array.isArray(d.gh)) {
     return {
       ...common, accumHours: null,
@@ -1005,8 +1100,12 @@ function adoptSource(modelKey, g, domainKey) {
          were competing for. Over wind speed they are the point, and they stay. */
       flowFields: ['spd'],
       // 6 dam is the interval these charts are conventionally contoured on, and
-      // the one the rendered version uses.
-      contour: { key: 'gh', label: 'Height', unit: 'dam', step: 6, always: true },
+      // the one the rendered version uses. `emphasise` is the one line drawn
+      // heavier: 552 dam is what forecasters read the pattern off at 500 hPa,
+      // and it is named here rather than hard-coded in the renderer because a
+      // second height panel at a different level has no 552 line to pick out.
+      contour: { key: 'gh', label: 'Height', unit: 'dam', step: 6, always: true,
+                 emphasise: 552 },
       // Grey wash over land, as on the Albany and Bentley charts this follows.
       // The anomaly is a property of the atmosphere and is shaded over sea and
       // land alike, so the continents need to be legible *through* it — the
@@ -1139,6 +1238,29 @@ const SIGMA_COLORS = [
   '#f39c39', '#ec7529', '#db4f27', '#c22d20', '#8f1a16', '#808888',
 ];
 
+/* Integrated vapour transport, in kg m⁻¹ s⁻¹, on the ladder the Albany and
+   Bentley charts use — 250, then 100 apart to 800, then coarsening. Uneven on
+   purpose and in the opposite direction from the sigma ramp: the interesting
+   range is the bottom half. 250 to 800 is the difference between a damp
+   westerly and a plume worth naming, where 1400 and 1600 are both simply
+   "extraordinary" and need no resolution between them.
+
+   Nothing below 250 is shaded. That is not a small transport, it is the
+   background state of the atmosphere over most of this frame on most days, and
+   washing it palest yellow would hide the plumes in a field of them — the same
+   argument the rainfall ladder makes about drizzle.
+
+   Sequential yellow through orange to red, which is the convention every IVT
+   product a reader has already seen uses. Past 1200 it leaves that ramp for
+   crimson and violet rather than the greys the reference charts use there: this
+   page washes its land grey on the same panel, and a value shaded the colour of
+   the continent under it is a value nobody can read. */
+const IVT_LEVELS = [250, 300, 400, 500, 600, 700, 800, 1000, 1200, 1400, 1600];
+const IVT_COLORS = [
+  '#fff7bc', '#fee996', '#fed976', '#feb24c', '#fd8d3c',
+  '#f4661f', '#e03a20', '#c01d1d', '#8f1a45', '#5c1a6b',
+];
+
 /* Mean sea level pressure. Diverging about 1013 hPa, because pressure is read as
    a polarity — which side of normal, and how far — rather than as a magnitude.
    Blue for low and red for high is the convention every reader of a surface
@@ -1259,6 +1381,7 @@ function ladderPos(levels, v, transparentBelow) {
 
 const precipPos = (mm) => ladderPos(PRECIP_LEVELS, mm, true);
 const sigmaPos = (s) => ladderPos(SIGMA_LEVELS, s, false);
+const ivtPos = (kg) => ladderPos(IVT_LEVELS, kg, true);
 
 /* The ladders resolved once into tables indexed by the stored integer itself —
    precipitation in tenths of a millimetre, sigma in hundredths — so the
@@ -1273,6 +1396,9 @@ function ladderTable(n, toValue, pos) {
 }
 const PRECIP_IDX = ladderTable(2001, (i) => i / 10, precipPos);          // 0..200 mm
 const SIGMA_IDX = ladderTable(2001, (i) => (i - 1000) / 100, sigmaPos);  // -10..+10 sigma
+// Whole kg m⁻¹ s⁻¹, which is also how the payload stores it. 2500 is well past
+// the strongest transport ever observed; the table clamps rather than wrapping.
+const IVT_IDX = ladderTable(2501, (i) => i, ivtPos);                    // 0..2500
 
 /* --------------------------------------------------------------- projection */
 
@@ -1334,12 +1460,15 @@ function makeLCC(lon0, lat0, sp1, sp2) {
   };
 }
 
-/* Per domain, defaulting to Mercator. Only the upper-air frame differs, and it
-   can afford to: its payload carries geopotential height and anomaly and no
-   wind, so there are no particles to advect. */
+/* Per domain, defaulting to Mercator. The three Europe frames differ — they are
+   one chart at three levels and have to be the same map — and pay for it: a
+   conic separates into neither axis, so the raster costs a full inverse per
+   pixel and a streakline has to be stepped in lon/lat rather than in screen
+   space. Both are affordable at this size; see drawRaster and stepParticles. */
 const DOMAIN_PROJ = {
   europe: makeLCC(7.5, 50, 35, 65),
   europe_sfc: makeLCC(7.5, 50, 35, 65),
+  europe_ivt: makeLCC(7.5, 50, 35, 65),
 };
 const projFor = (key) => DOMAIN_PROJ[key] || MERCATOR;
 
@@ -1571,23 +1700,44 @@ function loadSource(domainKey, modelKey) {
   // panels. The alternative — one constant, so the physics is identical — makes
   // the Malta panel strobe, because the same 10 m/s crosses a box eleven times
   // narrower eleven times faster.
-  TIME_ACCEL = 30000 * ((BOX.east - BOX.west) / 26);
+  // Divided where the vector is not a wind: a moisture flux is numerically in
+  // the hundreds, and advecting parcels at that rate is a blur rather than a
+  // flow. See the vector block in adoptSource.
+  TIME_ACCEL = 30000 * ((BOX.east - BOX.west) / 26)
+    / ((D.vector && D.vector.flowDivisor) || 1);
 
   const isUpper = D.keys.includes('sig');
   const isPressure = D.keys.includes('msl');
+  const vec = D.vector;
 
   LUTS = {};
-  // No wind ramp on the surface-pressure source: it carries no u/v, and offering
-  // a shading whose field is absent is what `shading` is filtered against.
-  if (!isPressure) {
+  // Asked of the source rather than inferred: the surface-pressure panel
+  // carries no u/v at all, and the vapour-transport one carries a pair that is
+  // not a wind speed and must not be offered as one.
+  if (D.shading.includes('spd')) {
     LUTS.spd = {
       lut: buildLUT(WIND_COLORS),
-      range: S_RANGE,
+      range: S_RANGE, mag: true,
       title: isUpper ? '500 hPa wind speed (m s⁻¹)' : '10 m wind speed (m s⁻¹)',
       tick: S_RANGE[1] > 40 ? 10 : 2.5, unit: ' m/s',
     };
   }
-  if (isPressure) {
+  if (vec) {
+    LUTS.ivt = {
+      lut: buildStepLUT(IVT_COLORS),
+      range: [IVT_LEVELS[0], IVT_LEVELS[IVT_LEVELS.length - 1]],
+      title: `Integrated vapour transport (${vec.unit})`,
+      levels: IVT_LEVELS, ladder: true, base: true, unit: ' ' + vec.short,
+      // The magnitude of the pair the source carries, the same derivation wind
+      // speed uses — which is why there is no third field in the payload.
+      mag: true,
+      // Five labels on a bar whose eleven rungs would otherwise smear. Chosen
+      // by position on the ladder, not by value: it is uneven, and an even
+      // spacing in kg/m/s bunches every label into the right-hand third.
+      ticks: [250, 500, 800, 1200, 1600],
+      idx: IVT_IDX, idxOffset: 0, idxScale: 1,
+    };
+  } else if (isPressure) {
     LUTS.msl = {
       lut: buildLUT(PRESSURE_COLORS),
       // Symmetric about 1013 hPa, because a diverging ramp that is not centred
@@ -1619,6 +1769,7 @@ function loadSource(domainKey, modelKey) {
       range: [PRECIP_LEVELS[0], PRECIP_LEVELS[PRECIP_LEVELS.length - 1]],
       title: `Precipitation (mm / ${SRC.accumHours} h)`,
       levels: PRECIP_LEVELS, ladder: true, base: true, unit: ' mm',
+      ticks: [0.25, 1, 2, 5, 10, 20, 30],
       idx: PRECIP_IDX, idxOffset: 0, idxScale: 10,
     };
   } else {
@@ -1627,6 +1778,7 @@ function loadSource(domainKey, modelKey) {
       range: [SIGMA_LEVELS[0], SIGMA_LEVELS[SIGMA_LEVELS.length - 1]],
       title: '500 hPa height anomaly (σ)',
       levels: SIGMA_LEVELS, ladder: true, unit: ' σ',
+      ticks: [-6, -3, -2, -1, 0, 1, 2, 3, 6],
       idx: SIGMA_IDX, idxOffset: 1000, idxScale: 100,
     };
   }
@@ -1653,10 +1805,18 @@ function loadSource(domainKey, modelKey) {
 
 
   // The readout rows are labelled from the source too — an upper-air panel
-  // reports a height and an anomaly, not a temperature and a rainfall.
-  $('r-temp-label').textContent = isPressure ? 'Pressure' : isUpper ? 'Height' : 'Temp';
-  $('r-prec-label').textContent = isPressure ? '—'
+  // reports a height and an anomaly, not a temperature and a rainfall, and the
+  // vapour-transport panel reports a height and a flux with no rainfall at all.
+  const hasGH = D.keys.includes('gh');
+  $('r-temp-label').textContent = isPressure ? 'Pressure' : hasGH ? 'Height' : 'Temp';
+  $('r-wind-label').textContent = vec ? vec.label : 'Wind';
+  $('r-prec-label').textContent = (isPressure || vec) ? '—'
     : isUpper ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
+  /* Re-locked here rather than at boot alone. It was called once, against the
+     Malta source, so every branch inside it that asks what the source carries
+     was dead: the upper-air panel got column widths fitted to "-00.0 °C" and
+     then printed "1000 dam" into them. A flux is wider still. */
+  lockReadout();
   setTime(state.tf);
 }
 
@@ -1961,26 +2121,35 @@ function drawRaster() {
         col = lon2col(ll[0]); row = lat2row(ll[1]);
       }
       const o = (j * ow + i) * 4;
-      let k;
 
-      if (field === 'spd') {
+      /* Two ways a shading gets its number, and they are independent of how it
+         gets its colour. `mag` means the field is the magnitude of the vector
+         pair the source carries rather than a stored field of its own — wind
+         speed on the surface panels, vapour transport on the Europe one, and
+         in both cases the payload is spared a third array that is a function
+         of the other two. */
+      let val;
+      if (spec.mag) {
+        // Not Math.hypot: this runs ~80,000 times a raster and the overflow
+        // guarding it pays for cannot arise on a wind or a moisture flux.
         const u = sampleCubic(CUR.u, col, row), v = sampleCubic(CUR.v, col, row);
-        if (Number.isNaN(u)) { px[o + 3] = 0; continue; }
-        k = Math.round((Math.sqrt(u * u + v * v) - range[0]) * inv);
-      } else if (spec.idx) {
+        val = Math.sqrt(u * u + v * v);
+      } else {
+        val = sampleShade(field, CUR[field], col, row);
+      }
+      if (Number.isNaN(val)) { px[o + 3] = 0; continue; }
+
+      let k;
+      if (spec.idx) {
         // Ladder scales resolve through their precomputed table. A negative
         // entry means "nothing here" — dry ground is left transparent rather
         // than washed palest blue, because 98% of an August domain is dry and
         // a wash over all of it hides the land the showers sit on.
-        const val = sampleShade(field, CUR[field], col, row);
-        if (Number.isNaN(val)) { px[o + 3] = 0; continue; }
         let q = Math.round(val * spec.idxScale) + spec.idxOffset;
         q = q < 0 ? 0 : q >= spec.idx.length ? spec.idx.length - 1 : q;
         k = spec.idx[q];
         if (k < 0) { px[o + 3] = 0; continue; }
       } else {
-        const val = sampleShade(field, CUR[field], col, row);
-        if (Number.isNaN(val)) { px[o + 3] = 0; continue; }
         k = Math.round((val - range[0]) * inv);
       }
 
@@ -2741,9 +2910,9 @@ function drawGeo() {
     ctxG.lineWidth = cont.always ? 1.0 : 0.8;
     const { paths, marks } = isothermPaths(cont.step || ISO_STEP, !!cont.labelLines);
     for (const [lev, path] of paths) {
-      // The 552 dam line is the one forecasters read the pattern off, so it is
-      // drawn heavier — the same emphasis the rendered chart gives it.
-      if (cont.always && lev === 552) {
+      // One line per chart may be drawn heavier — the 500 hPa panel's 552 dam.
+      // Which one, if any, is the source's to say: see the contour spec.
+      if (cont.emphasise != null && lev === cont.emphasise) {
         ctxG.save();
         ctxG.strokeStyle = '#0d47a1';
         ctxG.lineWidth = 2;
@@ -2856,18 +3025,28 @@ function stepParticles(dt) {
       continue;
     }
 
-    // Which of the two inks this streak needs, decided by the colour actually
-    // under it rather than by the theme. Precipitation is mostly transparent,
-    // so what is under a streak there is the land/sea base, not the ramp.
+    /* Which of the two inks this streak needs, decided by the colour actually
+       under it rather than by the theme.
+
+       Asked per pixel even on the ladders that leave gaps, which the theme
+       default used to answer for the whole panel. That was near enough while
+       the only such ladder was rainfall, where the shaded fraction of a domain
+       is a few percent; it is wrong on a vapour-transport plume, which is a
+       broad sheet of pale yellow that white streaklines vanish into. Where the
+       ladder did paint nothing, the base is what is under the streak and the
+       theme is still the right answer — hence the -1 test rather than a flag on
+       the scale. */
     let b = darkTheme ? 1 : 0;
-    if (spec && !spec.base) {
-      const val = state.field === 'spd' ? Math.sqrt(u * u + v * v)
+    if (spec) {
+      const val = spec.mag ? Math.sqrt(u * u + v * v)
         : sampleAt(CUR[state.field], col, row);
-      const f = spec.ladder ? ladderPos(spec.levels, val, false)
+      const f = spec.ladder ? ladderPos(spec.levels, val, !!spec.base)
         : (val - spec.range[0]) / (spec.range[1] - spec.range[0]);
-      let idx = Math.round(f * 255);
-      idx = idx < 0 ? 0 : idx > 255 ? 255 : idx;
-      b = spec.ink[idx];
+      if (f >= 0) {
+        let idx = Math.round(f * 255);
+        idx = idx < 0 ? 0 : idx > 255 ? 255 : idx;
+        b = spec.ink[idx];
+      }
     }
     buckets[b].push(p);
   }
@@ -2967,7 +3146,10 @@ function frame(now) {
     rasterKey = key;
     drawMap();
     const pk = peakWind();
-    $('wl-max').textContent = pk === null ? '—' : pk.toFixed(1) + ' m/s';
+    // "Peak" is whatever the source's vector pair measures — the strongest wind
+    // on most panels, the strongest moisture flux on one.
+    $('wl-max').textContent = pk === null ? '—'
+      : D.vector ? `${Math.round(pk)} ${D.vector.short}` : pk.toFixed(1) + ' m/s';
   }
 
   if (flowOn()) drawParticles(stepParticles(dt));
@@ -3047,15 +3229,18 @@ function lockTimebar() {
    read. Sized from the widest string each field can produce. */
 function lockReadout() {
   const isUpper = D.keys.includes('sig');
+  const hasGH = D.keys.includes('gh');
+  const vec = D.vector;
   const pts = ['NNE', 'WNW', 'SSW'];
+  const flux = vec ? [`0000 ${vec.short}`] : null;
   $('r-pos').style.minWidth = measureMax($('r-pos'), ['00.00°N  00.00°W']) + 'px';
   $('r-temp').style.minWidth = measureMax($('r-temp'),
-    isUpper ? ['1000 dam', '-100 dam'] : ['-00.0 °C']) + 'px';
-  $('r-wind').style.minWidth = measureMax($('r-wind'), ['00.0 m/s']) + 'px';
+    hasGH ? ['1000 dam', '-100 dam'] : ['-00.0 °C']) + 'px';
+  $('r-wind').style.minWidth = measureMax($('r-wind'), flux || ['00.0 m/s']) + 'px';
   $('r-dir').style.minWidth = measureMax($('r-dir'), pts.map((p) => `${p} 000°`)) + 'px';
   $('r-prec').style.minWidth = measureMax($('r-prec'),
     isUpper ? ['+0.0 σ', '-0.0 σ'] : ['000.0 mm', '—']) + 'px';
-  $('wl-max').style.minWidth = measureMax($('wl-max'), ['000.0 m/s']) + 'px';
+  $('wl-max').style.minWidth = measureMax($('wl-max'), flux || ['000.0 m/s']) + 'px';
 }
 
 function syncTime() {
@@ -3076,16 +3261,39 @@ function syncTime() {
 function buildTicks() {
   const box = $('ticks');
   box.innerHTML = '';
+  if (NT < 2) return;
 
+  // The day boundaries are collected before any of them is drawn, because how
+  // many there are decides how many can be. A timeline that runs a week either
+  // side of the present crosses a fortnight of days, and thirteen three-letter
+  // labels on one track is a smear. Thinning by a fixed stride rather than by
+  // collision keeps the survivors evenly spaced — dropping whichever pair
+  // happened to overlap would leave the gaps in arbitrary places.
+  const marks = [];
   let lastDay = null;
   SRC.steps.forEach((h, i) => {
     const d = new Date(INIT.getTime() + h * 3600e3);
     const day = d.getUTCDate();
     if (day === lastDay) return;
     lastDay = day;
+    marks.push({ i, d });
+  });
+  const every = Math.max(1, Math.ceil(marks.length / 8));
+
+  const ni = nowIndex();
+  const nowF = ni === null ? null : ni / (NT - 1);
+
+  const fmt = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' });
+  marks.forEach((m, k) => {
+    if (k % every) return;
+    const f = m.i / (NT - 1);
+    // Never printed on top of the present marker. Of the two the day is the one
+    // that can be spared: it is in the time bar above on every frame, whereas
+    // nothing else on the page says which part of the track has already
+    // happened.
+    if (nowF !== null && Math.abs(f - nowF) < 0.04) return;
     const el = document.createElement('span');
-    el.textContent = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' }).format(d);
-    const f = i / (NT - 1);
+    el.textContent = fmt.format(m.d);
     el.style.left = f * 100 + '%';
     // Edge labels anchor to their edge rather than centring, so the first day
     // is not half cut off against the start of the track.
@@ -3093,6 +3301,18 @@ function buildTicks() {
     else if (f > 0.98) el.style.transform = 'translateX(-100%)';
     box.appendChild(el);
   });
+
+  /* The present, marked. On a loop that was three-quarters forecast the start
+     of the track was near enough to now to stand in for it; on one that runs
+     seven days back it is not, and without this there is nothing to say where
+     observation ends and forecast begins. */
+  if (nowF !== null) {
+    const el = document.createElement('b');
+    el.className = 'now';
+    el.style.left = nowF * 100 + '%';
+    el.textContent = 'now';
+    box.appendChild(el);
+  }
 }
 
 /* --------------------------------------------------------------- colour bar - */
@@ -3134,11 +3354,13 @@ function drawColorbar() {
   const ticks = $('cbar-ticks');
   ticks.innerHTML = '';
   // A rung on the ladder is labelled only if there is room; thirteen labels on
-  // a 300 px bar is a grey smear, not a scale. These are spaced by *position*
-  // on the ladder rather than by value, because the ladder is logarithmic and
-  // evenly-spaced values bunch every label into the right-hand third.
-  const values = spec.ladder ? (spec.base ? [0.25, 1, 2, 5, 10, 20, 30]
-                                          : [-6, -3, -2, -1, 0, 1, 2, 3, 6]) : (() => {
+  // a 300 px bar is a grey smear, not a scale. Which rungs is the scale's own
+  // to say — they are spaced by *position* on an uneven ladder rather than by
+  // value, so there is no rule to derive them from. This used to be chosen by
+  // testing `spec.base`, which happened to separate rainfall from sigma right
+  // up until a third ladder was added that shared a property with the first
+  // and none of its numbers.
+  const values = spec.ladder ? spec.ticks : (() => {
     const out = [];
     for (let v = spec.range[0]; v <= spec.range[1] + 1e-9; v += spec.tick) out.push(v);
     return out;
@@ -3200,29 +3422,43 @@ function readout(x, y) {
   }
 
   const isUpper = D.keys.includes('sig');
+  const vec = D.vector;
   // The readout samples the way the shading does, so the number under the
   // crosshair belongs to the band it is sitting in. Reporting a bilinear value
   // over a bicubic map would disagree with the colour by a whole step near an
   // edge, which is exactly where anyone bothers to hover.
-  const t = isUpper ? sampleCubic(CUR.gh, col, row) : sampleShade('t', CUR.t, col, row);
-  $('r-temp').textContent = isUpper ? t.toFixed(0) + ' dam' : t.toFixed(1) + ' °C';
+  const hasGH = D.keys.includes('gh');
+  const t = hasGH ? sampleCubic(CUR.gh, col, row) : sampleShade('t', CUR.t, col, row);
+  $('r-temp').textContent = hasGH ? t.toFixed(0) + ' dam' : t.toFixed(1) + ' °C';
 
   const sp = Math.hypot(u, v);
-  $('r-wind').textContent = sp.toFixed(1) + ' m/s';
-  // Meteorological convention: the direction the wind is coming FROM.
-  const dir = (Math.atan2(-u, -v) * 180 / Math.PI + 360) % 360;
+  // The pair is a wind on every panel but one, where it is a moisture flux —
+  // hundreds of kg m⁻¹ s⁻¹, where a tenth of a unit would be noise.
+  $('r-wind').textContent = vec ? `${Math.round(sp)} ${vec.short}` : sp.toFixed(1) + ' m/s';
+  /* Meteorological convention for a wind: the direction it is coming FROM.
+     The opposite for a flux, which is read as an arrow pointing downstream —
+     reporting an atmospheric river by where it started is the one thing nobody
+     wants to know about it. */
+  const dir = ((vec && vec.toward
+    ? Math.atan2(u, v) : Math.atan2(-u, -v)) * 180 / Math.PI + 360) % 360;
   const pts = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
   $('r-dir').textContent = `${pts[Math.round(dir / 22.5) % 16]} ${Math.round(dir)}°`;
 
-  const extra = isUpper ? sampleCubic(CUR.sig, col, row) : sampleShade('p', CUR.p, col, row);
-  $('r-prec').textContent = isUpper
-    ? (extra >= 0 ? '+' : '') + extra.toFixed(1) + ' σ'
-    : (extra < 0.05 ? '—' : extra.toFixed(1) + ' mm');
+  if (vec) {
+    // Three rows say everything this panel has: the height, the transport and
+    // its direction. There is no fourth field to report.
+    $('r-prec').textContent = '—';
+  } else {
+    const extra = isUpper ? sampleCubic(CUR.sig, col, row) : sampleShade('p', CUR.p, col, row);
+    $('r-prec').textContent = isUpper
+      ? (extra >= 0 ? '+' : '') + extra.toFixed(1) + ' σ'
+      : (extra < 0.05 ? '—' : extra.toFixed(1) + ' mm');
+  }
 
   const spec = LUTS[state.field];
   const mark = $('cbar-mark');
   if (spec) {
-    const val = state.field === 'spd' ? sp : sampleShade(state.field, CUR[state.field], col, row);
+    const val = spec.mag ? sp : sampleShade(state.field, CUR[state.field], col, row);
     const f = barPos(spec, val);
     // A negative position means "no rain here", which has nowhere to sit on the
     // ladder. On the linear scales it just means the value is past the trimmed
@@ -3265,6 +3501,29 @@ const DESCS = {
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
   msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. Fronts are derived, not analysed: no model carries a fronts field, so these come from the thermal front parameter on 850 hPa wet-bulb potential temperature, typed by which way the wind is advecting it. Troughs are the valley lines of the pressure field itself, drawn as a plain heavy line and only where no front is already marking the same feature. Expect all of it to disagree with a hand analysis — occlusions are not separated out, and neither are upper fronts, upper troughs or convergence lines. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending.',
+  /* A function, because three of its numbers are the build's rather than the
+     page's: which levels the integral spanned and which level the contours
+     are. Written out as prose it read identically and was a copy of
+     config.py's IVT_LEVELS that nothing would have updated — the description
+     would have gone on naming 500 hPa long after the integral stopped there. */
+  ivt: (d) => 'Integrated vapour transport: the water vapour in the column ' +
+    'multiplied by the wind carrying it, integrated over the ' +
+    (d.levels ? d.levels.join(', ').replace(/, (\d+)$/, ' and $1 hPa') : 'lower tropospheric') +
+    ' surfaces and shaded in kg m⁻¹ s⁻¹. It is the field that says where the ' +
+    'water is going, which the height charts cannot — a trough says the flow ' +
+    'will be southerly, this says whether that southerly is dry or is an ' +
+    'atmospheric river. Above about 500 the plume is worth watching; above 800 ' +
+    'it is the story of the day. Streaklines are the transport vectors, drawn ' +
+    'in the direction the moisture is travelling rather than the direction ' +
+    'wind is conventionally said to come from, and slowed by a constant so a ' +
+    'flux in the hundreds animates like a wind in the tens. Contours are ' +
+    (d.level || 700) + ' hPa height every 6 dam — the level the plume is ' +
+    'steered at, so the pattern and the shading describe the same layer. ' +
+    'Stopping the integral short of the textbook 300 hPa leaves out under 5% ' +
+    'of a typical transport and saves three downloads a frame for every level ' +
+    'dropped. Below 250 nothing is shaded, because that is the background ' +
+    'state of the atmosphere rather than a plume. The column is cut off at the ' +
+    'model surface, so no transport is drawn through the inside of the Alps.',
   c: 'Total cloud cover through the whole depth of the atmosphere, so a thin cirrus sheet and a deep thunderstorm both read as overcast. Blue is clear sky, white is complete cover.',
   sat: 'MTG FCI from EUMETSAT, 20-minutely over the last 24 hours, resampled onto this frame. True colour by day; after sunset there is no visible light to photograph, so night falls back to the 10.5 µm infrared window. The scan nearest the selected time is shown, and past the newest scan the most recent one is held — there is no satellite picture of a forecast.',
   none: 'The wind field alone, as advected streaklines over land and sea.',
@@ -3276,10 +3535,18 @@ function syncDesc() {
   /* "None" means no shading, which on every other panel leaves the wind as the
      only thing drawn — hence the stock text. On the surface-pressure panel there
      is no wind to be left with: turning the shading off leaves the isobars, and
-     saying otherwise describes a layer the source does not carry. */
-  const lead = (state.field === 'none' && D.keys.includes('msl'))
-    ? 'Isobars and fronts, without the pressure shading behind them.'
-    : DESCS[state.field];
+     saying otherwise describes a layer the source does not carry. On the
+     vapour-transport panel there is a vector field, but it is not a wind, and
+     calling it one would misname the only thing still on the map. */
+  // An entry may be a function of the source, for the descriptions whose
+  // numbers belong to the build rather than to the page.
+  const entry = DESCS[state.field];
+  const lead = state.field !== 'none' ? (typeof entry === 'function' ? entry(D) : entry)
+    : D.keys.includes('msl')
+      ? 'Isobars and fronts, without the pressure shading behind them.'
+      : D.vector
+        ? 'The transport vectors as streaklines over the 700 hPa height contours, without the shading behind them. Direction without magnitude: where the moisture is going, with nothing said about how much of it there is.'
+        : DESCS.none;
   $('desc').textContent = `${lead} ${MODELS[state.model].label} at ~${km} km, ` +
     `${gap}-hourly to +${SRC.steps[SRC.steps.length - 1]} h, interpolated between steps. ` +
     'Hover for exact values.';
@@ -3307,15 +3574,38 @@ function pressGroup(boxId, attr, value) {
    the reader three days. */
 const currentValid = () => validAt(state.tf).date.getTime();
 
-function seekTo(ms) {
-  const first = INIT.getTime() + SRC.steps[0] * 3600e3;
-  const lastT = INIT.getTime() + SRC.steps[NT - 1] * 3600e3;
-  const clamped = Math.max(first, Math.min(lastT, ms));
-  const hours = (clamped - INIT.getTime()) / 3600e3;
+/* The fractional frame index at a given forecast hour, clamped to the loop.
+
+   Index space, not hour space, and the distinction matters as soon as a payload
+   is not evenly spaced: ICON-2I's past is three-hourly and its forecast hourly,
+   so the same hour sits at quite different fractions of the two. Everything
+   that positions something along the track — the scrubber, the day labels, the
+   present marker — counts frames, so they all come through here. */
+function indexAtHour(hours) {
+  const st = SRC.steps;
+  if (NT < 2) return 0;
+  const clamped = Math.max(st[0], Math.min(st[NT - 1], hours));
   let i = 0;
-  while (i < NT - 2 && SRC.steps[i + 1] <= hours) i++;
-  const denom = SRC.steps[i + 1] - SRC.steps[i];
-  setTime(i + (denom ? (hours - SRC.steps[i]) / denom : 0));
+  while (i < NT - 2 && st[i + 1] <= clamped) i++;
+  const denom = st[i + 1] - st[i];
+  return i + (denom ? (clamped - st[i]) / denom : 0);
+}
+
+const hoursAt = (ms) => (ms - INIT.getTime()) / 3600e3;
+
+function seekTo(ms) {
+  setTime(indexAtHour(hoursAt(ms)));
+}
+
+/* Where the present moment falls on this timeline, or null when it is off the
+   end. Not a given even on a forecast: the panel carries a week of past, and a
+   run old enough that the machine has been off for two days is a loop entirely
+   in front of now rather than around it. */
+function nowIndex() {
+  if (NT < 2) return null;
+  const h = hoursAt(Date.now());
+  if (h < SRC.steps[0] || h > SRC.steps[NT - 1]) return null;
+  return indexAtHour(h);
 }
 
 function afterSourceChange(keepValid) {
@@ -3459,9 +3749,16 @@ function buildFieldButtons() {
   }
   const windBtn = $('tg-wind');
   const windOK = flowAllowed();
+  const vec = D.vector;
+  // Named for what it draws. On one panel the streaklines are not wind at all,
+  // and a button reading "Wind flow" over a moisture flux is a wrong label on
+  // the only overlay that panel has.
+  windBtn.textContent = vec ? 'Transport flow' : 'Wind flow';
   windBtn.disabled = !windOK;
-  windBtn.title = windOK ? 'Wind drawn as advected streaklines'
-    : 'The height contours already show this flow — streaklines are offered on the wind-speed shading';
+  windBtn.title = !windOK
+    ? 'The height contours already show this flow — streaklines are offered on the wind-speed shading'
+    : vec ? 'Vapour transport as advected streaklines — the vector the shading is the magnitude of'
+      : 'Wind drawn as advected streaklines';
   windBtn.setAttribute('aria-pressed', String(state.wind && windOK));
 
   const cloudBtn = $('tg-cloud');
@@ -3483,11 +3780,15 @@ function buildDomainButtons() {
   const box = $('domains');
   box.innerHTML = '';
   for (const [key, d] of Object.entries(DOMAIN_META)) {
-    /* The surface-pressure frame is reached by its own tab and is the same box
-       as the upper-air one, so listing it here too would put two buttons reading
-       "Europe / North Atlantic" side by side in the domain row with nothing to
-       tell them apart. The tab bar is where the choice between levels belongs. */
-    if (key === 'europe_sfc') continue;
+    /* The Europe frame exists three times over — upper air, surface, vapour
+       transport — and the three are the same box. Listing them all here would
+       put three buttons reading "Europe / North Atlantic" side by side with
+       nothing to tell them apart, so the two that name a tab of their own say
+       so and are skipped. The tab bar is where a choice between levels belongs.
+       Declared on the domain rather than tested by key here, which is what the
+       last one was: adding a third level meant editing a condition that looked
+       like it was about one particular domain. */
+    if (d.tabOnly) continue;
     const b = document.createElement('button');
     b.textContent = d.label;
     b.dataset.domain = key;
@@ -3830,6 +4131,18 @@ function gifEstimate() {
     `${p.frames} frames · ${p.w} × ${p.h} px · ${(p.frames * p.delay / 1000).toFixed(1)} s loop`;
 }
 
+/* Every nth rung, keeping both ends. The page's colour bar is wide enough for
+   a ladder's full tick list; the exported one is not, and dropping the last
+   value would leave a scale that does not say where it stops. */
+function thinTicks(values, max) {
+  if (values.length <= max) return values;
+  const step = Math.ceil((values.length - 1) / (max - 1));
+  const out = values.filter((_, i) => i % step === 0);
+  const last = values[values.length - 1];
+  if (out[out.length - 1] !== last) out.push(last);
+  return out;
+}
+
 /* One GIF frame: the map and the flow as they are already drawn, scaled down,
    with the valid time and the colour bar drawn in. A GIF leaves the page it was
    made on, so the things the page was providing around the map — what time this
@@ -3861,7 +4174,8 @@ function composeFrame(ctx, w, h, mapH) {
   // corner and overlapping.
   const specNow = LUTS[state.field];
   const sub = [MODELS[state.model].label, DOMAIN_META[state.domain].label,
-               specNow ? specNow.title : 'wind flow'].join(' · ');
+               specNow ? specNow.title
+                 : D.vector ? 'vapour transport flow' : 'wind flow'].join(' · ');
   ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
   ctx.fillText(sub, 12, 43);
 
@@ -3891,7 +4205,12 @@ function composeFrame(ctx, w, h, mapH) {
     }
     ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
     ctx.fillStyle = muted;
-    const vals = spec.ladder ? [0.2, 1, 5, 20, 100]
+    /* The scale's own rungs, thinned to what a 120-340 px bar can carry. The
+       five millimetre values that used to be hard-coded here were the rainfall
+       ladder's, printed on whichever ladder was showing: the upper-air panel
+       exported a sigma scale labelled 5, 20 and 100, three of them clamped to
+       an end the ladder reaches at 6. */
+    const vals = spec.ladder ? thinTicks(spec.ticks, 5)
       : [spec.range[0], (spec.range[0] + spec.range[1]) / 2, spec.range[1]];
     for (const v of vals) {
       const f = barPos(spec, v);
@@ -6682,8 +7001,16 @@ function showView(name) {
      frame lit "Surface panels" while drawing a pressure chart, so the tab bar
      said the reader was on a page they were not on, and the new one looked like
      it did nothing. A domain that names no tab of its own belongs to the
-     surface panels, which is what the close-up frames all are. */
-  const tabDomain = { europe: 'europe', europe_sfc: 'europe_sfc' }[state.domain] || 'malta';
+     surface panels, which is what the close-up frames all are.
+
+     Read off the tab bar itself rather than from a list kept beside it: a
+     domain that has a map tab lights that tab, and everything else — every
+     close-up frame — belongs to the surface panels. The list this replaced had
+     to be edited in step with the markup, and adding a third level to the
+     Europe frame is exactly the edit that would have been missed. */
+  const tabDomain = [...$('tabs').children].some(
+    (b) => b.dataset.view === 'map' && b.dataset.domain === state.domain)
+    ? state.domain : 'malta';
   for (const b of $('tabs').children) {
     const on = b.dataset.view === name &&
       (name !== 'map' || b.dataset.domain === tabDomain);
@@ -6779,12 +7106,7 @@ const MODEL_SLUG = { icon_eu: 'icon-eu', icon_2i: 'icon-2i', ifs: 'ifs' };
 const SLUG_MODEL = Object.fromEntries(Object.entries(MODEL_SLUG).map(([k, v]) => [v, k]));
 
 function seekToHour(hours) {
-  const st = SRC.steps;
-  const clamped = Math.max(st[0], Math.min(st[NT - 1], hours));
-  let i = 0;
-  while (i < NT - 2 && st[i + 1] <= clamped) i++;
-  const denom = st[i + 1] - st[i];
-  setTime(i + (denom ? (clamped - st[i]) / denom : 0));
+  setTime(indexAtHour(hours));
 }
 
 /* replaceState, not location.hash: scrubbing walks through dozens of frames and
@@ -6885,6 +7207,13 @@ function applyHash() {
 
 state.view = 'map';
 loadSource('malta', 'icon_eu');
+/* Open on the present, not on frame zero. Frame zero used to be three hours
+   behind the run and reading it as "now" cost nothing; it is now a week behind,
+   and a page that opens on last Tuesday looks like a page serving stale data.
+   A hash that names a frame still wins — applyHash runs after this — and a hash
+   that names only a domain keeps this position through the switch, because
+   switchDomain carries the valid time across rather than the frame number. */
+seekTo(Date.now());
 buildDomainButtons();
 buildModelButtons();
 buildFieldButtons();
