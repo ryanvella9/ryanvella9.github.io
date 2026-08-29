@@ -467,9 +467,13 @@ title: "Forecast"
     <nav class="tabs" id="tabs">
       <button data-view="map" data-domain="malta" aria-pressed="true">Surface panels</button>
       <button data-view="mgram" aria-pressed="false">Meteogram</button>
-      <button data-view="map" data-domain="europe" aria-pressed="false">500 hPa</button>
-      <button data-view="map" data-domain="europe_sfc" aria-pressed="false">Surface pressure</button>
-      <button data-view="map" data-domain="europe_ivt" aria-pressed="false">Vapour transport</button>
+      <!-- One tab for the three Europe charts. They were three, which put half
+           the tab bar on one frame and read as three unrelated pages; they are
+           one frame at three levels, and a reader who wants the synoptic
+           picture wants to leaf through all three rather than pick one from a
+           menu. Which of them is showing is chosen inside the view, by the
+           Chart row and by up/down. -->
+      <button data-view="map" data-synoptic="1" aria-pressed="false">Synoptic charts</button>
       <button data-view="sat" aria-pressed="false">Satellite</button>
     </nav>
     <small id="cycles">loading…</small>
@@ -482,9 +486,17 @@ title: "Forecast"
   <section id="view-map">
 
   <div class="controls">
-    <div class="group">
+    <!-- Domain and Chart are the same slot, and never both filled. A close-up
+         frame is chosen by where it is, a synoptic chart by what it shows: on
+         the Europe frame every entry in the domain row would read "Europe /
+         North Atlantic", and on a close-up there is no chart to choose. -->
+    <div class="group" id="domain-group">
       <label>Domain</label>
       <div class="btns" id="domains"></div>
+    </div>
+    <div class="group" id="chart-group" hidden>
+      <label>Chart</label>
+      <div class="btns" id="charts"></div>
     </div>
     <div class="group">
       <label>Model</label>
@@ -808,6 +820,9 @@ title: "Forecast"
         at the newest scan.<br />
         Keyboard: <kbd>←</kbd> <kbd>→</kbd> step, <kbd>space</kbd> play/pause,
         <kbd>Home</kbd>/<kbd>End</kbd> jump — on whichever view is showing.
+        On the synoptic charts, <kbd>↑</kbd> <kbd>↓</kbd> move between the three
+        levels — 500 hPa, vapour transport, surface pressure — holding the
+        forecast hour, so the same moment is read at three heights.
       </div>
     </details>
   </footer>
@@ -961,6 +976,22 @@ const modelPart = (domainKey, modelKey) =>
    same engine with a different source rather than a second map viewer. It is
    registered before its data exists; the extent is all the shell needs to lay
    itself out, and the fields arrive when the page is opened. */
+/* The synoptic stack: one frame, three levels, read top-down through the
+   atmosphere. Ordering them by level rather than by when they were built is
+   what makes up/down mean something — the row runs 500 hPa, 700 hPa, surface,
+   so ArrowDown descends and ArrowUp climbs. It wraps, because three is few
+   enough that leafing with one key beats stopping at an end.
+
+   The labels are the old tab captions. They were three tabs, which spent half
+   the tab bar on one frame and read as three unrelated pages rather than as
+   one chart at three heights. */
+const SYNOPTIC = [
+  { domain: 'europe', label: '500 hPa' },
+  { domain: 'europe_ivt', label: 'Vapour transport' },
+  { domain: 'europe_sfc', label: 'Surface pressure' },
+];
+const isSynoptic = (key) => SYNOPTIC.some((s) => s.domain === key);
+
 DOMAIN_META.europe = {
   label: 'Europe / North Atlantic',
   // Bootstrap only — the payload carries the authoritative extent and replaces
@@ -969,6 +1000,10 @@ DOMAIN_META.europe = {
   // wrong value here shows as the map resizing the moment it appears.
   extent: { west: -60, east: 45, south: 28, north: 72 },
   lazy: true,
+  // All three are reached through the Synoptic tab and its Chart row. Listing
+  // them in the domain row as well would put three buttons reading "Europe /
+  // North Atlantic" side by side with nothing to tell them apart.
+  tabOnly: true,
 };
 
 /* The surface chart is the same frame at a different level, so it is a second
@@ -979,9 +1014,6 @@ DOMAIN_META.europe_sfc = {
   label: 'Europe / North Atlantic',
   extent: { west: -60, east: 45, south: 28, north: 72 },
   lazy: true,
-  // Reached by its own tab. Listing it in the domain row as well would put two
-  // buttons reading "Europe / North Atlantic" side by side with nothing to tell
-  // them apart — the choice between levels belongs in the tab bar.
   tabOnly: true,
 };
 
@@ -1515,6 +1547,9 @@ const state = {
   // first time, and clutter over the field every time after that.
   wind: true, clouds: false, iso: false, isoUser: false, places: false,
   mgPlace: 'valletta',
+  // The synoptic level the tab reopens on. 500 hPa is where a reader starts
+  // reading a synoptic situation, so it is where the tab starts.
+  synoptic: 'europe',
   playing: false, speed: 1,
   hover: null,
 };
@@ -1812,6 +1847,11 @@ function loadSource(domainKey, modelKey) {
   $('r-wind-label').textContent = vec ? vec.label : 'Wind';
   $('r-prec-label').textContent = (isPressure || vec) ? '—'
     : isUpper ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
+  /* Which chart the Synoptic tab reopens on, remembered so that leaving the
+     vapour panel for the Malta one and coming back lands where the reader
+     left rather than resetting to 500 hPa. */
+  if (isSynoptic(domainKey)) state.synoptic = domainKey;
+  syncControlGroups();
   /* Re-locked here rather than at boot alone. It was called once, against the
      Malta source, so every branch inside it that asks what the source carries
      was dead: the upper-air panel got column widths fitted to "-00.0 °C" and
@@ -3530,7 +3570,20 @@ const DESCS = {
 };
 
 function syncDesc() {
-  const gap = SRC.steps.length > 1 ? SRC.steps[1] - SRC.steps[0] : 1;
+  /* The *forecast's* cadence, which is not steps[1] - steps[0]: those are both
+     past frames. It never mattered while the past ran at the forecast's own
+     interval, and it does now — the synoptic panels carry a week of past at
+     half the resolution, so the old reading described a 6-hourly chart as
+     12-hourly. The past is stated separately rather than folded in, because one
+     number cannot honestly describe two cadences. */
+  const st = SRC.steps;
+  const f0 = st.findIndex((h) => h >= 0);
+  const gap = f0 >= 0 && f0 + 1 < st.length ? st[f0 + 1] - st[f0] : 1;
+  const backH = f0 > 0 ? -st[0] : 0;
+  const pastGap = f0 > 1 ? st[1] - st[0] : 0;
+  const pastText = !backH ? ''
+    : ` Past ${backH >= 48 ? Math.round(backH / 24) + ' days' : backH + ' h'}`
+      + `${pastGap ? ` at ${pastGap}-hourly` : ''}.`;
   const km = Math.round(SRC.dy * 111);
   /* "None" means no shading, which on every other panel leaves the wind as the
      only thing drawn — hence the stock text. On the surface-pressure panel there
@@ -3548,7 +3601,7 @@ function syncDesc() {
         ? 'The transport vectors as streaklines over the 700 hPa height contours, without the shading behind them. Direction without magnitude: where the moisture is going, with nothing said about how much of it there is.'
         : DESCS.none;
   $('desc').textContent = `${lead} ${MODELS[state.model].label} at ~${km} km, ` +
-    `${gap}-hourly to +${SRC.steps[SRC.steps.length - 1]} h, interpolated between steps. ` +
+    `${gap}-hourly to +${st[st.length - 1]} h, interpolated between steps.${pastText} ` +
     'Hover for exact values.';
   $('desc').title = $('desc').textContent;
 }
@@ -3780,14 +3833,12 @@ function buildDomainButtons() {
   const box = $('domains');
   box.innerHTML = '';
   for (const [key, d] of Object.entries(DOMAIN_META)) {
-    /* The Europe frame exists three times over — upper air, surface, vapour
-       transport — and the three are the same box. Listing them all here would
-       put three buttons reading "Europe / North Atlantic" side by side with
-       nothing to tell them apart, so the two that name a tab of their own say
-       so and are skipped. The tab bar is where a choice between levels belongs.
-       Declared on the domain rather than tested by key here, which is what the
-       last one was: adding a third level meant editing a condition that looked
-       like it was about one particular domain. */
+    /* The Europe frame exists three times over — upper air, vapour transport,
+       surface — and the three are the same box, so all three would read
+       "Europe / North Atlantic" here with nothing to tell them apart. They are
+       chosen in the Chart row instead. Declared on the domain rather than
+       tested by key, which is what this was: adding a level meant editing a
+       condition that looked like it was about one particular domain. */
     if (d.tabOnly) continue;
     const b = document.createElement('button');
     b.textContent = d.label;
@@ -3796,6 +3847,32 @@ function buildDomainButtons() {
     b.onclick = () => switchDomain(key);
     box.appendChild(b);
   }
+}
+
+/* The Chart row: which level of the synoptic frame is showing. It occupies the
+   same slot as the domain row and is never shown beside it — see the markup. */
+function buildChartButtons() {
+  const box = $('charts');
+  box.innerHTML = '';
+  for (const s of SYNOPTIC) {
+    const b = document.createElement('button');
+    b.textContent = s.label;
+    b.dataset.domain = s.domain;
+    b.setAttribute('aria-pressed', String(s.domain === state.domain));
+    b.onclick = () => switchDomain(s.domain);
+    box.appendChild(b);
+  }
+}
+
+/* Which of the two selectors the current frame wants. Called from loadSource,
+   which every path that changes frame goes through — the alternative was
+   calling it from switchDomain and from applyHash and from boot, and missing
+   one of them leaves the page offering a chart row for a Malta panel. */
+function syncControlGroups() {
+  const syn = isSynoptic(state.domain);
+  $('domain-group').hidden = syn;
+  $('chart-group').hidden = !syn;
+  if (syn) buildChartButtons(); else buildDomainButtons();
 }
 
 /* Every model is always listed, and one that does not reach the current domain
@@ -3923,6 +4000,26 @@ addEventListener('keydown', (e) => {
   else if (k === 'ArrowLeft') { setPlaying(false); setTime(Math.round(state.tf) - 1); syncTime(); }
   else if (k === 'Home') { setPlaying(false); setTime(0); syncTime(); }
   else if (k === 'End') { setPlaying(false); setTime(NT - 1); syncTime(); }
+  /* Up and down move through the synoptic stack, left and right through time —
+     two orthogonal gestures for the two axes a reader actually navigates. Only
+     on that frame: on a close-up there is no stack to climb, and arrows that
+     stepped through time on one panel and swapped chart on another would be
+     the same gesture doing two unrelated things. Same argument the satellite
+     view makes above about stills.
+
+     preventDefault because the default is scrolling the page, which on a view
+     built to fit one screen moves the map out from under the reader. */
+  else if (k === 'ArrowUp' || k === 'ArrowDown') {
+    const i = SYNOPTIC.findIndex((s) => s.domain === state.domain);
+    if (i < 0) return;
+    e.preventDefault();
+    const n = (i + (k === 'ArrowDown' ? 1 : -1) + SYNOPTIC.length) % SYNOPTIC.length;
+    setPlaying(false);
+    // The valid time is carried across by switchDomain, so climbing the stack
+    // holds the hour: 500 hPa on Thursday morning becomes the surface chart on
+    // Thursday morning, not the first frame of a different loop.
+    switchDomain(SYNOPTIC[n].domain).then(() => showView('map'));
+  }
 });
 
 /* -------------------------------------------------------------- GIF export -
@@ -6996,24 +7093,16 @@ function showView(name) {
   $('view-map').hidden = name !== 'map';
   $('view-mgram').hidden = name !== 'mgram';
   $('view-sat').hidden = name !== 'sat';
-  /* Which map tab a domain belongs to. This was a two-way test — europe, else
-     the surface panels — and a third map tab had nowhere to land: the pressure
-     frame lit "Surface panels" while drawing a pressure chart, so the tab bar
-     said the reader was on a page they were not on, and the new one looked like
-     it did nothing. A domain that names no tab of its own belongs to the
-     surface panels, which is what the close-up frames all are.
-
-     Read off the tab bar itself rather than from a list kept beside it: a
-     domain that has a map tab lights that tab, and everything else — every
-     close-up frame — belongs to the surface panels. The list this replaced had
-     to be edited in step with the markup, and adding a third level to the
-     Europe frame is exactly the edit that would have been missed. */
-  const tabDomain = [...$('tabs').children].some(
-    (b) => b.dataset.view === 'map' && b.dataset.domain === state.domain)
-    ? state.domain : 'malta';
+  /* Which map tab a domain belongs to. There are two of them now: the three
+     Europe levels light the synoptic tab, and every close-up frame lights the
+     surface panels. Getting this wrong is not cosmetic — an earlier version
+     lit "Surface panels" while drawing a pressure chart, so the tab bar told
+     the reader they were on a page they were not on and the tab they had just
+     pressed looked like it did nothing. */
+  const syn = isSynoptic(state.domain);
   for (const b of $('tabs').children) {
     const on = b.dataset.view === name &&
-      (name !== 'map' || b.dataset.domain === tabDomain);
+      (name !== 'map' || (b.dataset.synoptic ? syn : !syn));
     b.setAttribute('aria-pressed', String(on));
   }
   if (name === 'sat') { syncMeta(); satResize(); satSync(); satIdlePreload(); return; }
@@ -7051,7 +7140,9 @@ $('tabs').onclick = (e) => {
   if (!b) return;
   if (b.dataset.view === 'mgram') { openMeteogram(); return; }
   if (b.dataset.view === 'sat') { showView('sat'); return; }
-  const dom = b.dataset.domain;
+  // The synoptic tab names no domain of its own: it opens whichever of the
+  // three the reader was last on.
+  const dom = b.dataset.synoptic ? state.synoptic : b.dataset.domain;
   const go = () => showView('map');
   if (dom === state.domain) go();
   else switchDomain(dom).then(go);
