@@ -511,6 +511,11 @@ title: "Forecast"
       <div class="btns">
         <button id="tg-wind" aria-pressed="true">Wind flow</button>
         <button id="tg-cloud" aria-pressed="false">Clouds</button>
+        <!-- The observed sky, on the half of the timeline that already
+             happened. Sits beside the model's own cloud rather than replacing
+             it: the two disagreeing is the most useful thing this panel can
+             show, and it can only be seen if both are reachable. -->
+        <button id="tg-sat" aria-pressed="false">Satellite</button>
         <button id="tg-iso" aria-pressed="false">Isotherms</button>
         <button id="tg-places" aria-pressed="false">Places</button>
       </div>
@@ -805,6 +810,18 @@ title: "Forecast"
         Mercator, unlike the Lambert used by the rendered PNGs — a conformal
         projection is what lets the streaklines be advected in screen space
         without distorting direction.<br />
+        <b>Observed cloud.</b> The Satellite overlay on the map panels is MTG
+        FCI Geo Colour from EUMETView (CC BY 4.0), one scan per past step of
+        whichever timeline is showing — 3-hourly over the last day on the
+        surface frames, 12-hourly over the last week on the synoptic ones. Geo
+        Colour rather than true colour because a past window always contains
+        darkness: it is true colour while the sun is up and the 10.5 µm window
+        with city lights after dark, so every step has a picture instead of
+        every other one being blank. MSG cannot do this at all — SEVIRI has no
+        green channel, so there is no true-colour product for it. Nothing is
+        drawn over forecast hours. On the synoptic frame the picture stops at
+        the limb, roughly 50° W at these latitudes, because that is where the
+        Earth stops being visible from 0°.<br />
         <b>Satellite.</b> EUMETSAT MTG FCI (CC BY 4.0) for the 24-hour loop,
         20-minutely at about 1 km. The two stills are Copernicus Sentinel data
         (ESA): Sentinel-3 OLCI at 300 m, roughly daily, on the same frame as
@@ -834,6 +851,7 @@ title: "Forecast"
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_disc.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sentinel_malta.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/ndvi_malta.js"></script>
+<script src="https://ryanvella9.github.io/malta-forecast-charts/sat/overlay.js"></script>
 <script>
 /* ---------------------------------------------------------------------------
    Interactive forecast panels.
@@ -1546,6 +1564,9 @@ const state = {
   // Place labels off by default: they are an aid for finding your bearings the
   // first time, and clutter over the field every time after that.
   wind: true, clouds: false, iso: false, isoUser: false, places: false,
+  // Observed cloud over the past half of the track. Off by default: it is a
+  // second opinion on the panel, not the panel.
+  satOvl: false,
   mgPlace: 'valletta',
   // The synoptic level the tab reopens on. 500 hPa is where a reader starts
   // reading a synoptic situation, so it is where the tab starts.
@@ -2207,6 +2228,136 @@ function drawRaster() {
   // smooth-by-construction input reconstructs detail that was never there.
   ctxG.imageSmoothingQuality = 'low';
   ctxG.drawImage(off, 0, 0, W, H);
+}
+
+/* ------------------------------------------------------- observed cloud --- */
+
+/* The satellite picture for whichever past hour the panel is showing.
+
+   Not a loop and not a second view: one image per past step of the panel's own
+   timeline, laid onto the map so the model's cloud and the sky's can be
+   compared on one frame. The manifest names a box per frame — the three
+   synoptic levels share one — and a mask, which is the limb: a geostationary
+   satellite sees the same disc every scan, so where the picture runs out is a
+   property of the box rather than of the hour, and it ships once. */
+const OVL = window.OVERLAY || null;
+
+const ovlBox = () => {
+  if (!OVL) return null;
+  for (const b of Object.values(OVL.boxes)) {
+    if (b.domains.includes(state.domain)) return b;
+  }
+  return null;
+};
+
+/* The picture nearest the hour on screen, or null.
+
+   Nothing is drawn for a time no image covers, and that is the whole rule the
+   forecast half of the track falls out of: images exist only for past slots, so
+   scrubbing forward simply runs off the end of them. The half-step tolerance is
+   what stops the newest picture being stretched across the following night on
+   the synoptic panel, where a step is twelve hours. */
+function ovlFrameAt(date) {
+  const box = ovlBox();
+  if (!box || !box.frames.length) return null;
+  const t = date.getTime();
+  if (t > Date.now()) return null;            // no photograph of a forecast
+  let best = null, bestGap = Infinity;
+  for (const f of box.frames) {
+    const gap = Math.abs(Date.parse(f.t) - t);
+    if (gap < bestGap) { bestGap = gap; best = f; }
+  }
+  return bestGap <= box.stepH * 1800e3 ? best : null;   // half a step, in ms
+}
+
+/* Decoded pixels, kept by filename. An image is fetched once and then it is an
+   array read: scrubbing back and forth across a day would otherwise re-decode
+   the same JPEG on every frame. */
+const ovlCache = new Map();
+const ovlPending = new Set();
+
+function ovlPixels(file) {
+  if (ovlCache.has(file)) return ovlCache.get(file);
+  if (ovlPending.has(file)) return null;
+  ovlPending.add(file);
+  const img = new Image();
+  img.crossOrigin = 'anonymous';
+  img.onload = () => {
+    const cv = document.createElement('canvas');
+    cv.width = img.naturalWidth; cv.height = img.naturalHeight;
+    const c = cv.getContext('2d', { willReadFrequently: true });
+    c.drawImage(img, 0, 0);
+    ovlCache.set(file, {
+      w: cv.width, h: cv.height,
+      px: c.getImageData(0, 0, cv.width, cv.height).data,
+    });
+    ovlPending.delete(file);
+    // One repaint when it lands, rather than a poll: until now the layer drew
+    // nothing, so the frame on screen is missing it.
+    if (state.view === 'map') drawAll();
+  };
+  img.onerror = () => { ovlPending.delete(file); ovlCache.set(file, null); };
+  img.src = `${DATA_BASE}/sat/${file}`;
+  return null;
+}
+
+let ovlCv = null, ovlCtx = null, ovlImg = null;
+
+function drawSatOverlay() {
+  if (!state.satOvl) return;
+  const box = ovlBox();
+  if (!box) return;
+  const frame = ovlFrameAt(validAt(state.tf).date);
+  if (!frame) return;
+  const src = ovlPixels(frame.file);
+  const mask = box.mask ? ovlPixels(box.mask) : undefined;
+  // Both have to be decoded before anything is drawn: painting the picture and
+  // then the mask a frame later would flash the off-disc corner.
+  if (!src || (box.mask && !mask)) return;
+
+  const ow = Math.max(2, Math.ceil(W / RASTER_STEP));
+  const oh = Math.max(2, Math.ceil(H / RASTER_STEP));
+  if (!ovlCv || ovlCv.width !== ow || ovlCv.height !== oh) {
+    ovlCv = document.createElement('canvas');
+    ovlCv.width = ow; ovlCv.height = oh;
+    ovlCtx = ovlCv.getContext('2d');
+    ovlImg = ovlCtx.createImageData(ow, oh);
+  }
+  const out = ovlImg.data;
+
+  /* Resampled per pixel through the panel's own projection rather than blitted.
+     The image is plate carrée — that is what CRS:84 means — and no panel here
+     is: the close-ups are Mercator and the synoptic frame is a conic, so even
+     the ones that look like a straight paste are not one. This is drawRaster's
+     inner loop with an image behind it instead of a field. */
+  const { west, east, south, north } = box.extent;
+  const sx = src.w / (east - west), sy = src.h / (north - south);
+  const sep = PROJ.separable;
+  const lons = new Float32Array(ow);
+  if (sep) for (let i = 0; i < ow; i++) lons[i] = x2lon(((i + 0.5) / ow) * W);
+
+  for (let j = 0; j < oh; j++) {
+    const py = ((j + 0.5) / oh) * H;
+    const latSep = sep ? y2lat(py) : 0;
+    for (let i = 0; i < ow; i++) {
+      let lon, lat;
+      if (sep) { lon = lons[i]; lat = latSep; }
+      else { const ll = lonlat(((i + 0.5) / ow) * W, py); lon = ll[0]; lat = ll[1]; }
+      const o = (j * ow + i) * 4;
+      const cx = (lon - west) * sx, cy = (north - lat) * sy;
+      if (cx < 0 || cy < 0 || cx >= src.w || cy >= src.h) { out[o + 3] = 0; continue; }
+      const si = ((cy | 0) * src.w + (cx | 0)) * 4;
+      // The limb, from the mask that shipped with the box. Off the disc there
+      // is no picture — not a black one — so the map shows through.
+      if (mask && mask.px[si] < 128) { out[o + 3] = 0; continue; }
+      out[o] = src.px[si]; out[o + 1] = src.px[si + 1]; out[o + 2] = src.px[si + 2];
+      out[o + 3] = 255;
+    }
+  }
+  ovlCtx.putImageData(ovlImg, 0, 0);
+  ctxG.imageSmoothingEnabled = true;
+  ctxG.imageSmoothingQuality = 'low';
+  ctxG.drawImage(ovlCv, 0, 0, W, H);
 }
 
 /* Cloud cover as a translucent white sheet, so it can be read together with
@@ -3152,10 +3303,17 @@ function drawMap() {
      is the picture every forecast product draws. Temperature and wind speed
      cover every pixel, so cloud under them would simply be invisible, and goes
      on top as a veil instead. */
+  /* The satellite goes under the model's cloud sheet wherever both are drawn,
+     so the sheet reads as an annotation over the photograph rather than the
+     photograph burying it — which of the two is the claim and which is the
+     evidence is the whole point of having them on one frame. Both follow the
+     shading the same way: under a scale that leaves gaps, so rain and vapour
+     read on top of the cloud they came out of, and over one that covers every
+     pixel, where underneath would be invisible. */
   const cloudUnder = !spec || spec.base;
-  if (cloudUnder) drawClouds();
+  if (cloudUnder) { drawSatOverlay(); drawClouds(); }
   drawRaster();
-  if (!cloudUnder) drawClouds();
+  if (!cloudUnder) { drawSatOverlay(); drawClouds(); }
 
   drawGeo();
 }
@@ -3295,6 +3453,9 @@ function syncTime() {
   const s = $('scrub');
   if (document.activeElement !== s) s.value = String(Math.round(state.tf * 100));
   if (state.hover) readout(state.hover.x, state.hover.y);
+  // Whether there is a picture of this hour changes as the track is scrubbed,
+  // not only when the panel changes.
+  syncSatToggle();
   syncHash();
 }
 
@@ -3600,8 +3761,16 @@ function syncDesc() {
       : D.vector
         ? 'The transport vectors as streaklines over the 700 hPa height contours, without the shading behind them. Direction without magnitude: where the moisture is going, with nothing said about how much of it there is.'
         : DESCS.none;
+  /* Named only while the overlay is switched on. Keyed to the toggle rather
+     than to whether this particular hour has a picture, so that scrubbing does
+     not rewrite the paragraph under the reader every frame — and so this stays
+     out of syncTime, which runs at frame rate. */
+  const sat = state.satOvl && ovlBox()
+    ? ` Observed cloud from ${OVL.model} over the past hours, nearest scan to the`
+      + ' frame shown: true colour by day, infrared and city lights after dark.'
+    : '';
   $('desc').textContent = `${lead} ${MODELS[state.model].label} at ~${km} km, ` +
-    `${gap}-hourly to +${st[st.length - 1]} h, interpolated between steps.${pastText} ` +
+    `${gap}-hourly to +${st[st.length - 1]} h, interpolated between steps.${pastText}${sat} ` +
     'Hover for exact values.';
   $('desc').title = $('desc').textContent;
 }
@@ -3827,6 +3996,39 @@ function buildFieldButtons() {
   const iso = $('tg-iso');
   iso.textContent = D.contour.label;
   iso.title = `Contours of ${D.contour.label.toLowerCase()} (${D.contour.unit})`;
+
+  syncSatToggle();
+}
+
+/* The satellite toggle, which unlike the others is not available on every
+   frame: there is no photograph of Thursday. Disabled where no image covers
+   the hour on screen — which is the whole forecast half of the track, and any
+   gap upstream left in the past half — with the reason on hover, the same way
+   the flow toggle explains itself on the upper-air panel.
+
+   Called from syncTime as well as from here, because the answer changes as the
+   reader scrubs rather than only when they change panel. The guard is not an
+   optimisation: without it, assigning to .disabled on every animation frame
+   makes the button unclickable, because the assignment lands between the
+   pointer going down and coming up. */
+let satToggleState = null;
+function syncSatToggle() {
+  const btn = $('tg-sat');
+  const box = ovlBox();
+  const ok = !!box && !!ovlFrameAt(validAt(state.tf).date);
+  const key = `${ok}|${!!box}`;
+  if (key === satToggleState) return;
+  satToggleState = key;
+  btn.disabled = !ok;
+  // Lit for what is actually drawn, not for what was asked for — the same
+  // distinction the flow toggle makes on the upper-air panel. The preference
+  // survives in state.satOvl, so scrubbing back into the past turns the layer
+  // on again without the reader pressing anything.
+  btn.setAttribute('aria-pressed', String(state.satOvl && ok));
+  btn.title = !box
+    ? 'No observed imagery is published for this frame'
+    : ok ? `Observed cloud — ${OVL.model}, ${OVL.credit}`
+      : 'Observation only: this is a forecast hour, and there is no satellite picture of one';
 }
 
 function buildDomainButtons() {
@@ -3968,6 +4170,16 @@ const toggle = (id, key) => {
 toggle('tg-wind', 'wind');
 toggle('tg-cloud', 'clouds');
 toggle('tg-places', 'places');
+
+// Not through toggle(): this is the one overlay the description mentions, so
+// switching it has to rewrite that sentence as well as repaint the map.
+$('tg-sat').onclick = () => {
+  state.satOvl = !state.satOvl;
+  satToggleState = null;        // force syncSatToggle to repaint the button
+  syncSatToggle();
+  syncDesc();
+  drawAll();
+};
 
 // Contours are the one toggle whose default depends on the source, so the
 // reader's choice is recorded separately from the state actually in effect.
