@@ -2359,11 +2359,15 @@ function drawSatOverlay() {
       const cx = (lon - west) * sx, cy = (north - lat) * sy;
       if (cx < 0 || cy < 0 || cx >= src.w || cy >= src.h) { out[o + 3] = 0; continue; }
       const si = ((cy | 0) * src.w + (cx | 0)) * 4;
-      // The limb, from the mask that shipped with the box. Off the disc there
-      // is no picture — not a black one — so the map shows through.
-      if (mask && mask.px[si] < 128) { out[o + 3] = 0; continue; }
+      /* The limb, from the mask that shipped with the frame — used as an alpha
+         rather than as a yes/no. It is a gradient: a geostationary view is
+         already useless well before the Earth formally runs out, so the picture
+         fades over the last few degrees instead of ending at a line. Thresholding
+         it here would throw that away and put the hard edge straight back. */
+      const a = mask ? mask.px[si] : 255;
+      if (a === 0) { out[o + 3] = 0; continue; }
       out[o] = src.px[si]; out[o + 1] = src.px[si + 1]; out[o + 2] = src.px[si + 2];
-      out[o + 3] = 255;
+      out[o + 3] = a;
     }
   }
   ovlCtx.putImageData(ovlImg, 0, 0);
