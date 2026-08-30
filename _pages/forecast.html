@@ -810,18 +810,27 @@ title: "Forecast"
         Mercator, unlike the Lambert used by the rendered PNGs — a conformal
         projection is what lets the streaklines be advected in screen space
         without distorting direction.<br />
-        <b>Observed cloud.</b> The Satellite overlay on the map panels is MTG
-        FCI Geo Colour from EUMETView (CC BY 4.0), one scan per past step of
-        whichever timeline is showing — 3-hourly over the last day on the
-        surface frames, 12-hourly over the last week on the synoptic ones. Geo
-        Colour rather than true colour because a past window always contains
-        darkness: it is true colour while the sun is up and the 10.5 µm window
-        with city lights after dark, so every step has a picture instead of
-        every other one being blank. MSG cannot do this at all — SEVIRI has no
-        green channel, so there is no true-colour product for it. Nothing is
-        drawn over forecast hours. On the synoptic frame the picture stops at
-        the limb, roughly 50° W at these latitudes, because that is where the
-        Earth stops being visible from 0°.<br />
+        <b>Observed cloud.</b> The Satellite overlay on the map panels is one scan
+        per past step of whichever timeline is showing — 3-hourly over the last
+        day on the surface frames, 12-hourly over the last week on the synoptic
+        ones. Nothing is drawn over forecast hours.
+        Which imagery depends on how finely the frame is drawn. The close-ups
+        are limited by the instrument, so they take MTG FCI's high-resolution
+        fast imagery: 0.5 km in the visible, grey rather than colour because it
+        is a single channel, falling back to the 10.5 µm window after dark. The
+        wide frames are limited by the size of image they can afford to carry
+        rather than by the instrument, so they take Geo Colour instead — true
+        colour by day blended into infrared and city lights across the
+        terminator, which a window spanning whole days needs.
+        The synoptic frame is two satellites. From 0° the Earth's limb crosses
+        it near 50° W, which would cut off the western half of the Atlantic the
+        chart exists to watch, so GOES-East at 75.2° W is composited in to fill
+        it — each pixel taken from whichever satellite sees it less obliquely,
+        feathered across the join near 38° W. Both are the same Geo Colour
+        product, which is what lets them meet without a seam.
+        MSG is not used: EUMETView publishes no HRV, the SEVIRI channels it does
+        publish are 3 km and visibly blocky at these zooms, and SEVIRI has no
+        green channel, so there is no true-colour product for it at all.<br />
         <b>Satellite.</b> EUMETSAT MTG FCI (CC BY 4.0) for the 24-hour loop,
         20-minutely at about 1 km. The two stills are Copernicus Sentinel data
         (ESA): Sentinel-3 OLCI at 300 m, roughly daily, on the same frame as
