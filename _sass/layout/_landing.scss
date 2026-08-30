@@ -1,0 +1,32 @@
+.content-box {
+  margin-bottom: 1.25em;
+  padding: 1.35em 1.5em;
+  border: 1px solid var(--global-border-color);
+  border-radius: 8px;
+  background: var(--global-code-background-color);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.035);
+}
+
+.content-box > :first-child {
+  margin-top: 0;
+}
+
+.content-box > :last-child {
+  margin-bottom: 0;
+}
+
+.content-box h2 {
+  margin-top: 0;
+}
+
+html[data-theme="dark"] .content-box {
+  border-color: rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.035);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+@media screen and (max-width: 600px) {
+  .content-box {
+    padding: 1.05em 1em;
+  }
+}

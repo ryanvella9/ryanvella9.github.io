@@ -2,10 +2,13 @@
 permalink: /
 title: "About Me"
 author_profile: true
+hide_footer: true
 redirect_from: 
   - /about/
   - /about.html
 ---
+
+<section class="content-box" markdown="1">
 
 **Email:** _ryan.vella@env.ethz.ch_
 
@@ -15,7 +18,11 @@ I completed my PhD at the [Max Planck Institute for Chemistry](https://www.mpic.
 
 Before my PhD, I completed a fellowship in Earth Observation at the [European Space Agency (ESA)](https://www.esa.int/) in Frascati, Italy. I hold a BSc in Physics & Mathematics and an MSc in Geosciences from the [University of Malta](https://www.um.edu.mt/).
 
+</section>
 
+
+
+<section class="content-box" markdown="1">
 
 ## Research
 
@@ -36,6 +43,10 @@ Other research interests:
 - Light pollution
 
 
+</section>
+
+<section class="content-box" markdown="1">
+
 ## The Rest
 
 I co-founded and managed the environmental NGO Għaqda Siġar Maltin in Malta, dedicating several years to promoting ecological sustainability. I am passionate about trees, birds, and the natural environment. I enjoy working with satellite data and also operate several personal environmental sensors in Malta. As part of my conservation work, I help to raise awareness about light pollution and advocate for the preservation of Malta’s remaining Dark Sky Heritage Areas. Beyond these projects, I enjoy biking, hiking, and capturing the beauty of nature through photography.
@@ -43,5 +54,7 @@ I co-founded and managed the environmental NGO Għaqda Siġar Maltin in Malta, d
 
 
 <div style="text-align: right; font-style: italic;">
-Last updated on 15.07.2026
+Last updated on 30.08.2026
 </div>
+
+</section>
