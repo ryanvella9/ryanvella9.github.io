@@ -2270,7 +2270,13 @@ function ovlFrameAt(date) {
   const box = ovlBox();
   if (!box || !box.frames.length) return null;
   const t = date.getTime();
-  if (t > Date.now()) return null;            // no photograph of a forecast
+  /* No photograph of a forecast — but "now" is a boundary the page sits exactly
+     on, because it opens at Date.now(), and a frame a few seconds past the
+     clock is not a forecast in any sense that matters. The grace is how often
+     imagery actually arrives, so a frame inside the current fetch interval
+     still counts as the present. Without it the toggle came up disabled on the
+     close-up panels by a margin of seconds. */
+  if (t > Date.now() + (OVL.leadMin || 0) * 60e3) return null;
   let best = null, bestGap = Infinity;
   for (const f of box.frames) {
     const gap = Math.abs(Date.parse(f.t) - t);
@@ -4033,7 +4039,14 @@ function syncSatToggle() {
   const btn = $('tg-sat');
   const box = ovlBox();
   const ok = !!box && !!ovlFrameAt(validAt(state.tf).date);
-  const key = `${ok}|${!!box}`;
+  const future = validAt(state.tf).date.getTime() > Date.now();
+  /* Everything the message is built from belongs in the key, not just the
+     outcome. Twice now it has not been: the two disabled cases shared a key, so
+     a forecast hour kept "the scan has not arrived yet"; and the panel was
+     missing from it, so switching from the synoptic frame to Malta — both
+     enabled, so the key never moved — left Malta captioned with the Europe
+     box's two-satellite label. */
+  const key = `${ok}|${!!box}|${future}|${state.domain}`;
   if (key === satToggleState) return;
   satToggleState = key;
   btn.disabled = !ok;
@@ -4042,12 +4055,19 @@ function syncSatToggle() {
   // survives in state.satOvl, so scrubbing back into the past turns the layer
   // on again without the reader pressing anything.
   btn.setAttribute('aria-pressed', String(state.satOvl && ok));
+  /* Three different reasons, and they were two. A frame with no picture was
+     always blamed on being a forecast hour, which on a panel whose imagery had
+     simply not been fetched yet was a flat untruth — the reader was told the
+     present was the future. Which of the two it is has to be tested, not
+     assumed. */
   btn.title = !box
     ? 'No observed imagery is published for this frame'
     // Named from the box, not the manifest: a close-up is sharp grey imagery
     // and a wide frame is Geo Colour, and the reader is told which.
     : ok ? `Observed cloud — ${box.label}. ${box.credit || OVL.credit}`
-      : 'Observation only: this is a forecast hour, and there is no satellite picture of one';
+      : future
+        ? 'Observation only: this is a forecast hour, and there is no satellite picture of one'
+        : 'No scan published near this hour yet — the imagery is fetched every half hour';
 }
 
 function buildDomainButtons() {
