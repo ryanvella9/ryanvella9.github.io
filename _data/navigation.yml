@@ -15,6 +15,9 @@ main:
   # - title: "Malta from Space"
   #   url: /malta-from-space/
 
+  - title: "Outreach"
+    url: /outreach/
+
   - title: "Projects"
     url: /projects/
     children:
@@ -22,9 +25,6 @@ main:
         url: /environmental-monitoring/
       - title: "Weather"
         url: /forecast/
-
-  - title: "Outreach"
-    url: /outreach/
 
   # CV is now a download button at the bottom of the About page. The /cv/ page
   # itself still builds, so old links to it (and to /resume) keep working:
