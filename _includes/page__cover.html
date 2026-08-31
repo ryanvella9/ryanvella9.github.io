@@ -1,0 +1,37 @@
+{% include base_path %}
+
+{% comment %}
+  Looping video banner at the top of the content column.
+
+  It deliberately sits inside .page__inner-wrap rather than spanning the
+  viewport: above $sidebar-screen-min-width the author sidebar is
+  position:fixed, so a full-bleed hero is drawn underneath it instead of
+  pushing it down.
+
+  The poster is set as the figure background as well as the video poster, so
+  it carries the banner whenever the video does not play — before the first
+  frame decodes, if the file 404s, and under prefers-reduced-motion.
+{% endcomment %}
+
+{% if page.cover.poster contains "://" %}
+  {% capture cover_poster %}{{ page.cover.poster }}{% endcapture %}
+{% elsif page.cover.poster %}
+  {% capture cover_poster %}{{ page.cover.poster | prepend: "/images/" | prepend: base_path }}{% endcapture %}
+{% endif %}
+
+{% if page.cover.video contains "://" %}
+  {% capture cover_video %}{{ page.cover.video }}{% endcapture %}
+{% elsif page.cover.video %}
+  {% capture cover_video %}{{ page.cover.video | prepend: "/images/" | prepend: base_path }}{% endcapture %}
+{% endif %}
+
+<figure class="page__cover"{% if cover_poster %} style="background-image: url('{{ cover_poster }}');"{% endif %}>
+  <video class="page__cover-video" autoplay muted loop playsinline preload="metadata"
+    {% if cover_poster %}poster="{{ cover_poster }}"{% endif %}
+    aria-hidden="true" tabindex="-1">
+    <source src="{{ cover_video }}" type="video/mp4">
+  </video>
+  {% if page.cover.caption %}
+    <figcaption class="page__cover-caption">{{ page.cover.caption | markdownify | remove: "<p>" | remove: "</p>" }}</figcaption>
+  {% endif %}
+</figure>

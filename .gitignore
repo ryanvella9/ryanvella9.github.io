@@ -18,3 +18,8 @@ package-lock.json
 
 # Ignore folders related to IDEs
 .vscode/
+
+# Camera originals. Only the web-encoded derivatives belong in the repo —
+# the raw files are 10x the size and the history here is already large.
+images/img_*.mp4
+images/IMG_*.mp4

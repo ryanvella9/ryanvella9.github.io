@@ -161,6 +161,54 @@
   }
 }
 
+/*
+   Cover video
+   ========================================================================== */
+
+.page__cover {
+  position: relative;
+  margin: 0 0 2em;
+  aspect-ratio: 21 / 9;
+  overflow: hidden;
+  border-radius: $border-radius;
+  background-color: var(--global-border-color);
+  background-position: center;
+  background-size: cover;
+  background-repeat: no-repeat;
+
+  /* the source is 16:9, so a 21:9 window crops ~12% off the top and bottom */
+  @include breakpoint(max-width $small) {
+    aspect-ratio: 16 / 10;
+  }
+}
+
+.page__cover-video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.page__cover-caption {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  padding: 3px 8px;
+  color: #fff;
+  font-family: $caption-font-family;
+  font-size: $type-size-7;
+  background: rgba(#000, 0.5);
+  border-radius: $border-radius 0 $border-radius 0;
+}
+
+/* Motion here is decoration, so fall back to the poster still when the
+   visitor has asked for less of it. */
+@media (prefers-reduced-motion: reduce) {
+  .page__cover-video {
+    display: none;
+  }
+}
+
 .page__hero-image {
   width: 100%;
   height: auto;

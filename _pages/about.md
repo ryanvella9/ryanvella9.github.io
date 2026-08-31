@@ -2,6 +2,9 @@
 permalink: /
 title: "About Me"
 author_profile: true
+cover:
+  video: cover-clouds.mp4
+  poster: cover-clouds-poster.jpg
 redirect_from: 
   - /about/
   - /about.html
