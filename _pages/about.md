@@ -55,13 +55,7 @@ I co-founded and managed the environmental NGO Għaqda Siġar Maltin in Malta, d
 
 </section>
 
-<section class="content-box" markdown="1">
-
-## CV
-
-<a class="btn" href="/files/rv_cv.pdf" download><i class="fa-solid fa-download" aria-hidden="true"></i> Download my CV (PDF)</a>
-
-</section>
+<p><a href="/files/rv_cv.pdf" download>Download my CV</a></p>
 
 <div style="text-align: right; font-style: italic;">
 Last updated on 30 August 2026
