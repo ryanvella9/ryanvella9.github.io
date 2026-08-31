@@ -11,14 +11,17 @@ main:
   - title: "Publications"
     url: /publications/
 
-  - title: "Malta from Space"
-    url: /malta-from-space/
+  # Hidden for now (page still builds and is reachable at /malta-from-space/):
+  # - title: "Malta from Space"
+  #   url: /malta-from-space/
 
-  - title: "Live Sensors"
-    url: /environmental-monitoring/
-
-  - title: "Forecast"
-    url: /forecast/
+  - title: "Projects"
+    url: /projects/
+    children:
+      - title: "Malta Live Sensors"
+        url: /environmental-monitoring/
+      - title: "Weather"
+        url: /forecast/
 
   - title: "Outreach"
     url: /outreach/

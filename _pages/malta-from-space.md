@@ -3,6 +3,9 @@ layout: archive
 title: "Malta from Space"
 permalink: /malta-from-space/
 author_profile: true
+# Hidden for now: kept out of the header nav, the Malta Watch cards, and both
+# sitemaps. The page still builds and is reachable at its permalink.
+sitemap: false
 ---
 
 Over the past few years, I’ve been processing satellite imagery of the Maltese Islands. This collection features true-colour images along with additional derived products from satellite data.
