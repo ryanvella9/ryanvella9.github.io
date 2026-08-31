@@ -21,15 +21,6 @@ html[data-theme="dark"] .ot {
   --ot-hover: rgba(255, 255, 255, .06);
   --ot-chip-bg: rgba(255, 255, 255, .08);
 }
-.ot-lead {
-  font-size: 1.3rem;
-  line-height: 1.62;
-  font-weight: 400;
-  letter-spacing: -.003em;
-  color: var(--global-text-color);
-  max-width: 40em;
-  margin: 0 0 2.4em;
-}
 .ot-kicker {
   display: flex;
   align-items: center;
@@ -197,17 +188,7 @@ html[data-theme="dark"] .ot {
 }
 .ot-play:hover::after { background-color: #cc0000; transform: translate(-50%, -50%) scale(1.06); }
 .ot-play:focus-visible { outline: 2px solid var(--global-link-color); outline-offset: -2px; }
-.ot-note {
-  font-size: .9rem;
-  line-height: 1.6;
-  color: var(--global-text-color-light);
-  margin: 2.6em 0 0;
-  padding-top: 1.4em;
-  border-top: 1px solid var(--global-border-color);
-}
-.ot-note a { color: var(--global-link-color); text-underline-offset: 2px; }
 @media (max-width: 680px) {
-  .ot-lead { font-size: 1.16rem; margin-bottom: 2em; }
   .ot-card { grid-template-columns: 1fr; }
   .ot-card-img { min-height: 170px; }
   .ot-card-body { padding: 18px 18px 20px; }
@@ -222,7 +203,6 @@ html[data-theme="dark"] .ot {
 </style>
 
 <div class="ot">
-<p class="ot-lead">Explaining the atmosphere outside the lab &mdash; in the Maltese press and on national television, mostly on what a warming Mediterranean means for the weather people actually live through.</p>
 <h2 class="ot-kicker">Latest</h2>
 <div class="ot-card">
 <div class="ot-card-img"><img src="https://cdn-attachments.timesofmalta.com/9e2c17a9b60b10ba9a334620c74abc8ef683f8e6-1787826572-4c5f8be7-1200x630.jpg" alt="Bathers on a crowded Maltese beach during the summer marine heatwave" loading="lazy" width="1200" height="630"></div>
@@ -245,7 +225,7 @@ html[data-theme="dark"] .ot {
 <article class="ot-item">
 <div class="ot-meta"><b>2026</b>20 January<br>TVM News</div>
 <div class="ot-main">
-<h3 class="ot-title"><a href="https://tvmnews.mt/news/nistennew-li-dawn-il-maltempati-jkunu-iktar-frekwenti-u-bsahhithom/">&ldquo;Nistennew li dawn il-maltempati jkunu iktar frekwenti u b&rsquo;saħħithom&rdquo;</a><span class="ot-badge is-tv">TV</span><span class="ot-badge is-lang">Maltese</span></h3>
+<h3 class="ot-title"><a href="https://tvmnews.mt/news/nistennew-li-dawn-il-maltempati-jkunu-iktar-frekwenti-u-bsahhithom/">&ldquo;Nistennew li dawn il-maltempati jkunu iktar frekwenti u b&rsquo;saħħithom&rdquo;</a><span class="ot-badge is-tv">TV</span><span class="ot-badge is-lang">In Maltese</span></h3>
 <p class="ot-desc">On the severity of Storm Harry, and why extreme weather in the central Mediterranean is expected to become more frequent and more intense.</p>
 <div class="ot-video" data-yt="v4Tz5YdoFoQ" data-title="TVM News: Storm Harry and extreme weather">
 <button type="button" class="ot-play" aria-label="Play the TVM News segment on Storm Harry"><img src="/images/outreach/storm-harry.jpg" alt="" loading="lazy" width="1280" height="720"></button>
@@ -262,7 +242,7 @@ html[data-theme="dark"] .ot {
 <article class="ot-item">
 <div class="ot-meta"><b>2024</b>15 August<br>TVM News</div>
 <div class="ot-main">
-<h3 class="ot-title"><a href="https://tvmnews.mt/news/l-gharajjex-jintensifikaw-fnofs-awwissu-meta-l-wicc-tal-bahar-jilhaq-it-30-grad/">&ldquo;L-għarajjex jintensifikaw f&rsquo;nofs Awwissu, meta l-wiċċ tal-baħar jilħaq it-30 grad&rdquo;</a><span class="ot-badge is-tv">TV</span><span class="ot-badge is-lang">Maltese</span></h3>
+<h3 class="ot-title"><a href="https://tvmnews.mt/news/l-gharajjex-jintensifikaw-fnofs-awwissu-meta-l-wicc-tal-bahar-jilhaq-it-30-grad/">&ldquo;L-għarajjex jintensifikaw f&rsquo;nofs Awwissu, meta l-wiċċ tal-baħar jilħaq it-30 grad&rdquo;</a><span class="ot-badge is-tv">TV</span><span class="ot-badge is-lang">In Maltese</span></h3>
 <p class="ot-desc">How Malta&rsquo;s convective summer thunderstorms &mdash; locally known as <em>għarajjex</em> &mdash; form once the sea surface climbs past 30&deg;C.</p>
 <div class="ot-video" data-yt="-i5lAr-bag4" data-title="TVM News: how summer għarajjex form">
 <button type="button" class="ot-play" aria-label="Play the TVM News segment on summer thunderstorms"><img src="/images/outreach/gharajjex.jpg" alt="" loading="lazy" width="1280" height="720"></button>
@@ -276,7 +256,6 @@ html[data-theme="dark"] .ot {
 <p class="ot-desc">Air pollution from ships is linked to some 40,000 premature deaths worldwide each year, and the industry accounts for around four per cent of anthropogenic greenhouse gas emissions.</p>
 </div>
 </article>
-<p class="ot-note">Journalists are welcome to get in touch at <a href="mailto:ryan.vella@env.ethz.ch">ryan.vella@env.ethz.ch</a> &mdash; happy to comment in English or Maltese.</p>
 </div>
 
 <script>
