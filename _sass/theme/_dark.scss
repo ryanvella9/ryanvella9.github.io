@@ -8,10 +8,18 @@ $dark-gray                  : mix(#000, $gray, 40%);
 $darker-gray                : mix(#000, $gray, 60%);
 $light-gray                 : mix(#fff, $gray, 50%);
 
-$background                 : #474747;
-$background-light           : mix(#fff, $background, 80%);
-$background-lighter         : mix(#fff, $background, 90%);
-$text                       : #ffffff;
+/* Deep slate. A flat mid grey (this was #474747) sits too close to the warm
+   photography and the teal links to read as neutral — it comes across muddy,
+   almost brown. The surfaces below are pitched much darker and pulled a touch
+   towards blue so they sit under the accent rather than fighting it. */
+$background                 : #14181c; // page
+$surface                    : #1b2026; // raised: content boxes, code, tables
+$background-deep            : #11151a; // masthead and footer
+$border                     : #2b333c;
+$border-strong              : #39434e;
+
+$text                       : #e6e9ec;
+$text-muted                 : #a8b2bd;
 $link                       : #0ea1c5;
 $link-dark                  : mix(#000, $link, 25%);
 $link-light                 : mix(#fff, $link, 25%);
@@ -35,21 +43,26 @@ $sidebar-screen-min-width   : 1024px;
 
 /* Dark theme for the site */
 html[data-theme="dark"] {
-    --global-base-color                 : #{$background};
+    /* Not the page colour: .btn and the mobile nav paint their background from
+       this, so it has to stay visible against the surfaces around it. */
+    --global-base-color                 : #{$border-strong};
     --global-bg-color                   : #{$background};
-    --global-footer-bg-color            : #{$background};
-    --global-border-color               : #{$light-gray};
-    --global-dark-border-color          : #{$background-light};
-    --global-code-background-color      : #fafafa;
-    --global-code-text-color            : #{$darker-gray};
-    --global-fig-caption-color          : #{$light-gray};
+    --global-masthead-bg-color          : #{$background-deep};
+    --global-footer-bg-color            : #{$background-deep};
+    --global-border-color               : #{$border};
+    --global-dark-border-color          : #{$border-strong};
+    /* Raised panels. This was #fafafa, which lit up every code block and table
+       cell in dark mode. */
+    --global-code-background-color      : #{$surface};
+    --global-code-text-color            : #{$text};
+    --global-fig-caption-color          : #{$text-muted};
     /* links carry no underline, so the colour must stand on its own (AA on the dark bg) */
     --global-link-color                 : #{mix(#fff, $link, 35%)};
     --global-link-color-hover           : #{mix(#fff, $link, 60%)};
     --global-link-color-visited         : #{$link-light};
     --global-masthead-link-color        : #{$text};
-    --global-masthead-link-color-hover  : #{$background-light};
+    --global-masthead-link-color-hover  : #{mix(#fff, $link, 35%)};
     --global-text-color                 : #{$text};
-    --global-text-color-light           : #{$light-gray};
-    --global-thead-color                : #{$background-lighter};
+    --global-text-color-light           : #{$text-muted};
+    --global-thead-color                : #{$border};
 }

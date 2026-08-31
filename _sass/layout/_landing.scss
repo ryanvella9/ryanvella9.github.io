@@ -19,10 +19,10 @@
   margin-top: 0;
 }
 
+/* The border and background now come through from the dark theme variables;
+   only the shadow needs deepening to register against the darker page. */
 html[data-theme="dark"] .content-box {
-  border-color: rgba(255, 255, 255, 0.18);
-  background: rgba(255, 255, 255, 0.035);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
 }
 
 @media screen and (max-width: 600px) {
