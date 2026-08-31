@@ -3,6 +3,9 @@ layout: archive
 title: "Personal Projects"
 permalink: /the-rest/
 author_profile: true
+# Hidden for now: kept out of the header nav and both sitemaps. The page still
+# builds and is reachable at its permalink.
+sitemap: false
 ---
 
 This section contains my personal projects and interests beyond academia.

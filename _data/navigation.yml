@@ -26,13 +26,16 @@ main:
   - title: "Outreach"
     url: /outreach/
 
-  - title: "CV"
-    url: /cv/
+  # CV is now a download button at the bottom of the About page. The /cv/ page
+  # itself still builds, so old links to it (and to /resume) keep working:
+  # - title: "CV"
+  #   url: /cv/
 
-  - title: "Personal Projects"
-    url: /the-rest/
-    children:
-      - title: "Nature"
-        url: /nature/
-      - title: "Malta Watch"
-        url: /malta-watch/
+  # Hidden for now (page still builds and is reachable at /the-rest/):
+  # - title: "Personal Projects"
+  #   url: /the-rest/
+  #   children:
+  #     - title: "Nature"
+  #       url: /nature/
+  #     - title: "Malta Watch"
+  #       url: /malta-watch/
