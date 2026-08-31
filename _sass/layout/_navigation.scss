@@ -337,7 +337,8 @@
     color: inherit;
 
     &:hover {
-      text-decoration: underline;
+      text-decoration: none;
+      color: var(--global-link-color-hover);
     }
   }
 

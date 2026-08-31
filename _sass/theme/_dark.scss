@@ -43,8 +43,9 @@ html[data-theme="dark"] {
     --global-code-background-color      : #fafafa;
     --global-code-text-color            : #{$darker-gray};
     --global-fig-caption-color          : #{$light-gray};
-    --global-link-color                 : #{$link};
-    --global-link-color-hover           : #{$link-dark};
+    /* links carry no underline, so the colour must stand on its own (AA on the dark bg) */
+    --global-link-color                 : #{mix(#fff, $link, 35%)};
+    --global-link-color-hover           : #{mix(#fff, $link, 60%)};
     --global-link-color-visited         : #{$link-light};
     --global-masthead-link-color        : #{$text};
     --global-masthead-link-color-hover  : #{$background-light};

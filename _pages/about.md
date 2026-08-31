@@ -46,7 +46,7 @@ Other research interests:
 
 <section class="content-box" markdown="1">
 
-## The Rest
+## Beyond Research
 
 I co-founded and managed the environmental NGO Għaqda Siġar Maltin in Malta, dedicating several years to promoting ecological sustainability. I am passionate about trees, birds, and the natural environment. I enjoy working with satellite data and also operate several personal environmental sensors in Malta. As part of my conservation work, I help to raise awareness about light pollution and advocate for the preservation of Malta’s remaining Dark Sky Heritage Areas. Beyond these projects, I enjoy biking, hiking, and capturing the beauty of nature through photography.
 
