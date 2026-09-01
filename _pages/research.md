@@ -23,6 +23,28 @@ html[data-theme="dark"] .rx {
   --rx-sep: rgba(255, 255, 255, .28);
   --rx-role: #5cc6e4;
 }
+.rx-vis { margin: 0 0 2.6em; }
+.rx-vis-frame {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #05070a center / cover no-repeat;
+}
+.rx-vis-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rx-vis-cap {
+  font-size: .8rem;
+  line-height: 1.55;
+  color: var(--global-text-color-light);
+  margin: .75em 0 0;
+  max-width: 46em;
+}
+.rx-vis-cap b { color: var(--global-text-color); font-weight: 600; }
+/* The still carries the panel whenever the clip does not play: before the
+   first frame decodes, if the file 404s, and under reduced motion. */
+@media (prefers-reduced-motion: reduce) {
+  .rx-vis-video { display: none; }
+}
 .rx-lead {
   font-size: 1.3rem;
   line-height: 1.62;
@@ -135,6 +157,14 @@ html[data-theme="dark"] .rx {
   color: var(--rx-role);
   margin-bottom: 4px;
 }
+.rx-when {
+  display: block;
+  font-size: .78rem;
+  font-weight: 700;
+  color: var(--global-text-color);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 3px;
+}
 .rx-title {
   font-size: 1.08rem;
   font-weight: 700;
@@ -159,11 +189,19 @@ html[data-theme="dark"] .rx {
 </style>
 
 <div class="rx">
+<figure class="rx-vis">
+<div class="rx-vis-frame" style="background-image: url('/images/icon-ham-poster.jpg');">
+<video class="rx-vis-video" autoplay muted loop playsinline preload="metadata" poster="/images/icon-ham-poster.jpg">
+<source src="/images/icon-ham.mp4" type="video/mp4">
+</video>
+</div>
+<figcaption class="rx-vis-cap"><b>Aerosols, clouds and precipitation in a global ICON-HAM simulation, 1999&ndash;2010.</b> Aerosol optical depth at 550&nbsp;nm split by species (left), total cloud cover (centre) and precipitation rate (right).</figcaption>
+</figure>
 <p class="rx-lead">My research sits at the intersection of atmospheric physics &amp; chemistry, climate science, and Earth-system modelling &mdash; with a particular interest in the processes that shape cloud formation and the role they play in the climate system.</p>
 <h2 class="rx-kicker">Currently</h2>
 <div class="rx-now">
 <div class="rx-now-head">
-<span class="rx-now-meta">ETH Z&uuml;rich &middot; Postdoctoral researcher</span>
+<span class="rx-now-meta">ETH Z&uuml;rich &middot; Postdoctoral researcher &middot; since April 2025</span>
 <span class="rx-badge is-active"><span class="rx-dot" aria-hidden="true"></span>Active</span>
 </div>
 <h3 class="rx-now-title">Ice-Nucleating Particles in Mixed-Phase Clouds</h3>
@@ -172,14 +210,21 @@ html[data-theme="dark"] .rx {
 <h2 class="rx-kicker rx-kicker-prev">Previously</h2>
 <div class="rx-list">
 <div class="rx-item">
-<div class="rx-meta"><span class="rx-role">PhD</span>Max Planck Institute for Chemistry &amp; JGU Mainz</div>
+<div class="rx-meta"><span class="rx-role">Postdoc</span><span class="rx-when">2024 &ndash; 2025</span>Max Planck Institute for Chemistry</div>
+<div class="rx-main">
+<h3 class="rx-title">Circulation Change in the Earth System</h3>
+<p class="rx-desc">Earth-system modelling of how large-scale circulation change propagates through the atmosphere &mdash; including the aerosol, cloud and air-quality response to a weakening Atlantic overturning circulation.</p>
+</div>
+</div>
+<div class="rx-item">
+<div class="rx-meta"><span class="rx-role">PhD</span><span class="rx-when">2020 &ndash; 2024</span>Max Planck Institute for Chemistry &amp; JGU Mainz</div>
 <div class="rx-main">
 <h3 class="rx-title">Vegetation&ndash;Climate Interactions</h3>
 <p class="rx-desc">Examining the role of biogenic volatile organic compound (BVOC) emissions in the Earth system, and how vegetation shapes atmospheric chemistry and climate through the compounds it releases.</p>
 </div>
 </div>
 <div class="rx-item">
-<div class="rx-meta"><span class="rx-role">Fellowship</span>European Space Agency &middot; Frascati, Italy</div>
+<div class="rx-meta"><span class="rx-role">Fellowship</span><span class="rx-when">2019 &ndash; 2020</span>European Space Agency &middot; Frascati, Italy</div>
 <div class="rx-main">
 <h3 class="rx-title">Earth Observation</h3>
 <p class="rx-desc">Developing remote-sensing applications for atmospheric and climate research during a fellowship at the European Space Agency.</p>
