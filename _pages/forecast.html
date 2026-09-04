@@ -757,11 +757,15 @@ title: "Weather"
         <b>Data.</b> DWD ICON-EU 0.0625°, native over Malta and subsampled to
         0.25° over the Central Mediterranean; ItaliaMeteo-Arpae ICON-2I
         0.025 × 0.02° (CC BY 4.0), hourly to +72 h, Malta only — its domain
-        stops at 33.7 °N; ECMWF IFS 0.25° open data (CC BY 4.0), 6-hourly, on
-        every frame — the three Europe charts, out to +144 h, and the
+        stops at 33.7 °N; ECMWF IFS 0.25° open data (CC BY 4.0) on
+        every frame — the three Europe charts, 6-hourly to +144 h and
+        12-hourly to +360 h beyond it, and the
         surface fields over the other two, held to ICON-EU's +120 h so that
         switching model on a frame lands on the same day rather than dragging
-        the timeline back a day. IFS is offered there as a second opinion
+        the timeline back a day. The full fifteen days are only published on
+        the 00 and 12 UTC runs, so the Europe charts prefer those; on a
+        morning when ECMWF is late they fall back to the newest run and stop
+        at +144 h, and the next cycle repairs it. IFS is offered there as a second opinion
         rather than a better one: at 0.25° it is the coarsest of the three, and
         over Malta it is a dozen grid points, but it is run independently of
         ICON, so where the two disagree is a reading of how settled the
@@ -874,8 +878,10 @@ const DATA_BASE = 'https://ryanvella9.github.io/malta-forecast-charts';
    — grid, time axis, initialisation, accumulation interval — hangs off here
    rather than off the page, because the three models agree on none of it:
    ICON-EU is 3-hourly to +120 on a 0.0625 deg grid, ICON-2I is hourly to +72 on
-   0.02 deg, IFS is 6-hourly to +144 on 0.25 deg, and they initialise at
-   different hours. */
+   0.02 deg, IFS is 6-hourly to +144 and then 12-hourly to +360 on 0.25 deg, and
+   they initialise at different hours. Note that the IFS axis is not evenly
+   spaced even within its own forecast — see syncDesc and indexAtHour, both of
+   which count steps rather than assume an interval. */
 const DOMAIN_META = {};
 for (const [k, d] of Object.entries(PANEL.domains)) {
   DOMAIN_META[k] = { label: d.label, extent: d.extent };
@@ -3731,10 +3737,27 @@ function syncDesc() {
      interval, and it does now — the synoptic panels carry a week of past at
      half the resolution, so the old reading described a 6-hourly chart as
      12-hourly. The past is stated separately rather than folded in, because one
-     number cannot honestly describe two cadences. */
+     number cannot honestly describe two cadences.
+
+     Nor can one number describe the forecast any more. The synoptic panels run
+     6-hourly through +144 h and 12-hourly out to +360, because day 7 to day 15
+     is read for whether the pattern holds rather than for the hour a front
+     crosses. Calling that "6-hourly to +360 h" would promise the second half a
+     resolution it does not have, so the run lengths are walked and every change
+     of interval is named. Panels with one cadence are unaffected: a single run
+     reads exactly as it did before. */
   const st = SRC.steps;
   const f0 = st.findIndex((h) => h >= 0);
-  const gap = f0 >= 0 && f0 + 1 < st.length ? st[f0 + 1] - st[f0] : 1;
+  const fc = f0 >= 0 ? st.slice(f0) : [];
+  const runs = [];
+  for (let i = 1; i < fc.length; i++) {
+    const d = fc[i] - fc[i - 1];
+    if (runs.length && runs[runs.length - 1].gap === d) runs[runs.length - 1].to = fc[i];
+    else runs.push({ gap: d, to: fc[i] });
+  }
+  const gapText = runs.length
+    ? runs.map((r, i) => `${i ? 'then ' : ''}${r.gap}-hourly to +${r.to} h`).join(', ')
+    : `to +${st[st.length - 1]} h`;
   const backH = f0 > 0 ? -st[0] : 0;
   const pastGap = f0 > 1 ? st[1] - st[0] : 0;
   const pastText = !backH ? ''
@@ -3766,7 +3789,7 @@ function syncDesc() {
       + `${ovl.label}.`
     : '';
   $('desc').textContent = `${lead} ${MODELS[state.model].label} at ~${km} km, ` +
-    `${gap}-hourly to +${st[st.length - 1]} h, interpolated between steps.${pastText}${sat} ` +
+    `${gapText}, interpolated between steps.${pastText}${sat} ` +
     'Hover for exact values.';
   $('desc').title = $('desc').textContent;
 }
