@@ -11,51 +11,51 @@ title: "Malta Live Sensors"
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Malta Live Sensors · Ryan Vella</title>
+<script>
+/* Runs before first paint so a reader who has chosen light does not get a dark
+   flash on every load. Dark needs nothing done to it — it is the :root default,
+   and initTheme() re-applies the same decision once the page script runs. */
+try {
+  if (localStorage.getItem("envdash-theme") === "light")
+    document.documentElement.setAttribute("data-theme", "light");
+} catch (e) {}
+</script>
 <style>
-/* ============================================================ theme ==== */
+/* ============================================================ theme ====
+   Dark is the default, not the OS preference: :root carries the dark values
+   and light is the opt-in override, so the dashboard opens dark for everyone
+   and matches the rest of the site rather than whatever the machine is set to.
+   The toggle still swings both ways and is still remembered — it just starts
+   from dark. */
 :root{
-  --bg:#f4f5f7; --surface:#ffffff; --hairline:#e3e5ea;
-  --ink:#1c1f26; --ink-2:#5a6170; --ink-3:#8a91a0;
-  --shadow:0 1px 2px rgba(16,20,30,.05), 0 6px 20px rgba(16,20,30,.06);
-  --grid:#eceef2; --axis:#c6cad4;
-  --c-temp:#e8743b; --c-cold:#3b82c4; --c-rh:#3b82c4; --c-wind:#2f9e6e;
-  --c-rain:#005b96; --c-pm25:#3b6fd4; --c-pm10:#d1443f; --c-cloud:#4c4fbe;
-  /* Gold=clear, pale blue-grey=patchy/cirrus, slate=overcast. Yellow marked the
-     middle category before, which read as "sunny" and inverted the whole scale
-     at a glance. */
-  --band-clear:#f5b301; --band-mid:#b7cbda; --band-over:#8a9198;
-  --good:#2f9e6e; --moderate:#d9a520; --poor:#d1443f;
-  --pill:#eef0f4; --nsb-dark:#3a4a7a; --nsb-bright:#c9922e;
-  --sun:#e8a33b; --moon:#7f8aa8;
-}
-@media (prefers-color-scheme:dark){
-  :root:not([data-theme="light"]){
-    --bg:#0f1216; --surface:#171b21; --hairline:#262c35;
-    --ink:#e8eaee; --ink-2:#a2aab8; --ink-3:#6f7889;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.28);
-    --grid:#222831; --axis:#3a424e;
-    --c-temp:#f08a4b; --c-cold:#5b9fe0; --c-rh:#5b9fe0; --c-wind:#48b98a;
-    --c-rain:#3d8fd0; --c-pm25:#6b95e8; --c-pm10:#e56b66; --c-cloud:#7d7fe0;
-    --band-clear:#d9a017; --band-mid:#7d94a6; --band-over:#5d646f;
-    --good:#48b98a; --moderate:#e0b53c; --poor:#e56b66;
-    --pill:#222831; --nsb-dark:#5b6ea8; --nsb-bright:#d9a94a;
-    --sun:#f0b64b; --moon:#9aa6c4;
-  }
-}
-:root[data-theme="dark"]{
   --bg:#0f1216; --surface:#171b21; --hairline:#262c35;
   --ink:#e8eaee; --ink-2:#a2aab8; --ink-3:#6f7889;
   --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.28);
   --grid:#222831; --axis:#3a424e;
   --c-temp:#f08a4b; --c-cold:#5b9fe0; --c-rh:#5b9fe0; --c-wind:#48b98a;
   --c-rain:#3d8fd0; --c-pm25:#6b95e8; --c-pm10:#e56b66; --c-cloud:#7d7fe0;
+  /* Gold=clear, pale blue-grey=patchy/cirrus, slate=overcast. Yellow marked the
+     middle category before, which read as "sunny" and inverted the whole scale
+     at a glance. */
   --band-clear:#d9a017; --band-mid:#7d94a6; --band-over:#5d646f;
   --good:#48b98a; --moderate:#e0b53c; --poor:#e56b66;
   --pill:#222831; --nsb-dark:#5b6ea8; --nsb-bright:#d9a94a;
   --sun:#f0b64b; --moon:#9aa6c4;
 }
+:root[data-theme="light"]{
+  --bg:#f4f5f7; --surface:#ffffff; --hairline:#e3e5ea;
+  --ink:#1c1f26; --ink-2:#5a6170; --ink-3:#8a91a0;
+  --shadow:0 1px 2px rgba(16,20,30,.05), 0 6px 20px rgba(16,20,30,.06);
+  --grid:#eceef2; --axis:#c6cad4;
+  --c-temp:#e8743b; --c-cold:#3b82c4; --c-rh:#3b82c4; --c-wind:#2f9e6e;
+  --c-rain:#005b96; --c-pm25:#3b6fd4; --c-pm10:#d1443f; --c-cloud:#4c4fbe;
+  --band-clear:#f5b301; --band-mid:#b7cbda; --band-over:#8a9198;
+  --good:#2f9e6e; --moderate:#d9a520; --poor:#d1443f;
+  --pill:#eef0f4; --nsb-dark:#3a4a7a; --nsb-bright:#c9922e;
+  --sun:#e8a33b; --moon:#7f8aa8;
+}
+:root{ color-scheme:dark; }
 :root[data-theme="light"]{ color-scheme:light; }
-:root[data-theme="dark"]{ color-scheme:dark; }
 
 /* ============================================================= base ==== */
 *{box-sizing:border-box}
@@ -1284,9 +1284,10 @@ function setNote(){
 /* -------------------------------------------------------------- theme */
 function applyTheme(mode){
   const root = document.documentElement;
-  if (mode) root.setAttribute("data-theme", mode); else root.removeAttribute("data-theme");
-  const dark = getComputedStyle(root).getPropertyValue("--bg").trim().startsWith("#0")
-    || (root.getAttribute("data-theme") === "dark");
+  /* Dark is the :root default, so only light needs an attribute to select it. */
+  if (mode === "light") root.setAttribute("data-theme", "light");
+  else root.removeAttribute("data-theme");
+  const dark = mode !== "light";
   $("#theme").innerHTML = themeIcon(dark);
   /* colours come from CSS variables at draw time, so a redraw re-themes */
   drawAll();
@@ -1295,18 +1296,16 @@ function applyTheme(mode){
 function initTheme(){
   let saved = null;
   try { saved = localStorage.getItem("envdash-theme"); } catch (e) {}
-  applyTheme(saved);
+  /* Anything but an explicit "light" — including nothing saved at all — opens
+     dark. The OS preference is deliberately not consulted, so the page matches
+     the rest of the site instead of the machine. The head sets the same
+     attribute before first paint; this only has to agree with it. */
+  applyTheme(saved === "light" ? "light" : "dark");
   $("#theme").addEventListener("click", () => {
-    const root = document.documentElement;
-    const nowDark = root.getAttribute("data-theme")
-      ? root.getAttribute("data-theme") === "dark"
-      : matchMedia("(prefers-color-scheme: dark)").matches;
-    const next = nowDark ? "light" : "dark";
+    const next = document.documentElement.getAttribute("data-theme") === "light"
+      ? "dark" : "light";
     try { localStorage.setItem("envdash-theme", next); } catch (e) {}
     applyTheme(next);
-  });
-  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
-    if (!document.documentElement.getAttribute("data-theme")) applyTheme(null);
   });
 }
 

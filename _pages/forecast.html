@@ -16,82 +16,59 @@ title: "Weather"
 <title>Malta forecast</title>
 <style>
   /* Design tokens for the whole viewer. Kept here rather than in a stylesheet
-     so the page stays a single self-contained file. */
+     so the page stays a single self-contained file.
+
+     Dark is the default, not the OS preference: :root carries the dark values
+     and light is the opt-in override, so the page opens dark for everyone and
+     matches the rest of the site rather than whatever the machine happens to be
+     set to. The toggle still swings both ways — it just starts from dark. */
   :root {
-    --bg: #f4f6f8;
-    --panel: #ffffff;
-    --border: #cfd8dc;
-    --text: #102027;
-    --muted: #546e7a;
-    --faint: #8b9ba5;
-    --accent: #0d47a1;
-    --accent-soft: #e3ecf7;
-    --shadow: 0 1px 2px rgba(16, 32, 39, .06), 0 6px 20px rgba(16, 32, 39, .06);
-    --veil: rgba(255, 255, 255, .92);
+    --bg: #0f1216;
+    --panel: #171b21;
+    --border: #262c35;
+    --text: #e8eaee;
+    --muted: #a2aab8;
+    --faint: #78818f;
+    --accent: #6fb1f0;
+    --accent-soft: #1b2b3d;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .28);
+    --veil: rgba(23, 27, 33, .92);
     /* Cartography. Drawn over a saturated data layer, so these are deliberately
        near-black rather than themed ink — a light coastline disappears into a
        yellow 30 degC field. */
-    --coast: rgba(20, 26, 31, .85);
-    --border-line: rgba(20, 26, 31, .38);
-    --label: #10171c;
-    --label-halo: rgba(255, 255, 255, .85);
-    --sea: #dfe8ee;
-    --land: #f2efe6;
+    --coast: rgba(8, 11, 14, .9);
+    --border-line: rgba(8, 11, 14, .45);
+    --label: #f2f5f8;
+    --label-halo: rgba(10, 14, 18, .8);
+    --sea: #10161c;
+    --land: #1e242b;
     /* Grey wash over land on the upper-air panel, and the graticule. Both sit
        on top of shading, so they are set as alpha over whatever is beneath
        rather than as opaque colours. */
-    --land-mask: rgba(146, 152, 160, .34);
-    --grat: rgba(20, 26, 31, .20);
-    --grat-ink: rgba(20, 26, 31, .62);
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --bg: #0f1216;
-      --panel: #171b21;
-      --border: #262c35;
-      --text: #e8eaee;
-      --muted: #a2aab8;
-      --faint: #78818f;
-      --accent: #6fb1f0;
-      --accent-soft: #1b2b3d;
-      --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .28);
-      --veil: rgba(23, 27, 33, .92);
-      --coast: rgba(8, 11, 14, .9);
-      --border-line: rgba(8, 11, 14, .45);
-      --label: #f2f5f8;
-      --label-halo: rgba(10, 14, 18, .8);
-      --sea: #10161c;
-      --land: #1e242b;
-      --land-mask: rgba(126, 134, 145, .26);
-      --grat: rgba(226, 232, 238, .18);
-      --grat-ink: rgba(226, 232, 238, .60);
-    }
-  }
-
-  :root[data-theme="dark"] {
-    --bg: #0f1216; --panel: #171b21; --border: #262c35; --text: #e8eaee;
-    --muted: #a2aab8; --faint: #78818f; --accent: #6fb1f0; --accent-soft: #1b2b3d;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.28);
-    --veil: rgba(23, 27, 33, .92);
-    --coast: rgba(8, 11, 14, .9); --border-line: rgba(8, 11, 14, .45);
-    --label: #f2f5f8; --label-halo: rgba(10, 14, 18, .8);
-    --sea: #10161c; --land: #1e242b;
     --land-mask: rgba(126, 134, 145, .26);
-    --grat: rgba(226, 232, 238, .18); --grat-ink: rgba(226, 232, 238, .60);
+    --grat: rgba(226, 232, 238, .18);
+    --grat-ink: rgba(226, 232, 238, .60);
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f4f6f8; --panel: #ffffff; --border: #cfd8dc; --text: #102027;
+    --muted: #546e7a; --faint: #8b9ba5; --accent: #0d47a1; --accent-soft: #e3ecf7;
+    --shadow: 0 1px 2px rgba(16, 32, 39, .06), 0 6px 20px rgba(16, 32, 39, .06);
+    --veil: rgba(255, 255, 255, .92);
+    --coast: rgba(20, 26, 31, .85); --border-line: rgba(20, 26, 31, .38);
+    --label: #10171c; --label-halo: rgba(255, 255, 255, .85);
+    --sea: #dfe8ee; --land: #f2efe6;
+    --land-mask: rgba(146, 152, 160, .34);
+    --grat: rgba(20, 26, 31, .20); --grat-ink: rgba(20, 26, 31, .62);
   }
   /* The NDVI chart's ink, and the one token that has to be picked twice rather
      than derived. The map above it is a photograph's worth of fixed colour that
      does not follow the theme — it cannot, the ramp means something — so the
      line underneath has to carry the same green into two very different
      backgrounds on its own: dark enough to hold 4.6:1 on white, light enough
-     for 6.5:1 on the dark panel. All four cases in one block, because the three
-     token blocks above are already three places to forget. */
-  :root { --c-ndvi: #3d7a33; }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --c-ndvi: #8fc96f; }
-  }
-  :root[data-theme="dark"] { --c-ndvi: #8fc96f; }
+     for 6.5:1 on the dark panel. Both cases in one block, because the token
+     blocks above are already two places to forget. */
+  :root { --c-ndvi: #8fc96f; }
   :root[data-theme="light"] { --c-ndvi: #3d7a33; }
 
   /* --grid was only ever a fallback inside drawMeteogram — the token itself was
@@ -100,15 +77,11 @@ title: "Weather"
      they were behind. The light value here is the old fallback exactly, so
      nothing changes in the light theme; the dark one is a shade off the panel,
      which is what a grid is for. */
-  :root { --grid: #eceef2; }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) { --grid: #262c35; }
-  }
-  :root[data-theme="dark"] { --grid: #262c35; }
+  :root { --grid: #262c35; }
   :root[data-theme="light"] { --grid: #eceef2; }
 
+  :root { color-scheme: dark; }
   :root[data-theme="light"] { color-scheme: light; }
-  :root[data-theme="dark"] { color-scheme: dark; }
 
   * { box-sizing: border-box; }
 
@@ -7415,9 +7388,10 @@ const SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-w
 const MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>';
 
 function isDark() {
-  const t = document.documentElement.dataset.theme;
-  if (t) return t === 'dark';
-  return matchMedia('(prefers-color-scheme: dark)').matches;
+  // Dark is the page default rather than the OS preference, so the only thing
+  // that makes this false is an explicit toggle to light. Keep this in step
+  // with the token blocks at the top, which are keyed the same way.
+  return document.documentElement.dataset.theme !== 'light';
 }
 function paintTheme() {
   $('theme').innerHTML = isDark() ? SUN : MOON;
