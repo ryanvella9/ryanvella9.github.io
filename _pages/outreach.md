@@ -59,8 +59,7 @@ html[data-theme="dark"] .ot {
 .ot-badge.is-quote { color: var(--ot-quote); background: var(--ot-quote-bg); }
 .ot-badge.is-tv { color: var(--ot-tv); background: var(--ot-tv-bg); }
 .ot-badge.is-talk { color: var(--ot-talk); background: var(--ot-talk-bg); }
-.ot-badge.is-lang,
-.ot-badge.is-event { color: var(--global-text-color-light); background: var(--ot-chip-bg); }
+.ot-badge.is-lang { color: var(--global-text-color-light); background: var(--ot-chip-bg); }
 .ot-card {
   display: grid;
   grid-template-columns: minmax(0, .92fr) minmax(0, 1.18fr);
@@ -218,7 +217,7 @@ html[data-theme="dark"] .ot {
 </div>
 </div>
 <p class="ot-pair"><span aria-hidden="true">&#8627;</span><span>Written as a follow-up to <b>&ldquo;Why major autumn storms could be on the horizon&rdquo;</b> (21 August), in which I was <a href="https://timesofmalta.com/article/malta-unusually-warm-seas-fuel-stronger-autumn-storms-experts-say.1133005">interviewed by Matthew Bonanno</a> on the marine heatwave running about 3&deg;C above normal.</span></p>
-<h2 class="ot-kicker ot-kicker-arc">Archive</h2>
+<h2 class="ot-kicker ot-kicker-arc">Press</h2>
 <article class="ot-item">
 <div class="ot-meta"><b>2026</b>21 August<br>Times of Malta</div>
 <div class="ot-main">
@@ -260,33 +259,33 @@ html[data-theme="dark"] .ot {
 <p class="ot-desc">Air pollution from ships is linked to some 40,000 premature deaths worldwide each year, and the industry accounts for around four per cent of anthropogenic greenhouse gas emissions.</p>
 </div>
 </article>
-<h2 class="ot-kicker ot-kicker-arc">Talks &amp; festivals</h2>
+<h2 class="ot-kicker ot-kicker-arc">Public engagement</h2>
 <article class="ot-item">
 <div class="ot-meta"><b>2026</b>August<br>Zurich</div>
 <div class="ot-main">
-<h3 class="ot-title"><a href="https://www.scientifica.ch/">Scientifica</a><span class="ot-badge is-event">Festival</span></h3>
-<p class="ot-desc">The public science festival of ETH Zurich and the University of Zurich, held across the city over nine days.</p>
+<h3 class="ot-title"><a href="https://www.scientifica.ch/">Scientifica</a><span class="ot-badge is-talk">Exhibit</span></h3>
+<p class="ot-desc">Ran a stand at the public science festival of ETH Zurich and the University of Zurich, held across the city over nine days.</p>
 </div>
 </article>
 <article class="ot-item">
 <div class="ot-meta"><b>2019</b>September<br>Valletta</div>
 <div class="ot-main">
-<h3 class="ot-title"><a href="https://www.scienceinthecity.org.mt/">Science in the City</a><span class="ot-badge is-event">Festival</span></h3>
-<p class="ot-desc">Malta&rsquo;s national science and arts festival, which takes over the streets of Valletta each autumn.</p>
+<h3 class="ot-title"><a href="https://www.scienceinthecity.org.mt/">Science in the City</a><span class="ot-badge is-talk">Exhibit</span></h3>
+<p class="ot-desc">Ran a stand at Malta&rsquo;s national science and arts festival, which fills the streets of Valletta each autumn.</p>
 </div>
 </article>
 <article class="ot-item">
 <div class="ot-meta"><b>2019</b>June<br>Malta</div>
 <div class="ot-main">
-<h3 class="ot-title">Light pollution in Malta<span class="ot-badge is-talk">Invited talk</span></h3>
-<p class="ot-desc">Public talk given at the invitation of <a href="https://www.maltastro.org/">The Astronomical Society of Malta</a>.</p>
+<h3 class="ot-title">Light pollution in Malta<span class="ot-badge is-talk">Public talk</span></h3>
+<p class="ot-desc">Given at the invitation of <a href="https://www.maltastro.org/">The Astronomical Society of Malta</a>.</p>
 </div>
 </article>
 <article class="ot-item">
 <div class="ot-meta"><b>2016</b>September<br>Valletta</div>
 <div class="ot-main">
-<h3 class="ot-title"><a href="https://www.scienceinthecity.org.mt/">Science in the City</a><span class="ot-badge is-event">Festival</span></h3>
-<p class="ot-desc">Malta&rsquo;s national science and arts festival, which takes over the streets of Valletta each autumn.</p>
+<h3 class="ot-title"><a href="https://www.scienceinthecity.org.mt/">Science in the City</a><span class="ot-badge is-talk">Exhibit</span></h3>
+<p class="ot-desc">Ran a stand at Malta&rsquo;s national science and arts festival, which fills the streets of Valletta each autumn.</p>
 </div>
 </article>
 </div>
