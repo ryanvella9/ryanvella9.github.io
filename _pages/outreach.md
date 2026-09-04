@@ -11,6 +11,7 @@ author_profile: true
   --ot-write: #2e7d5b;   --ot-write-bg: #e4f1ea;
   --ot-quote: #2a7793;   --ot-quote-bg: #e0eef4;
   --ot-tv: #a4671a;      --ot-tv-bg: #f6ecdb;
+  --ot-talk: #6b5aa6;    --ot-talk-bg: #ece9f5;
   --ot-hover: #f2f5f6;
   --ot-chip-bg: #eceff1;
 }
@@ -18,6 +19,7 @@ html[data-theme="dark"] .ot {
   --ot-write: #6fce9f;   --ot-write-bg: rgba(111, 206, 159, .15);
   --ot-quote: #5cc6e4;   --ot-quote-bg: rgba(92, 198, 228, .15);
   --ot-tv: #e0a765;      --ot-tv-bg: rgba(224, 167, 101, .16);
+  --ot-talk: #b3a6e8;    --ot-talk-bg: rgba(179, 166, 232, .16);
   --ot-hover: rgba(255, 255, 255, .06);
   --ot-chip-bg: rgba(255, 255, 255, .08);
 }
@@ -56,7 +58,9 @@ html[data-theme="dark"] .ot {
 .ot-badge.is-write { color: var(--ot-write); background: var(--ot-write-bg); }
 .ot-badge.is-quote { color: var(--ot-quote); background: var(--ot-quote-bg); }
 .ot-badge.is-tv { color: var(--ot-tv); background: var(--ot-tv-bg); }
-.ot-badge.is-lang { color: var(--global-text-color-light); background: var(--ot-chip-bg); }
+.ot-badge.is-talk { color: var(--ot-talk); background: var(--ot-talk-bg); }
+.ot-badge.is-lang,
+.ot-badge.is-event { color: var(--global-text-color-light); background: var(--ot-chip-bg); }
 .ot-card {
   display: grid;
   grid-template-columns: minmax(0, .92fr) minmax(0, 1.18fr);
@@ -254,6 +258,35 @@ html[data-theme="dark"] .ot {
 <div class="ot-main">
 <h3 class="ot-title"><a href="https://timesofmalta.com/article/shipping-industrys-heavy-toll-on-the-environment.834511">Shipping industry&rsquo;s heavy toll on the environment</a><span class="ot-badge is-write">Op-ed</span></h3>
 <p class="ot-desc">Air pollution from ships is linked to some 40,000 premature deaths worldwide each year, and the industry accounts for around four per cent of anthropogenic greenhouse gas emissions.</p>
+</div>
+</article>
+<h2 class="ot-kicker ot-kicker-arc">Talks &amp; festivals</h2>
+<article class="ot-item">
+<div class="ot-meta"><b>2026</b>August<br>Zurich</div>
+<div class="ot-main">
+<h3 class="ot-title"><a href="https://www.scientifica.ch/">Scientifica</a><span class="ot-badge is-event">Festival</span></h3>
+<p class="ot-desc">The public science festival of ETH Zurich and the University of Zurich, held across the city over nine days.</p>
+</div>
+</article>
+<article class="ot-item">
+<div class="ot-meta"><b>2019</b>September<br>Valletta</div>
+<div class="ot-main">
+<h3 class="ot-title"><a href="https://www.scienceinthecity.org.mt/">Science in the City</a><span class="ot-badge is-event">Festival</span></h3>
+<p class="ot-desc">Malta&rsquo;s national science and arts festival, which takes over the streets of Valletta each autumn.</p>
+</div>
+</article>
+<article class="ot-item">
+<div class="ot-meta"><b>2019</b>June<br>Malta</div>
+<div class="ot-main">
+<h3 class="ot-title">Light pollution in Malta<span class="ot-badge is-talk">Invited talk</span></h3>
+<p class="ot-desc">Public talk given at the invitation of <a href="https://www.maltastro.org/">The Astronomical Society of Malta</a>.</p>
+</div>
+</article>
+<article class="ot-item">
+<div class="ot-meta"><b>2016</b>September<br>Valletta</div>
+<div class="ot-main">
+<h3 class="ot-title"><a href="https://www.scienceinthecity.org.mt/">Science in the City</a><span class="ot-badge is-event">Festival</span></h3>
+<p class="ot-desc">Malta&rsquo;s national science and arts festival, which takes over the streets of Valletta each autumn.</p>
 </div>
 </article>
 </div>
