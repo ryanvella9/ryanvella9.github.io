@@ -2,25 +2,18 @@
    Various functions that we want to use within the template
    ========================================================================== */
 
-// Determine the expected state of the theme toggle, which can be "dark", "light", or
-// "system". Default is "system".
+// Determine the expected state of the theme toggle, which can be "dark" or "light".
+// Dark is the site default (site_theme in _config.yml), so anything unrecognised —
+// including no stored preference at all — means dark. The OS preference is
+// deliberately not consulted: the site has a look, and it is the dark one.
 let determineThemeSetting = () => {
   let themeSetting = localStorage.getItem("theme");
-  return (themeSetting != "dark" && themeSetting != "light" && themeSetting != "system") ? "system" : themeSetting;
+  return themeSetting === "light" ? "light" : "dark";
 };
 
-// Determine the computed theme, which can be "dark" or "light". If the theme setting is
-// "system", the computed theme is determined based on the user's system preference.
-let determineComputedTheme = () => {
-  let themeSetting = determineThemeSetting();
-  if (themeSetting != "system") {
-    return themeSetting;
-  }
-  return (userPref && userPref("(prefers-color-scheme: dark)").matches) ? "dark" : "light";
-};
-
-// detect OS/browser preference
-const browserPref = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+// Determine the computed theme, which can be "dark" or "light". With the OS
+// preference out of the picture this is just the stored setting.
+let determineComputedTheme = () => determineThemeSetting();
 
 // Set the theme on page load or when explicitly called
 let setTheme = (theme) => {
@@ -28,7 +21,7 @@ let setTheme = (theme) => {
     theme ||
     localStorage.getItem("theme") ||
     $("html").attr("data-theme") ||
-    browserPref;
+    "dark";
 
   if (use_theme === "dark") {
     $("html").attr("data-theme", "dark");
@@ -90,14 +83,10 @@ $(document).ready(function () {
   const scssLarge = 925;          // pixels, from /_sass/_themes.scss
   const scssMastheadHeight = 70;  // pixels, from the current theme (e.g., /_sass/theme/_default.scss)
 
-  // If the user hasn't chosen a theme, follow the OS preference
+  // Re-apply the decision the head script already made before first paint.
+  // No OS-preference listener: flipping the machine to light mid-session used to
+  // drag an unset visitor out of the site default.
   setTheme();
-  window.matchMedia('(prefers-color-scheme: dark)')
-        .addEventListener("change", (e) => {
-          if (!localStorage.getItem("theme")) {
-            setTheme(e.matches ? "dark" : "light");
-          }
-        });
 
   // Enable the theme toggle
   $('#theme-toggle').on('click', toggleTheme);

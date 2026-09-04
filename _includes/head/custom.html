@@ -2,6 +2,17 @@
 
 <!-- start custom head snippets -->
 
+<!-- Dark is the site default (site_theme in _config.yml puts data-theme="dark"
+     straight on <html>). This runs before first paint so a reader who has
+     toggled to light does not get a dark flash on every load; setTheme() then
+     reaches the same conclusion once main.min.js runs. -->
+<script>
+try {
+  if (localStorage.getItem("theme") === "light")
+    document.documentElement.removeAttribute("data-theme");
+} catch (e) {}
+</script>
+
 <!-- Support for Academicons -->
 <link rel="stylesheet" href="{{ base_path }}/assets/css/academicons.css"/>
 
@@ -12,6 +23,6 @@
 <link rel="icon" type="image/png" href="{{ base_path }}/images/favicon-192x192.png" sizes="192x192"/>
 <link rel="manifest" href="{{ base_path }}/images/manifest.json"/>
 <link rel="icon" href="/images/favicon.ico"/>
-<meta name="theme-color" content="#ffffff"/>
+<meta name="theme-color" content="#14181c"/>
 
 <!-- end custom head snippets -->
