@@ -61,6 +61,32 @@ title: "Weather"
     --land-mask: rgba(146, 152, 160, .34);
     --grat: rgba(20, 26, 31, .20); --grat-ink: rgba(20, 26, 31, .62);
   }
+
+  /* Paper: the cartography set for a panel whose data layer leaves most of the
+     frame bare, whatever theme the page is in. IVT shades only the plumes —
+     nothing under 250 kg/m/s gets a colour — so unlike the 500 hPa anomaly,
+     which covers every pixel and never lets a base show, here the base *is*
+     most of the picture. Drawn in the dark theme it came out a near-black
+     rectangle with a yellow smear across it rather than the chart it is in the
+     light one.
+
+     These are the light block's values, deliberately duplicated rather than
+     derived: the map reads them off #paper-probe below instead of off <html>,
+     so one panel can be drawn on paper without the page changing theme
+     underneath the rest of the UI. Only the map tokens are here — the page
+     chrome around it stays dark. */
+  .paper {
+    --coast: rgba(20, 26, 31, .85); --border-line: rgba(20, 26, 31, .38);
+    --label: #10171c; --label-halo: rgba(255, 255, 255, .85);
+    --sea: #dfe8ee; --land: #f2efe6;
+    --land-mask: rgba(146, 152, 160, .34);
+    --grat: rgba(20, 26, 31, .20); --grat-ink: rgba(20, 26, 31, .62);
+  }
+  /* Rendered, so getComputedStyle resolves it, but of no size and never shown. */
+  #paper-probe {
+    position: fixed; top: 0; left: 0; width: 0; height: 0;
+    visibility: hidden; pointer-events: none;
+  }
   /* The NDVI chart's ink, and the one token that has to be picked twice rather
      than derived. The map above it is a photograph's worth of fixed colour that
      does not follow the theme — it cannot, the ramp means something — so the
@@ -440,9 +466,9 @@ title: "Weather"
     <nav class="tabs" id="tabs">
       <button data-view="map" data-domain="malta" aria-pressed="true">Surface panels</button>
       <button data-view="mgram" aria-pressed="false">Meteogram</button>
-      <!-- One tab for the three Europe charts. They were three, which put half
+      <!-- One tab for the four Europe charts. They were three tabs, which put half
            the tab bar on one frame and read as three unrelated pages; they are
-           one frame at three levels, and a reader who wants the synoptic
+           one frame at four levels, and a reader who wants the synoptic
            picture wants to leaf through all three rather than pick one from a
            menu. Which of them is showing is chosen inside the view, by the
            Chart row and by up/down. -->
@@ -578,6 +604,9 @@ title: "Weather"
     </div>
 
     <div class="stage" id="stage">
+      <!-- Carries the paper token set so mapCss() has a second element to
+           resolve against. Nothing is drawn in it; it exists to be measured. -->
+      <div id="paper-probe" class="paper" aria-hidden="true"></div>
       <canvas id="cv-map"></canvas>
       <canvas id="cv-flow"></canvas>
 
@@ -758,7 +787,7 @@ title: "Weather"
         0.25° over the Central Mediterranean; ItaliaMeteo-Arpae ICON-2I
         0.025 × 0.02° (CC BY 4.0), hourly to +72 h, Malta only — its domain
         stops at 33.7 °N; ECMWF IFS 0.25° open data (CC BY 4.0) on
-        every frame — the three Europe charts, 6-hourly to +144 h and
+        every frame — the four Europe charts, 6-hourly to +144 h and
         12-hourly to +360 h beyond it, and the
         surface fields over the other two, held to ICON-EU's +120 h so that
         switching model on a frame lands on the same day rather than dragging
@@ -774,6 +803,20 @@ title: "Weather"
         interval, differenced from the model's accumulation — six hours on IFS
         against three on ICON-EU and one on ICON-2I, which is why the same
         shower shades deeper on the coarser model.<br />
+        <b>Meteogram.</b> Three models spliced end to end, each carrying the
+        chart as far as it goes: ICON-2I hourly to +72 h, ICON-EU three-hourly
+        to +120 h, then IFS to +360 h. A rule and a label mark every handover
+        and the shading deepens behind each one, because a change of model is
+        not a change in the weather and must not read as one. The IFS section
+        steps three-hourly to +144 h and six-hourly after it — not a
+        preference but the gust field's own window, which is the maximum over
+        the preceding three hours up to +144 and over the preceding six beyond
+        it; sampling more coarsely than that would report part of an interval
+        as though it were all of it. Past about day ten the temperature is a
+        weak signal and the rain bars are close to noise, so the section is
+        drawn to be read as a pattern rather than as a forecast for an hour,
+        and the summary line above the chart deliberately speaks only for the
+        first five days.<br />
         <b>Vapour transport.</b> Derived here rather than downloaded: specific
         humidity and wind on the 1000, 925, 850, 700, 600 and 500 hPa surfaces,
         integrated over pressure and divided by <i>g</i>. The column is cut off
@@ -823,9 +866,9 @@ title: "Weather"
         at the newest scan.<br />
         Keyboard: <kbd>←</kbd> <kbd>→</kbd> step, <kbd>space</kbd> play/pause,
         <kbd>Home</kbd>/<kbd>End</kbd> jump — on whichever view is showing.
-        On the synoptic charts, <kbd>↑</kbd> <kbd>↓</kbd> move between the three
-        levels — 500 hPa, vapour transport, surface pressure — holding the
-        forecast hour, so the same moment is read at three heights.
+        On the synoptic charts, <kbd>↑</kbd> <kbd>↓</kbd> move between the four
+        levels — 250 hPa jet, 500 hPa, vapour transport, surface pressure —
+        holding the forecast hour, so the same moment is read at four heights.
       </div>
     </details>
   </footer>
@@ -900,6 +943,12 @@ const FIELD_SPECS = {
   p: { slug: 'precip', label: 'Precipitation', unit: ' mm' },
   c: { slug: 'cloud', label: 'Cloud cover', unit: ' %' },
   sig: { slug: '500g_anom', label: 'Height anomaly', unit: ' σ' },
+  // The jet panel's shading. A second standardised anomaly, in the same units
+  // and on the same ladder as `sig`, but of the meridional wind rather than of
+  // height — so it says how far the flow has been bent from its seasonal norm,
+  // not how unusual the pattern's amplitude is. Kept as its own key precisely
+  // because the two would otherwise be indistinguishable in every caption.
+  van: { slug: 'vanom', label: 'V-wind anomaly', unit: ' σ' },
   msl: { slug: 'mslp', label: 'Pressure', unit: ' hPa' },
   // Derived from u and v exactly as 'spd' is — the payload carries the two
   // components and the magnitude is the hypotenuse. What differs is what the
@@ -945,9 +994,10 @@ const MODELS = {
     // and one run in Offenbach part company is a reading of how settled the
     // forecast is that neither can give alone.
     label: 'IFS',
-    domains: ['europe', 'europe_sfc', 'europe_ivt', 'medit', 'malta', 'zurich'],
+    domains: ['europe_jet', 'europe', 'europe_sfc', 'europe_ivt',
+              'medit', 'malta', 'zurich'],
     /* Several payloads, because IFS is asked several different questions here:
-       three levels of the Europe frame and the surface fields over the
+       four levels of the Europe frame and the surface fields over the
        Mediterranean ones. A domain names the file it needs; a model without
        `parts` names one file for all of them, which is every other model. */
     parts: {
@@ -966,6 +1016,12 @@ const MODELS = {
         file: 'ivt_europe.js', global: 'IVT',
         geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
       },
+      // A fourth, and the lightest of them — it is strided to 0.75° where the
+      // others are 0.5°, for the reason config.py's JET_STRIDE gives.
+      europe_jet: {
+        file: 'jet_europe.js', global: 'JET',
+        geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
+      },
       medit: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
       malta: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
       zurich: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
@@ -982,16 +1038,22 @@ const modelPart = (domainKey, modelKey) =>
    same engine with a different source rather than a second map viewer. It is
    registered before its data exists; the extent is all the shell needs to lay
    itself out, and the fields arrive when the page is opened. */
-/* The synoptic stack: one frame, three levels, read top-down through the
+/* The synoptic stack: one frame, four levels, read top-down through the
    atmosphere. Ordering them by level rather than by when they were built is
-   what makes up/down mean something — the row runs 500 hPa, 700 hPa, surface,
-   so ArrowDown descends and ArrowUp climbs. It wraps, because three is few
-   enough that leafing with one key beats stopping at an end.
+   what makes up/down mean something — the row runs 250 hPa, 500 hPa, 700 hPa,
+   surface, so ArrowDown descends and ArrowUp climbs. It wraps, because four is
+   few enough that leafing with one key beats stopping at an end.
+
+   The jet chart goes at the top because that is where it is in the atmosphere,
+   not because it was added last. It is also the one that reads as a cause: the
+   500 hPa panel under it shows the wave, and this shows the tropopause
+   structure driving it.
 
    The labels are the old tab captions. They were three tabs, which spent half
-   the tab bar on one frame and read as three unrelated pages rather than as
-   one chart at three heights. */
+   the tab bar on one frame and read as unrelated pages rather than as one
+   chart at several heights. */
 const SYNOPTIC = [
+  { domain: 'europe_jet', label: '250 hPa jet' },
   { domain: 'europe', label: '500 hPa' },
   { domain: 'europe_ivt', label: 'Vapour transport' },
   { domain: 'europe_sfc', label: 'Surface pressure' },
@@ -1029,6 +1091,15 @@ DOMAIN_META.europe_sfc = {
    what a moisture plume looks like is a question you go and ask, not one every
    visitor is answered whether they asked or not. */
 DOMAIN_META.europe_ivt = {
+  label: 'Europe / North Atlantic',
+  extent: { west: -60, east: 45, south: 28, north: 72 },
+  lazy: true,
+  tabOnly: true,
+};
+
+/* The jet and PV chart, the fourth level of the same frame. Lazy for the same
+   reason as the other two, and the cheapest of them to fetch. */
+DOMAIN_META.europe_jet = {
   label: 'Europe / North Atlantic',
   extent: { west: -60, east: 45, south: 28, north: 72 },
   lazy: true,
@@ -1123,6 +1194,51 @@ function adoptSource(modelKey, g, domainKey) {
       levels: g.levels,
       scales: { gh: g.ghScale, u: g.ivtScale, v: g.ivtScale },
       data: { u: d.iu, v: d.iv, gh: d.gh },
+    };
+  }
+  /* The jet panel. Tested before the height branch for the same reason the
+     vapour one is: what distinguishes it is `pv`, which nothing else carries,
+     and its anomaly is deliberately *not* called `sig` — that key means the
+     500 hPa height anomaly everywhere else in this file, and half a dozen
+     paths key their titles and their ladder off it. Two different quantities
+     under one name is how a chart ends up captioned as the wrong level. */
+  if (Array.isArray(d.pv)) {
+    return {
+      ...common, accumHours: null,
+      keys: ['u', 'v', 'pv', 'van'],
+      shading: ['van', 'spd', 'none'],
+      /* Streaklines over both shadings, which is the opposite of the 500 hPa
+         panel's rule and for a reason that inverts cleanly. There the contours
+         *are* the flow — height gradient is geostrophic wind — so streaks
+         redrew what the isohypses had already drawn. Here the contours are PV,
+         which says where the tropopause is, not which way the air is going; and
+         the shading is a v-wind anomaly, which says how far from normal the
+         flow is bent but nothing about its speed or its direction along the
+         jet. The wind is genuinely a third variable on this chart, so it is
+         available over either. */
+      flowFields: ['van', 'spd'],
+      /* Every whole PVU, labelled. 2 PVU is conventionally the dynamical
+         tropopause and the line a reader is looking for, but it is not
+         emphasised: on this frame the 2 PVU contour runs the width of the map
+         and picking it out in a second colour draws a heavy line across the
+         entire chart rather than highlighting a feature. The labels are what
+         make it findable, which is why this is the third chart here to set
+         labelLines and the reason is the same each time — the line carries its
+         own value because there is no other way to tell which one it is. */
+      /* 1 to 8 PVU. Below 1 is tropospheric air with no structure worth a
+         line; above 8 is deep stratosphere, which on this frame is a large
+         area of very steep gradient that contours into a solid block and says
+         nothing a reader of a jet chart wants. The band that carries the
+         information is the one the tropopause moves through. */
+      contour: { key: 'pv', label: 'PV', unit: 'PVU', step: 1,
+                 min: 1, max: 8, smooth: 4,
+                 always: true, labelLines: true },
+      // Grey wash over land, as on the other two atmosphere-property panels.
+      landmask: true,
+      level: g.level,
+      pvLayer: g.pvLayer,
+      scales: { pv: g.pvScale, van: g.vanScale },
+      data: { u: d.u, v: d.v, pv: d.pv, van: d.van },
     };
   }
   if (Array.isArray(d.gh)) {
@@ -1498,8 +1614,8 @@ function makeLCC(lon0, lat0, sp1, sp2) {
   };
 }
 
-/* Per domain, defaulting to Mercator. The three Europe frames differ — they are
-   one chart at three levels and have to be the same map — and pay for it: a
+/* Per domain, defaulting to Mercator. The four Europe frames differ — they are
+   one chart at four levels and have to be the same map — and pay for it: a
    conic separates into neither axis, so the raster costs a full inverse per
    pixel and a streakline has to be stepped in lon/lat rather than in screen
    space. Both are affordable at this size; see drawRaster and stepParticles. */
@@ -1507,6 +1623,7 @@ const DOMAIN_PROJ = {
   europe: makeLCC(7.5, 50, 35, 65),
   europe_sfc: makeLCC(7.5, 50, 35, 65),
   europe_ivt: makeLCC(7.5, 50, 35, 65),
+  europe_jet: makeLCC(7.5, 50, 35, 65),
 };
 const projFor = (key) => DOMAIN_PROJ[key] || MERCATOR;
 
@@ -1752,6 +1869,11 @@ function loadSource(domainKey, modelKey) {
 
   const isUpper = D.keys.includes('sig');
   const isPressure = D.keys.includes('msl');
+  // The jet panel. Its own flag rather than a widened `isUpper`, because the
+  // two want opposite answers nearly everywhere they are asked: this one has a
+  // wind speed to shade and a level that is not 500, and its readout carries an
+  // anomaly of a different quantity.
+  const isJet = D.keys.includes('van');
   const vec = D.vector;
 
   LUTS = {};
@@ -1762,7 +1884,9 @@ function loadSource(domainKey, modelKey) {
     LUTS.spd = {
       lut: buildLUT(WIND_COLORS),
       range: S_RANGE, mag: true,
-      title: isUpper ? '500 hPa wind speed (m s⁻¹)' : '10 m wind speed (m s⁻¹)',
+      title: isUpper ? '500 hPa wind speed (m s⁻¹)'
+        : isJet ? `${D.level} hPa wind speed (m s⁻¹)`
+        : '10 m wind speed (m s⁻¹)',
       tick: S_RANGE[1] > 40 ? 10 : 2.5, unit: ' m/s',
     };
   }
@@ -1771,7 +1895,11 @@ function loadSource(domainKey, modelKey) {
       lut: buildStepLUT(IVT_COLORS),
       range: [IVT_LEVELS[0], IVT_LEVELS[IVT_LEVELS.length - 1]],
       title: `Integrated vapour transport (${vec.unit})`,
-      levels: IVT_LEVELS, ladder: true, base: true, unit: ' ' + vec.short,
+      // Drawn on paper in both themes — see the .paper block. Only this ladder
+      // asks for it: precipitation is the other `base` layer, and rain on a
+      // dark map is a night image on purpose.
+      levels: IVT_LEVELS, ladder: true, base: true, paperBase: true,
+      unit: ' ' + vec.short,
       // The magnitude of the pair the source carries, the same derivation wind
       // speed uses — which is why there is no third field in the payload.
       mag: true,
@@ -1791,6 +1919,22 @@ function loadSource(domainKey, modelKey) {
       range: [973, 1053],
       title: 'Mean sea level pressure (hPa)',
       tick: 10, unit: ' hPa',
+    };
+  } else if (isJet) {
+    /* The same ladder and the same colours as the height anomaly, which is a
+       deliberate exception to the rule the pressure ramp next door states. That
+       rule exists so two panels showing *different quantities* are not painted
+       identically. These two show the same quantity — a standardised anomaly in
+       sigma — of two different fields, and a reader who has learned that orange
+       is +2σ should not have to relearn it one level up. What tells the panels
+       apart is the overlay: black PV contours here, height contours there. */
+    LUTS.van = {
+      lut: buildLUT(SIGMA_COLORS),
+      range: [SIGMA_LEVELS[0], SIGMA_LEVELS[SIGMA_LEVELS.length - 1]],
+      title: `${D.level} hPa v-wind anomaly (σ)`,
+      levels: SIGMA_LEVELS, ladder: true, unit: ' σ',
+      ticks: [-6, -3, -2, -1, 0, 1, 2, 3, 6],
+      idx: SIGMA_IDX, idxOffset: 1000, idxScale: 100,
     };
   } else if (!isUpper) {
     LUTS.t = {
@@ -1852,10 +1996,11 @@ function loadSource(domainKey, modelKey) {
   // reports a height and an anomaly, not a temperature and a rainfall, and the
   // vapour-transport panel reports a height and a flux with no rainfall at all.
   const hasGH = D.keys.includes('gh');
-  $('r-temp-label').textContent = isPressure ? 'Pressure' : hasGH ? 'Height' : 'Temp';
+  $('r-temp-label').textContent = isPressure ? 'Pressure'
+    : hasGH ? 'Height' : isJet ? 'PV' : 'Temp';
   $('r-wind-label').textContent = vec ? vec.label : 'Wind';
   $('r-prec-label').textContent = (isPressure || vec) ? '—'
-    : isUpper ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
+    : (isUpper || isJet) ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
   /* Which chart the Synoptic tab reopens on, remembered so that leaving the
      vapour panel for the Malta one and coming back lands where the reader
      left rather than resetting to 500 hPa. */
@@ -2437,14 +2582,16 @@ function strokeRings(ctx, rings, color, width) {
    covers none of it, and a shower floating over a white rectangle is not
    locatable. */
 function drawBase(css) {
-  ctxG.fillStyle = css.getPropertyValue('--sea').trim();
+  const sea = css.getPropertyValue('--sea').trim();
+  const land = css.getPropertyValue('--land').trim();
+  ctxG.fillStyle = sea;
   ctxG.fillRect(0, 0, W, H);
   tracePolys(ctxG, GEO.land);
-  ctxG.fillStyle = css.getPropertyValue('--land').trim();
+  ctxG.fillStyle = land;
   ctxG.fill('evenodd');
   if (GEO.lakes && GEO.lakes.length) {
     tracePolys(ctxG, GEO.lakes);
-    ctxG.fillStyle = css.getPropertyValue('--sea').trim();
+    ctxG.fillStyle = sea;
     ctxG.fill('evenodd');
   }
 }
@@ -2470,7 +2617,14 @@ function smoothT() {
   const tmp = new Float32Array(n), out = new Float32Array(n);
   // Separable 1-2-1 box, twice — cheap, and enough to kill the single-cell
   // terrain spikes without moving a frontal zone anywhere a reader would see.
-  for (let pass = 0; pass < 2; pass++) {
+  //
+  // Twice is right for a temperature or a height. Potential vorticity needs
+  // more: it is a derivative field built from a vorticity that is itself a
+  // derivative, so it arrives with structure two scales below anything the
+  // chart means to show, and at one contour per PVU that structure closes a
+  // ring around every cell of it. The source asks for what it needs.
+  const passes = D.contour.smooth || 2;
+  for (let pass = 0; pass < passes; pass++) {
     const from = pass === 0 ? src : out;
     for (let r = 0; r < NY; r++) {
       for (let c = 0; c < NX; c++) {
@@ -2513,6 +2667,9 @@ const MS_TABLE = {
    the most expensive thing on the page to a rounding error. */
 function isothermPaths(step, wantMarks) {
   const F = smoothT();
+  // Hoisted: read once per call rather than once per cell per level.
+  const CLO = D.contour.min ?? null;
+  const CHI = D.contour.max ?? null;
   const paths = new Map();
   const pathFor = (lev) => {
     let p = paths.get(lev);
@@ -2565,8 +2722,17 @@ function isothermPaths(step, wantMarks) {
       if (v2 < lo) lo = v2; else if (v2 > hi) hi = v2;
       if (v3 < lo) lo = v3; else if (v3 > hi) hi = v3;
 
-      const first = Math.ceil(lo / step) * step;
-      if (first > hi) continue;
+      /* Clamped to the band the chart is actually read in, where the source
+         names one. On the height and pressure panels there is no such band —
+         every contour the field crosses is wanted. On the PV panel there is:
+         the field runs past 15 PVU over the pole, and contouring all of it at
+         1 PVU draws forty lines through the top of the frame that say only
+         "stratosphere", burying the 2 PVU line the chart exists for. */
+      let first = Math.ceil(lo / step) * step;
+      let last = hi;
+      if (CLO !== null && first < CLO) first = Math.ceil(CLO / step) * step;
+      if (CHI !== null && last > CHI) last = CHI;
+      if (first > last) continue;
 
       // Corners in the same order as v0..v3: (c,r), (c+1,r), (c+1,r+1), (c,r+1).
       let ax, ay, bx, by, cx, cy, dx, dy;
@@ -2580,7 +2746,7 @@ function isothermPaths(step, wantMarks) {
         cx = GX[j2]; cy = GY[j2]; dx = GX[j3]; dy = GY[j3];
       }
 
-      for (let level = first; level <= hi; level += step) {
+      for (let level = first; level <= last; level += step) {
         const idx = (v0 > level ? 1 : 0) | (v1 > level ? 2 : 0)
                   | (v2 > level ? 4 : 0) | (v3 > level ? 8 : 0);
         if (idx === 0 || idx === 15) continue;
@@ -3083,8 +3249,20 @@ function drawGraticule(css) {
   ctxG.restore();
 }
 
+/* Which token set the map draws itself in. Everything on the canvas — base,
+   coastlines, borders, place labels, graticule, contour labels — resolves
+   through here, so a panel that asks for paper gets all of it and not just a
+   pale rectangle with dark-theme ink written over the top. The page chrome
+   still reads <html> and stays in whatever theme the reader chose.
+
+   LUTS is rebuilt whenever the domain changes, so this is looked up per draw
+   rather than cached. */
+const PAPER_PROBE = document.getElementById('paper-probe');
+const mapCss = () => getComputedStyle(
+  (LUTS[state.field] || {}).paperBase ? PAPER_PROBE : document.documentElement);
+
 function drawGeo() {
-  const css = getComputedStyle(document.documentElement);
+  const css = mapCss();
 
   if (D.landmask) fillRings(ctxG, GEO.land, css.getPropertyValue('--land-mask').trim());
   drawGraticule(css);
@@ -3292,7 +3470,7 @@ let last = 0;
 let rasterKey = null;
 
 function drawMap() {
-  const css = getComputedStyle(document.documentElement);
+  const css = mapCss();
   ctxG.clearRect(0, 0, W, H);
   const spec = LUTS[state.field];
   if (!spec || spec.base) drawBase(css);
@@ -3428,17 +3606,18 @@ function lockTimebar() {
    read. Sized from the widest string each field can produce. */
 function lockReadout() {
   const isUpper = D.keys.includes('sig');
+  const isJet = D.keys.includes('van');
   const hasGH = D.keys.includes('gh');
   const vec = D.vector;
   const pts = ['NNE', 'WNW', 'SSW'];
   const flux = vec ? [`0000 ${vec.short}`] : null;
   $('r-pos').style.minWidth = measureMax($('r-pos'), ['00.00°N  00.00°W']) + 'px';
   $('r-temp').style.minWidth = measureMax($('r-temp'),
-    hasGH ? ['1000 dam', '-100 dam'] : ['-00.0 °C']) + 'px';
+    hasGH ? ['1000 dam', '-100 dam'] : isJet ? ['-00.0 PVU'] : ['-00.0 °C']) + 'px';
   $('r-wind').style.minWidth = measureMax($('r-wind'), flux || ['00.0 m/s']) + 'px';
   $('r-dir').style.minWidth = measureMax($('r-dir'), pts.map((p) => `${p} 000°`)) + 'px';
   $('r-prec').style.minWidth = measureMax($('r-prec'),
-    isUpper ? ['+0.0 σ', '-0.0 σ'] : ['000.0 mm', '—']) + 'px';
+    (isUpper || isJet) ? ['+0.0 σ', '-0.0 σ'] : ['000.0 mm', '—']) + 'px';
   $('wl-max').style.minWidth = measureMax($('wl-max'), flux || ['000.0 m/s']) + 'px';
 }
 
@@ -3624,14 +3803,22 @@ function readout(x, y) {
   }
 
   const isUpper = D.keys.includes('sig');
+  const isJet = D.keys.includes('van');
   const vec = D.vector;
   // The readout samples the way the shading does, so the number under the
   // crosshair belongs to the band it is sitting in. Reporting a bilinear value
   // over a bicubic map would disagree with the colour by a whole step near an
   // edge, which is exactly where anyone bothers to hover.
   const hasGH = D.keys.includes('gh');
-  const t = hasGH ? sampleCubic(CUR.gh, col, row) : sampleShade('t', CUR.t, col, row);
-  $('r-temp').textContent = hasGH ? t.toFixed(0) + ' dam' : t.toFixed(1) + ' °C';
+  // The jet panel reports PV in this row, which is its contoured field the way
+  // height is the other two panels'. One decimal: the contours are whole PVU
+  // and 2 PVU is the line that matters, so "1.8" and "2.3" is the distinction
+  // worth resolving and a second digit would be spurious precision on a field
+  // this smoothed.
+  const t = isJet ? sampleCubic(CUR.pv, col, row)
+    : hasGH ? sampleCubic(CUR.gh, col, row) : sampleShade('t', CUR.t, col, row);
+  $('r-temp').textContent = isJet ? t.toFixed(1) + ' PVU'
+    : hasGH ? t.toFixed(0) + ' dam' : t.toFixed(1) + ' °C';
 
   const sp = Math.hypot(u, v);
   // The pair is a wind on every panel but one, where it is a moisture flux —
@@ -3651,8 +3838,10 @@ function readout(x, y) {
     // its direction. There is no fourth field to report.
     $('r-prec').textContent = '—';
   } else {
-    const extra = isUpper ? sampleCubic(CUR.sig, col, row) : sampleShade('p', CUR.p, col, row);
-    $('r-prec').textContent = isUpper
+    const anom = isUpper ? CUR.sig : isJet ? CUR.van : null;
+    const extra = anom ? sampleCubic(anom, col, row)
+      : sampleShade('p', CUR.p, col, row);
+    $('r-prec').textContent = anom
       ? (extra >= 0 ? '+' : '') + extra.toFixed(1) + ' σ'
       : (extra < 0.05 ? '—' : extra.toFixed(1) + ' mm');
   }
@@ -3699,7 +3888,16 @@ stage.addEventListener('pointerleave', () => {
 
 const DESCS = {
   t: '2 m temperature shaded, with 10 m wind drawn as advected streaklines — each streak is a parcel of air moved by the wind field, so its length is the wind speed and its direction is the wind direction.',
-  spd: '10 m wind speed shaded, with the flow itself drawn as advected streaklines over it.',
+  /* A function because this shading is offered at three different heights and
+     the sentence named only one of them. It has said "10 m" on the 500 hPa
+     panel for as long as that panel has offered wind speed; adding a third
+     level made the same wrong sentence appear on a chart whose whole subject
+     is the jet, which is what finally showed it up. The height branch has no
+     `level` in its payload, so it is identified the way everything else here
+     identifies it — by the field it carries. */
+  spd: (d) => (d.keys.includes('sig') ? '500 hPa'
+    : d.level ? `${d.level} hPa` : '10 m')
+    + ' wind speed shaded, with the flow itself drawn as advected streaklines over it.',
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
   msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. Fronts are derived, not analysed: no model carries a fronts field, so these come from the thermal front parameter on 850 hPa wet-bulb potential temperature, typed by which way the wind is advecting it. Troughs are the valley lines of the pressure field itself, drawn as a plain heavy line and only where no front is already marking the same feature. Expect all of it to disagree with a hand analysis — occlusions are not separated out, and neither are upper fronts, upper troughs or convergence lines. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending.',
@@ -3726,6 +3924,32 @@ const DESCS = {
     'dropped. Below 250 nothing is shaded, because that is the background ' +
     'state of the atmosphere rather than a plume. The column is cut off at the ' +
     'model surface, so no transport is drawn through the inside of the Alps.',
+  /* A function for the same reason the vapour one is: the level and the layer
+     the PV was averaged over are the build's numbers, not the page's, and a
+     description that spelled them out in prose would go on claiming 300–200 hPa
+     long after config.py's JET_PV_LAYER stopped saying so. */
+  van: (d) => 'Standardised anomaly of the ' + (d.level || 250) + ' hPa ' +
+    'meridional wind, in standard deviations from the 1981–2010 NCEP/NCAR ' +
+    'daily climatology. Read it as flow amplification rather than as jet ' +
+    'strength: it says how far the north–south component has departed from ' +
+    'normal for the date, so an amplified trough and ridge show as a ' +
+    'blue-and-orange couplet and a fast but zonal jet barely registers at ' +
+    'all. That is what makes Rossby wave packets and blocking legible — the ' +
+    'streaklines say how fast the wind is going, this says how far it is ' +
+    'being bent. Contours are potential vorticity averaged over the ' +
+    (d.pvLayer ? d.pvLayer.join('–') : '300–200') + ' hPa layer, every 1 PVU ' +
+    'and labelled. The 2 PVU line is conventionally the dynamical tropopause, ' +
+    'so where it dips equatorward the tropopause is low and the air beneath ' +
+    'it is stratospheric in origin — the precursor a surface development is ' +
+    'usually reading from. PV here is the isobaric approximation, ' +
+    '−g(ζ + f)·∂θ/∂p, computed from the relative vorticity at ' +
+    (d.level || 250) + ' hPa and the stability across the layer: ECMWF ' +
+    'publishes no PV in its open data, so it has to be derived. The tilting ' +
+    'terms are dropped, which is second order in a jet core and genuinely not ' +
+    'zero inside a tropopause fold, so treat sharp filaments as indicative. ' +
+    'Stored on a 0.75° grid where the other Europe panels use 0.5°, which ' +
+    'costs nothing the chart expresses — the anomaly comes from a 2.5° ' +
+    'climatology and the PV has to be smoothed before it is contoured anyway.',
   c: 'Total cloud cover through the whole depth of the atmosphere, so a thin cirrus sheet and a deep thunderstorm both read as overcast. Blue is clear sky, white is complete cover.',
   sat: 'MTG FCI from EUMETSAT, 20-minutely over the last 24 hours, resampled onto this frame. True colour by day; after sunset there is no visible light to photograph, so night falls back to the 10.5 µm infrared window. The scan nearest the selected time is shown, and past the newest scan the most recent one is held — there is no satellite picture of a forecast.',
   none: 'The wind field alone, as advected streaklines over land and sea.',
@@ -3778,7 +4002,9 @@ function syncDesc() {
       ? 'Isobars and fronts, without the pressure shading behind them.'
       : D.vector
         ? 'The transport vectors as streaklines over the 700 hPa height contours, without the shading behind them. Direction without magnitude: where the moisture is going, with nothing said about how much of it there is.'
-        : DESCS.none;
+        : D.keys.includes('van')
+          ? 'Potential vorticity contours and the ' + (D.level || 250) + ' hPa flow, without the anomaly shading behind them. The 2 PVU line alone, which is the tropopause and often all a reader wants from this chart.'
+          : DESCS.none;
   /* Named only while the overlay is switched on. Keyed to the toggle rather
      than to whether this particular hour has a picture, so that scrubbing does
      not rewrite the paragraph under the reader every frame — and so this stays
@@ -4134,10 +4360,15 @@ function buildModelButtons() {
 
 function syncMeta() {
   if (state.view === 'mgram' && MG.data) {
-    // Both models are named when the long range is grafted on, so the credit
-    // line matches what the chart is actually showing.
-    const src = MG.data.tailModel
-      ? `${MG.data.model} to +${MG.data.steps[MG.data.tailFrom - 1]} h, then ${MG.data.tailModel}`
+    // Every model is named, in the order the chart uses them, so the credit
+    // line matches what is actually being shown. Each is given the hour it
+    // hands over at rather than only the first — with three sources, "then
+    // IFS" alone would not say whether that begins on day five or day six.
+    const js = mgJoins(MG.data);
+    const src = js.length
+      ? js.reduce((acc, j) =>
+          `${acc} to +${MG.data.steps[j.from - 1]} h, then ${j.model}`,
+        MG.data.model)
       : MG.data.model;
     $('cycles').textContent =
       `${src} · init ${fmtUTC.format(new Date(MG.data.init))} UTC`;
@@ -5190,6 +5421,57 @@ function mgRainF(r) {
    out once per place rather than once per frame: drawMeteogram runs on every
    pointermove, and the day summaries alone are a few thousand solar positions
    and a couple of hundred Intl formats. */
+/* Where each model takes over, oldest first.
+
+   The chart began as one model, then two, and is now three — ICON-2I hourly to
+   +72 h, ICON-EU three-hourly to +120, IFS to the end of its run. The payload
+   says so in `joins`; everything that draws or labels a handover reads it from
+   here rather than counting on there being exactly one.
+
+   The legacy single-join fields are still honoured, because a payload can
+   outlive the page that wrote it and vice versa: a cached page meeting a new
+   payload, or this page meeting one built before `joins` existed, both have to
+   produce a correct chart rather than an unmarked splice. */
+function mgJoins(d) {
+  if (!d) return [];
+  if (Array.isArray(d.joins)) return d.joins.filter((j) => j.from > 0 && j.from < d.steps.length);
+  if (d.tailFrom > 0 && d.tailFrom < d.steps.length) {
+    return [{ from: d.tailFrom, model: d.tailModel, short: d.tailShort || 'ICON-EU' }];
+  }
+  return [];
+}
+
+/* Which model index `i` came from — 0 is the lead model, 1 the first tail, and
+   so on. Used by the tooltip and by the day cards, both of which have to name
+   a source for one frame rather than describe the splice as a whole. */
+function mgSourceAt(d, i) {
+  const js = mgJoins(d);
+  let k = 0;
+  while (k < js.length && i >= js[k].from) k++;
+  return k === 0 ? { short: d.modelShort || 'ICON-2I', model: d.model }
+    : { short: js[k - 1].short, model: js[k - 1].model };
+}
+
+/* "hourly to +72 h, 3-hourly to +144 h, 6-hourly to +360 h".
+
+   Every change of bucket width named. With three models there are two of them
+   — the hourly-to-three-hourly step at ICON-2I's end, and the three-to-six one
+   inside the IFS section where ECMWF's gust window doubles — and a single
+   number would describe neither half. Walked off `span`, which is the width
+   each rain bar actually covers, rather than off the step list: at a model join
+   the two differ, and the bar is what a reader is looking at. */
+function mgCadence(d) {
+  const sp = (d.span && d.span.length) ? d.span : d.steps.map(() => 1);
+  const runs = [];
+  for (let i = 0; i < d.steps.length; i++) {
+    const g = sp[i] || 1;
+    if (runs.length && runs[runs.length - 1].g === g) runs[runs.length - 1].to = d.steps[i];
+    else runs.push({ g, to: d.steps[i] });
+  }
+  return runs.map((r) => `${r.g === 1 ? 'hourly' : r.g + '-hourly'} to +${r.to} h`)
+    .join(', ');
+}
+
 function mgPrepare(d) {
   if (MG.prepFor === d) return MG.prep;
   const init = new Date(d.init);
@@ -5235,6 +5517,10 @@ function mgPrepare(d) {
 
     let tMax = -Infinity, tMin = Infinity, mm = 0, gust = 0, iHi = -1, iLo = -1;
     let wPeak = 0, vx = 0, vy = 0, tailN = 0;
+    // How wide this day's rain buckets are. Tallied rather than assumed: the
+    // chart now steps 1 h -> 3 h -> 6 h across three models, so a day can hold
+    // two widths and the card should name the one it is mostly drawn at.
+    const spans = new Map();
     const halves = [
       { day: true, cSum: 0, cN: 0, wet: 0, tSum: 0, tN: 0 },
       { day: false, cSum: 0, cN: 0, wet: 0, tSum: 0, tN: 0 },
@@ -5254,6 +5540,8 @@ function mgPrepare(d) {
       vx += d.wind[i] * Math.sin(d.dir[i] * Math.PI / 180);
       vy += d.wind[i] * Math.cos(d.dir[i] * Math.PI / 180);
       if (d.tailFrom > 0 && i >= d.tailFrom) tailN++;
+      const sp = SPAN[i] || 1;
+      spans.set(sp, (spans.get(sp) || 0) + 1);
       const up = mgSunElev(at(s), d.lat, d.lon) > 0;
       const H = halves[up ? 0 : 1];
       H.cSum += d.cloud[i]; H.cN++; H.tSum += d.temp[i]; H.tN++;
@@ -5290,6 +5578,11 @@ function mgPrepare(d) {
       // Named for the model most of the day came from, not the model its first
       // hour came from — the join rarely lands on a midnight.
       tail: count > 0 && tailN > count / 2,
+      // The bucket width the day is mostly drawn at, for the card's chip. Same
+      // "most of the day" rule as `tail` above, and for the same reason.
+      span: spans.size
+        ? [...spans.entries()].sort((a, b) => b[1] - a[1] || b[0] - a[0])[0][0]
+        : 1,
     });
   }
   // "Today" and "Tomorrow" only when the run really is current.
@@ -5331,15 +5624,33 @@ function mgPrepare(d) {
 
 /* ------------------------------------------------------------- describing -- */
 
+/* How much of the chart the summary sentence speaks for.
+
+   Not all of it, since the IFS section took the chart to +360 h. A sentence
+   like "22 mm in all, most of it Thursday" is a useful thing to say about five
+   days and a misleading one to say about fifteen: it would total rain a
+   deterministic run cannot place that far out, and would pick a wettest day
+   out of noise. Five days is what this sentence described when ICON-EU was the
+   end of the chart, and it is the range it still describes — the long section
+   is drawn to be read as a pattern, not summed.
+
+   An hour rather than a model or a join index, so it means the same thing when
+   a section is missing: a cycle without the ICON-EU tail must not silently
+   shrink the summary to ICON-2I's three days. */
+const MG_SUMMARY_H = 120;
+
 function mgDescribe(d) {
   if (!d || !d.steps) return '';
   const P = mgPrepare(d);
-  const n = d.steps.length;
-  const tHi = Math.max(...d.temp), tLo = Math.min(...d.temp);
-  const cloudMean = d.cloud.reduce((a, b) => a + b, 0) / n;
-  const mm = d.precip.reduce((a, b) => a + b, 0);
-  const gust = Math.max(...d.gust);
-  const meanW = Math.max(...d.wind);
+  const nAll = d.steps.length;
+  const n = Math.max(2, d.steps.filter((h) => h <= MG_SUMMARY_H).length);
+  const beyond = d.steps[nAll - 1] > MG_SUMMARY_H ? d.steps[nAll - 1] : 0;
+  const temps = d.temp.slice(0, n);
+  const tHi = Math.max(...temps), tLo = Math.min(...temps);
+  const cloudMean = d.cloud.slice(0, n).reduce((a, b) => a + b, 0) / n;
+  const mm = d.precip.slice(0, n).reduce((a, b) => a + b, 0);
+  const gust = Math.max(...d.gust.slice(0, n));
+  const meanW = Math.max(...d.wind.slice(0, n));
 
   const summer = tHi >= 30;
   let sky;
@@ -5349,14 +5660,17 @@ function mgDescribe(d) {
   else if (cloudMean < 88) sky = 'Mostly cloudy';
   else sky = 'Overcast';
 
-  // Warmest day, named the way the header names it.
+  // Warmest day, named the way the header names it. Both loops are bounded by
+  // the same five days as the numbers above, so the sentence cannot name a
+  // wettest day that lies out in the part it is not describing.
+  const days = P.days.filter((day) => day.from < MG_SUMMARY_H);
   let warm = null;
-  for (const day of P.days) {
+  for (const day of days) {
     if (day.tMax === null || day.count < 5) continue;
     if (!warm || day.tMax > warm.tMax) warm = day;
   }
   let wet = null;
-  for (const day of P.days) if (!wet || day.mm > wet.mm) wet = day;
+  for (const day of days) if (!wet || day.mm > wet.mm) wet = day;
 
   const bft = mgBeaufort(meanW);
   const windWord = bft <= 2 ? 'light' : bft <= 3 ? 'gentle' : bft <= 4 ? 'moderate'
@@ -5373,13 +5687,19 @@ function mgDescribe(d) {
 
   const rainWord = mm < 0.2
     ? 'dry throughout'
-    : `${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm in all, most of it ${wet.name ? wet.name.toLowerCase() : wet.wd}`;
+    : `${mm < 10 ? mm.toFixed(1) : Math.round(mm)} mm in all, most of it ${wet && (wet.name || wet.wd) ? (wet.name ? wet.name.toLowerCase() : wet.wd) : 'mid-week'}`;
 
   const peak = warm ? `, warmest ${warm.name ? warm.name.toLowerCase() : warm.wd}` : '';
   const gustWord = gust * 3.6 >= 55 ? `, gusting ${Math.round(gust * 3.6)} km/h` : '';
 
-  return `${sky} — ${Math.round(tLo)} to ${Math.round(tHi)} °C${peak}; `
+  const body = `${sky} — ${Math.round(tLo)} to ${Math.round(tHi)} °C${peak}; `
     + `${windWord} ${dirWord} wind${gustWord}; ${rainWord}.`;
+  // The scope is only worth stating when there is chart beyond it. Said once,
+  // at the front, so nobody reads five days of totals as a fortnight's.
+  return beyond
+    ? `Next five days. ${body} The chart runs to +${beyond} h beyond that, `
+      + 'where it is a guide to the pattern rather than to any given hour.'
+    : body;
 }
 
 /* ------------------------------------------------------------------ layout -- */
@@ -5527,12 +5847,17 @@ function drawMeteogram() {
     }
   }
 
-  /* --- 3. the tail, where a second model takes over ----------------------- */
-  let xJoin = null;
-  if (d.tailFrom > 0 && d.tailFrom < n) {
-    xJoin = Xh(d.steps[d.tailFrom] - (d.steps[d.tailFrom] - d.steps[d.tailFrom - 1]) / 2);
+  /* --- 3. the tails, where each successive model takes over --------------- */
+  /* One wash per handover, laid over the last rather than replacing it, so the
+     shading deepens with every model further from the lead. That reads as
+     "further from the forecast you should trust most", which is exactly what
+     the axis is doing, and it costs no legend to say it. */
+  const joins = mgJoins(d);
+  const xJoins = joins.map((j) =>
+    Xh(d.steps[j.from] - (d.steps[j.from] - d.steps[j.from - 1]) / 2));
+  for (const xj of xJoins) {
     c.fillStyle = ink(pal.dark ? 0.035 : 0.026);
-    c.fillRect(xJoin, washTop, L.x1 - xJoin, plotBot - washTop);
+    c.fillRect(xj, washTop, L.x1 - xj, plotBot - washTop);
   }
 
   /* --- 4. the hours already gone ----------------------------------------- */
@@ -5882,23 +6207,37 @@ function drawMeteogram() {
   c.strokeStyle = ink(0.16); c.lineWidth = 1;
   c.strokeRect(L.x0 + 0.5, plotTop + 0.5, L.x1 - L.x0 - 1, plotBot - plotTop - 1);
 
-  /* --- 12. the model join ------------------------------------------------- */
-  if (xJoin !== null) {
-    const x = Math.round(xJoin) + 0.5;
-    c.strokeStyle = ink(0.34); c.lineWidth = 2;
-    c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
-    const lab = (d.tailShort || 'ICON-EU') + (L.narrow ? '' : ' · 3-hourly');
-    c.font = mgF('600 11px');
-    const lw = c.measureText(lab).width;
-    // Inside the temperature panel rather than on the sky ribbon, and saying
-    // what actually changes at the rule: the step from hourly to three-hourly
-    // buckets, not merely that a different model's name applies.
-    const bx = Math.min(x + 6, L.x1 - lw - 14);
-    mgRoundRect(c, bx, rT.y + 6, lw + 12, 18, 9);
-    c.fillStyle = panelHex; c.fill();
-    c.strokeStyle = ink(0.22); c.lineWidth = 1; c.stroke();
-    c.fillStyle = ink(0.66);
-    c.fillText(lab, bx + 6, rT.y + 19);
+  /* --- 12. the model joins ------------------------------------------------ */
+  /* The label says what actually changes at the rule: the model, and the step
+     to a coarser rain bucket when there is one. The bucket width is read off
+     the data rather than written in — it was hard-coded to "3-hourly" while
+     ICON-EU was the only tail, which the IFS section would have made a lie at
+     the very moment the buckets doubled again.
+
+     Labels are placed left-to-right and pushed clear of the previous one, so
+     two joins a few hours apart degrade to two touching pills rather than one
+     illegible overprint. */
+  {
+    let minX = L.x0 + 4;
+    joins.forEach((j, k) => {
+      const x = Math.round(xJoins[k]) + 0.5;
+      c.strokeStyle = ink(0.34); c.lineWidth = 2;
+      c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
+      const sp = SPAN[j.from] || 0;
+      const prevSp = SPAN[j.from - 1] || 0;
+      const lab = (j.short || 'model')
+        + (L.narrow || !sp || sp === prevSp ? '' : ` · ${sp}-hourly`);
+      c.font = mgF('600 11px');
+      const lw = c.measureText(lab).width;
+      const bx = Math.min(Math.max(x + 6, minX), L.x1 - lw - 14);
+      if (bx + lw + 12 > L.x1 - 2) return;   // no room left; the rule stands alone
+      mgRoundRect(c, bx, rT.y + 6, lw + 12, 18, 9);
+      c.fillStyle = panelHex; c.fill();
+      c.strokeStyle = ink(0.22); c.lineWidth = 1; c.stroke();
+      c.fillStyle = ink(0.66);
+      c.fillText(lab, bx + 6, rT.y + 19);
+      minX = bx + lw + 16;
+    });
   }
 
   /* --- 13. the hour ruler ------------------------------------------------- */
@@ -6172,7 +6511,7 @@ function drawMgHeader(c, d, P, L, pal, xJoin) {
           : `${day.dir} ${Math.round(day.wPeak * 3.6)} km/h`]);
     }
     if (day.partial) chips.push([ink(0.44), 'part day']);
-    if (day.tail) chips.push([ink(0.44), '3-hourly']);
+    if (day.span > 1) chips.push([ink(0.44), `${day.span}-hourly`]);
 
     c.font = mgF('600 11px');
     let x = px;
@@ -6224,7 +6563,7 @@ function mgTip(i) {
       ? `${rate.toFixed(1)} mm/h${sp > 1 ? ` (${d.precip[i].toFixed(1)} mm / ${sp} h)` : ''}`
       : '—') +
     row('Pressure', `${d.pres[i].toFixed(1)} hPa`) +
-    (d.tailFrom ? row('Model', i >= d.tailFrom ? (d.tailShort || 'ICON-EU') : 'ICON-2I') : '');
+    (mgJoins(d).length ? row('Model', mgSourceAt(d, i).short) : '');
   tip.style.opacity = '1';
 
   const x = MG.scales.X(i);
@@ -7370,11 +7709,10 @@ function showView(name) {
     $('mg-place').textContent = d ? d.place : 'Point forecast';
     if (d) {
       const init = new Date(d.init);
-      const gap = d.span && d.span.length ? d.span[0] : 1;
+      const js = mgJoins(d);
       $('mg-sub').textContent =
-        `${d.model} · init ${fmtUTC.format(init)} UTC · ` +
-        `${gap === 1 ? 'hourly' : gap + '-hourly'} to +${d.steps[d.steps.length - 1]} h` +
-        (d.tailShort ? `, then ${d.tailShort}` : '');
+        `${d.model} · init ${fmtUTC.format(init)} UTC · ${mgCadence(d)}` +
+        (js.length ? ` · then ${js.map((j) => j.short).join(', ')}` : '');
       $('mg-now').textContent = `${d.credit} · © Ryan Vella`;
       // Written by the renderer, which is the only thing that knows what
       // this particular run actually says.
