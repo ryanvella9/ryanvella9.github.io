@@ -21,7 +21,10 @@ title: "Weather"
      Dark is the default, not the OS preference: :root carries the dark values
      and light is the opt-in override, so the page opens dark for everyone and
      matches the rest of the site rather than whatever the machine happens to be
-     set to. The toggle still swings both ways — it just starts from dark. */
+     set to. The toggle still swings both ways — it just starts from dark.
+
+     These are the *chrome* tokens only. The map's own ink is not here and does
+     not follow the theme at all — see .paper below. */
   :root {
     --bg: #0f1216;
     --panel: #171b21;
@@ -33,21 +36,6 @@ title: "Weather"
     --accent-soft: #1b2b3d;
     --shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 8px 24px rgba(0, 0, 0, .28);
     --veil: rgba(23, 27, 33, .92);
-    /* Cartography. Drawn over a saturated data layer, so these are deliberately
-       near-black rather than themed ink — a light coastline disappears into a
-       yellow 30 degC field. */
-    --coast: rgba(8, 11, 14, .9);
-    --border-line: rgba(8, 11, 14, .45);
-    --label: #f2f5f8;
-    --label-halo: rgba(10, 14, 18, .8);
-    --sea: #10161c;
-    --land: #1e242b;
-    /* Grey wash over land on the upper-air panel, and the graticule. Both sit
-       on top of shading, so they are set as alpha over whatever is beneath
-       rather than as opaque colours. */
-    --land-mask: rgba(126, 134, 145, .26);
-    --grat: rgba(226, 232, 238, .18);
-    --grat-ink: rgba(226, 232, 238, .60);
   }
 
   :root[data-theme="light"] {
@@ -55,26 +43,27 @@ title: "Weather"
     --muted: #546e7a; --faint: #8b9ba5; --accent: #0d47a1; --accent-soft: #e3ecf7;
     --shadow: 0 1px 2px rgba(16, 32, 39, .06), 0 6px 20px rgba(16, 32, 39, .06);
     --veil: rgba(255, 255, 255, .92);
-    --coast: rgba(20, 26, 31, .85); --border-line: rgba(20, 26, 31, .38);
-    --label: #10171c; --label-halo: rgba(255, 255, 255, .85);
-    --sea: #dfe8ee; --land: #f2efe6;
-    --land-mask: rgba(146, 152, 160, .34);
-    --grat: rgba(20, 26, 31, .20); --grat-ink: rgba(20, 26, 31, .62);
   }
 
-  /* Paper: the cartography set for a panel whose data layer leaves most of the
-     frame bare, whatever theme the page is in. IVT shades only the plumes —
-     nothing under 250 kg/m/s gets a colour — so unlike the 500 hPa anomaly,
-     which covers every pixel and never lets a base show, here the base *is*
-     most of the picture. Drawn in the dark theme it came out a near-black
-     rectangle with a yellow smear across it rather than the chart it is in the
-     light one.
+  /* Paper: the cartography the map is drawn in, in both themes and on every
+     panel. A chart is not chrome. Its colours carry meaning — a coastline, a
+     grey land wash, a labelled centre are read against a shading ramp that is
+     itself fixed — and inverting the ink around a fixed ramp does not produce
+     a dark version of the chart, it produces a different chart. The reference
+     products these follow are all drawn on white for the same reason.
 
-     These are the light block's values, deliberately duplicated rather than
-     derived: the map reads them off #paper-probe below instead of off <html>,
-     so one panel can be drawn on paper without the page changing theme
-     underneath the rest of the UI. Only the map tokens are here — the page
-     chrome around it stays dark. */
+     This began as an opt-in for the vapour panel alone, which shades only the
+     plumes: with nothing under 250 kg/m/s coloured, the base *is* most of the
+     picture, and in the dark theme it came out a near-black rectangle with a
+     yellow smear across it. That argument was never really about IVT. Every
+     panel here leaves some base showing, and every one of them was drawing its
+     coastlines and its centre labels in ink chosen for a background the data
+     had already covered over.
+
+     So the map now always resolves through #paper-probe rather than off
+     <html>, and the page chrome around it — header, controls, colour bar,
+     readout, meteogram — still follows the reader's theme. Dark page, light
+     chart, which is what the panel looked like in the light theme all along. */
   .paper {
     --coast: rgba(20, 26, 31, .85); --border-line: rgba(20, 26, 31, .38);
     --label: #10171c; --label-halo: rgba(255, 255, 255, .85);
@@ -813,7 +802,14 @@ title: "Weather"
         chart as far as it goes: ICON-2I hourly to +72 h, ICON-EU three-hourly
         to +120 h, then IFS to +360 h. A rule and a label mark every handover
         and the shading deepens behind each one, because a change of model is
-        not a change in the weather and must not read as one. The IFS section
+        not a change in the weather and must not read as one.
+        <i>Forecast</i> shows the first two, which is the chart as it stood
+        before the long range existed; <i>Extended</i> adds the third. Two
+        views rather than one because the axis is linear in time — drawn
+        together, the hourly detail anyone opens this page for would be
+        squeezed into a fifth of the width to make room for nine days that
+        cannot resolve an hour. Both come out of the same download, so the
+        button is instant. The IFS section
         steps three-hourly to +144 h and six-hourly after it — not a
         preference but the gust field's own window, which is the maximum over
         the preceding three hours up to +144 and over the preceding six beyond
@@ -823,6 +819,20 @@ title: "Weather"
         drawn to be read as a pattern rather than as a forecast for an hour,
         and the summary line above the chart deliberately speaks only for the
         first five days.<br />
+        <b>24 h rainfall.</b> The IFS total-precipitation field differenced
+        across a fixed 24-hour window, so each chart is the total for the day
+        <i>ending</i> at the time shown — rain and melted snow, convective and
+        large-scale together. Consecutive frames overlap: six hours apart, two
+        charts share eighteen hours of the same rain. That is what a running
+        daily total is, and it is also what makes an accumulation affordable on
+        a timeline whose cadence changes — a fixed window means the same thing
+        at six-hourly, at twelve-hourly and in the archive's twelve-hourly past,
+        where a since-the-last-frame bucket would not. The loop starts at +24 h,
+        the first hour with a full day behind it. Read the totals as a pattern
+        rather than a measurement: at 0.25° a convective cell is smaller than a
+        grid box, so the model spreads an hour's downpour over a wider and
+        gentler area, and orography smoothed to 25 km under-rains the windward
+        slope it was smoothed off.<br />
         <b>Vapour transport.</b> Derived here rather than downloaded: specific
         humidity and wind on the 1000, 925, 850, 700, 600 and 500 hPa surfaces,
         integrated over pressure and divided by <i>g</i>. The column is cut off
@@ -956,6 +966,7 @@ const FIELD_SPECS = {
   // because the two would otherwise be indistinguishable in every caption.
   van: { slug: 'vanom', label: 'V-wind anomaly', unit: ' σ' },
   msl: { slug: 'mslp', label: 'Pressure', unit: ' hPa' },
+  r24: { slug: 'rain24', label: '24 h rain', unit: ' mm' },
   // Derived from u and v exactly as 'spd' is — the payload carries the two
   // components and the magnitude is the hypotenuse. What differs is what the
   // components are: a flux, not a wind.
@@ -1000,7 +1011,7 @@ const MODELS = {
     // and one run in Offenbach part company is a reading of how settled the
     // forecast is that neither can give alone.
     label: 'IFS',
-    domains: ['europe_jet', 'europe', 'europe_sfc', 'europe_ivt',
+    domains: ['europe_jet', 'europe', 'europe_sfc', 'europe_ivt', 'europe_rain',
               'medit', 'malta', 'zurich'],
     /* Several payloads, because IFS is asked several different questions here:
        four levels of the Europe frame and the surface fields over the
@@ -1026,6 +1037,12 @@ const MODELS = {
       // others are 0.5°, for the reason config.py's JET_STRIDE gives.
       europe_jet: {
         file: 'jet_europe.js', global: 'JET',
+        geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
+      },
+      // A fifth, and the only one of them that is not a level of the
+      // atmosphere. Same coastlines again — five panels, one download.
+      europe_rain: {
+        file: 'rain_europe.js', global: 'RAIN',
         geoFile: 'upper_geo.js', geoGlobal: 'UPPER_GEO',
       },
       medit: { file: 'ifs_surface.js', global: 'IFS_SURFACE' },
@@ -1063,6 +1080,11 @@ const SYNOPTIC = [
   { domain: 'europe', label: '500 hPa' },
   { domain: 'europe_ivt', label: 'Vapour transport' },
   { domain: 'europe_sfc', label: 'Surface pressure' },
+  /* Below the surface chart rather than beside it. The stack is ordered by
+     height through the atmosphere and this is the one panel that is not a level
+     at all — it is what reached the ground — so it belongs at the bottom, which
+     is also where ArrowDown from the surface chart lands. */
+  { domain: 'europe_rain', label: '24 h rain' },
 ];
 const isSynoptic = (key) => SYNOPTIC.some((s) => s.domain === key);
 
@@ -1106,6 +1128,15 @@ DOMAIN_META.europe_ivt = {
 /* The jet and PV chart, the fourth level of the same frame. Lazy for the same
    reason as the other two, and the cheapest of them to fetch. */
 DOMAIN_META.europe_jet = {
+  label: 'Europe / North Atlantic',
+  extent: { west: -60, east: 45, south: 28, north: 72 },
+  lazy: true,
+  tabOnly: true,
+};
+
+/* Twenty-four hour rainfall, the fifth chart on the frame. Lazy like the rest,
+   and the second-cheapest of them to fetch. */
+DOMAIN_META.europe_rain = {
   label: 'Europe / North Atlantic',
   extent: { west: -60, east: 45, south: 28, north: 72 },
   lazy: true,
@@ -1278,6 +1309,46 @@ function adoptSource(modelKey, g, domainKey) {
       data: { u: d.u, v: d.v, gh: d.gh, sig: d.sig },
     };
   }
+  /* Twenty-four hour rainfall, shaded, under the isobars of the same hour.
+
+     Tested before the pressure branch below, and it has to be: this payload
+     carries `msl` too, and the surface panel's test would claim it first and
+     draw the isobars with no rain under them. The order encodes "the most
+     specific source that matches", which is the only reading that stays
+     correct as payloads gain fields. */
+  if (Array.isArray(d.r24)) {
+    return {
+      ...common,
+      /* Not an accumulation interval in the sense the surface panels mean it.
+         Theirs is "since the previous frame", so it changes when the cadence
+         does and the viewer divides by it to get a rate. This is a fixed
+         window that happens to be longer than the gap between frames — the
+         frames overlap — so there is no per-frame interval to declare and
+         nothing for the readout to divide by. */
+      accumHours: null,
+      window: g.window || 24,
+      keys: ['r24', 'msl'],
+      shading: ['r24', 'none'],
+      flowFields: [],
+      // Isobars, as on the surface panel and at the same 4 hPa. Unlabelled
+      // here, where that panel labels them: there the line *is* the subject and
+      // carries its own value, and here it is context over a shaded field that
+      // the numbers would clutter.
+      contour: { key: 'msl', label: 'Pressure', unit: 'hPa', step: 4,
+                 always: true },
+      // No land wash. The other Europe panels subdue the continents because
+      // their field is a property of the atmosphere to be read *through* the
+      // coastline; rainfall is a thing that happens to the ground, and where it
+      // falls on land is most of what a reader wants off this chart.
+      landmask: false,
+      // Highs and lows go with the isobars, for the same reason the surface
+      // panel draws them: closed curves without a sign are ambiguous.
+      centres: true,
+      scales: { r24: g.r24Scale, msl: g.mslScale },
+      data: { r24: d.r24, msl: d.msl },
+    };
+  }
+
   /* Mean sea level pressure: isobars and the centres between them, the surface
      chart's whole content. Read off the payload the same way the upper-air one
      is, so a source is what it carries rather than what shipped it.
@@ -1384,6 +1455,23 @@ const WIND_COLORS = [
 const PRECIP_LEVELS = [0.25, 0.5, 1, 1.5, 2, 3, 5, 7, 10, 15, 20, 25, 30];
 const PRECIP_COLORS = [
   '#dff3fb', '#b3e5f6', '#8ad6f1', '#59bfe9', '#39a1df', '#2e79ce',
+  '#33a869', '#88c93f', '#f0dc2c', '#f6a52a', '#ee6e2b', '#d5242b',
+];
+
+/* Twenty-four hour rainfall, which needs a ladder of its own rather than the
+   one above. PRECIP_LEVELS tops out at 30 mm because it shades what fell in
+   three hours, where 30 mm is a downpour; a day's total reaches that on an
+   ordinary wet day in Europe and 150 mm in the events the chart exists for, so
+   on that ladder a serious rainfall would saturate to one colour over half the
+   frame and say nothing about which half mattered.
+
+   The rungs are the ones a European rainfall warning is written in — 1, 5, 10,
+   20, 50, 100 mm — with intermediate steps where the eye needs them. Same
+   hue progression as the three-hourly ladder, so the two read as the same
+   quantity at different scales rather than as different fields. */
+const RAIN24_LEVELS = [1, 2, 5, 10, 15, 20, 30, 40, 50, 75, 100, 150];
+const RAIN24_COLORS = [
+  '#dff3fb', '#b3e5f6', '#59bfe9', '#39a1df', '#2e79ce',
   '#33a869', '#88c93f', '#f0dc2c', '#f6a52a', '#ee6e2b', '#d5242b',
 ];
 
@@ -1541,6 +1629,7 @@ function ladderPos(levels, v, transparentBelow) {
 }
 
 const precipPos = (mm) => ladderPos(PRECIP_LEVELS, mm, true);
+const rain24Pos = (mm) => ladderPos(RAIN24_LEVELS, mm, true);
 const sigmaPos = (s) => ladderPos(SIGMA_LEVELS, s, false);
 const ivtPos = (kg) => ladderPos(IVT_LEVELS, kg, true);
 
@@ -1556,6 +1645,10 @@ function ladderTable(n, toValue, pos) {
   return t;
 }
 const PRECIP_IDX = ladderTable(2001, (i) => i / 10, precipPos);          // 0..200 mm
+// 0..500 mm, where the three-hourly table stops at 200. A day's total on the
+// Alpine or Norwegian slope reaches past 200 in a real event, and a table that
+// ended there would clamp the very frames this chart is opened for.
+const RAIN24_IDX = ladderTable(5001, (i) => i / 10, rain24Pos);          // 0..500 mm
 const SIGMA_IDX = ladderTable(2001, (i) => (i - 1000) / 100, sigmaPos);  // -10..+10 sigma
 // Whole kg m⁻¹ s⁻¹, which is also how the payload stores it. 2500 is well past
 // the strongest transport ever observed; the table clamps rather than wrapping.
@@ -1631,6 +1724,7 @@ const DOMAIN_PROJ = {
   europe_sfc: makeLCC(7.5, 50, 35, 65),
   europe_ivt: makeLCC(7.5, 50, 35, 65),
   europe_jet: makeLCC(7.5, 50, 35, 65),
+  europe_rain: makeLCC(7.5, 50, 35, 65),
 };
 const projFor = (key) => DOMAIN_PROJ[key] || MERCATOR;
 
@@ -1878,7 +1972,13 @@ function loadSource(domainKey, modelKey) {
     / ((D.vector && D.vector.flowDivisor) || 1);
 
   const isUpper = D.keys.includes('sig');
-  const isPressure = D.keys.includes('msl');
+  /* What a panel *shades*, not what it carries. The distinction did not exist
+     while the surface panel was the only source with an msl array; the rainfall
+     panel carries one too, for its isobar overlay, and on `keys` these two
+     tests would both claim it — leaving the rain shaded with a pressure ramp
+     and its colour bar titled "Mean sea level pressure". */
+  const isPressure = D.shading.includes('msl');
+  const isRain = D.shading.includes('r24');
   // The jet panel. Its own flag rather than a widened `isUpper`, because the
   // two want opposite answers nearly everywhere they are asked: this one has a
   // wind speed to shade and a level that is not 500, and its readout carries an
@@ -1905,10 +2005,11 @@ function loadSource(domainKey, modelKey) {
       lut: buildStepLUT(IVT_COLORS),
       range: [IVT_LEVELS[0], IVT_LEVELS[IVT_LEVELS.length - 1]],
       title: `Integrated vapour transport (${vec.unit})`,
-      // Drawn on paper in both themes — see the .paper block. Only this ladder
-      // asks for it: precipitation is the other `base` layer, and rain on a
-      // dark map is a night image on purpose.
-      levels: IVT_LEVELS, ladder: true, base: true, paperBase: true,
+      // `base`: transport is the bottom layer of the map rather than a property
+      // drawn over it, so the coastline goes on top. This ladder used to carry
+      // `paperBase` as well, which is now what every panel does unconditionally
+      // — see mapCss.
+      levels: IVT_LEVELS, ladder: true, base: true,
       unit: ' ' + vec.short,
       // The magnitude of the pair the source carries, the same derivation wind
       // speed uses — which is why there is no third field in the payload.
@@ -1918,6 +2019,27 @@ function loadSource(domainKey, modelKey) {
       // spacing in kg/m/s bunches every label into the right-hand third.
       ticks: [250, 500, 800, 1200, 1600],
       idx: IVT_IDX, idxOffset: 0, idxScale: 1,
+    };
+  } else if (isRain) {
+    LUTS.r24 = {
+      lut: buildStepLUT(RAIN24_COLORS),
+      range: [RAIN24_LEVELS[0], RAIN24_LEVELS[RAIN24_LEVELS.length - 1]],
+      title: `Rainfall (mm / ${D.window || 24} h)`,
+      /* `base` for the same reason the three-hourly ladder is: rain is the
+         bottom layer of the map rather than a property drawn over it, so the
+         coastline goes on top.
+
+         This used to add that rain on a dark map was "a night image on
+         purpose". It is not drawn that way any more — the map is on paper in
+         both themes now, so the rain ladder sits on the same pale base as
+         everything else. The ladder's own colours are unchanged; what went is
+         the near-black surround they used to sit in. */
+      levels: RAIN24_LEVELS, ladder: true, base: true, unit: ' mm',
+      // Six of twelve rungs. Chosen by what a warning is written in rather than
+      // by even spacing, which on this ladder would label 15 and 40 and skip
+      // 50 and 100.
+      ticks: [1, 5, 10, 20, 50, 100],
+      idx: RAIN24_IDX, idxOffset: 0, idxScale: 10,
     };
   } else if (isPressure) {
     LUTS.msl = {
@@ -2006,10 +2128,13 @@ function loadSource(domainKey, modelKey) {
   // reports a height and an anomaly, not a temperature and a rainfall, and the
   // vapour-transport panel reports a height and a flux with no rainfall at all.
   const hasGH = D.keys.includes('gh');
-  $('r-temp-label').textContent = isPressure ? 'Pressure'
+  // The rainfall panel reports both of the things it draws: the isobar value on
+  // the row the pressure panel uses, and the day's total on the rain row.
+  $('r-temp-label').textContent = (isPressure || isRain) ? 'Pressure'
     : hasGH ? 'Height' : isJet ? 'PV' : 'Temp';
   $('r-wind-label').textContent = vec ? vec.label : 'Wind';
-  $('r-prec-label').textContent = (isPressure || vec) ? '—'
+  $('r-prec-label').textContent = isRain ? `Rain ${D.window || 24} h`
+    : (isPressure || vec) ? '—'
     : (isUpper || isJet) ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
   /* Which chart the Synoptic tab reopens on, remembered so that leaving the
      vapour panel for the Malta one and coming back lands where the reader
@@ -2129,7 +2254,12 @@ function sampleCubic(a, col, row) {
    a negative millimetre is not a quantity, and left alone the undershoot around
    a heavy cell paints a dry halo through the middle of a shower. Clamped for
    fields that cannot go below zero. */
-const NONNEG = { p: true, c: true, spd: true };
+// Cubic sampling overshoots at a sharp edge, and the edge between a dry cell
+// and a wet one is as sharp as this data gets — so a bicubic read just outside
+// a rain band can come back negative. Clamped, because "-0.4 mm fell" is not a
+// reading, and on a ladder whose first rung is above zero it would draw as a
+// hole in the field rather than as dry ground.
+const NONNEG = { p: true, c: true, spd: true, r24: true };
 function sampleShade(key, a, col, row) {
   const v = sampleCubic(a, col, row);
   return (NONNEG[key] && v < 0) ? 0 : v;
@@ -3259,17 +3389,20 @@ function drawGraticule(css) {
   ctxG.restore();
 }
 
-/* Which token set the map draws itself in. Everything on the canvas — base,
-   coastlines, borders, place labels, graticule, contour labels — resolves
-   through here, so a panel that asks for paper gets all of it and not just a
-   pale rectangle with dark-theme ink written over the top. The page chrome
-   still reads <html> and stays in whatever theme the reader chose.
+/* Which token set the map draws itself in: always paper, on every panel and in
+   both themes. Everything on the canvas — base, coastlines, borders, place
+   labels, graticule, contour labels — resolves through here, so the chart gets
+   all of it and not just a pale rectangle with dark-theme ink written over the
+   top. The page chrome still reads <html> and stays in whatever theme the
+   reader chose.
 
-   LUTS is rebuilt whenever the domain changes, so this is looked up per draw
-   rather than cached. */
+   This used to be conditional on the shading asking for it, and only the
+   vapour ladder did. See the .paper block for why that condition was the wrong
+   shape: the map is a chart rather than part of the interface, and a chart
+   whose ramp is fixed cannot have its ink inverted around it and still mean
+   the same thing. */
 const PAPER_PROBE = document.getElementById('paper-probe');
-const mapCss = () => getComputedStyle(
-  (LUTS[state.field] || {}).paperBase ? PAPER_PROBE : document.documentElement);
+const mapCss = () => getComputedStyle(PAPER_PROBE);
 
 function drawGeo() {
   const css = mapCss();
@@ -3781,29 +3914,39 @@ function clearReadout(msg) {
 function readout(x, y) {
   const [lon, lat] = lonlat(x, y);
   const col = lon2col(lon), row = lat2row(lat);
-  const isPressure = D.keys.includes('msl');
-  // On the surface-pressure source the wind is absent by design, so the
-  // in-domain test falls to the field that source does carry.
-  const u = isPressure ? 0 : uAt(col, row);
-  const v = isPressure ? 0 : vAt(col, row);
-  const probe = isPressure ? sampleAt(CUR.msl, col, row) : u;
+  // Neither the surface-pressure panel nor the rainfall one carries a wind —
+  // by design on both — so the in-domain test falls to the field they do carry,
+  // which happens to be the same one.
+  const noWind = !D.keys.includes('u');
+  const isRain = D.shading.includes('r24');
+  const u = noWind ? 0 : uAt(col, row);
+  const v = noWind ? 0 : vAt(col, row);
+  const probe = noWind ? sampleAt(CUR.msl, col, row) : u;
 
   if (Number.isNaN(probe)) { clearReadout('Outside the domain'); return; }
 
   const ns = lat >= 0 ? 'N' : 'S', ew = lon >= 0 ? 'E' : 'W';
   $('r-pos').textContent = `${Math.abs(lat).toFixed(2)}°${ns}  ${Math.abs(lon).toFixed(2)}°${ew}`;
 
-  if (isPressure) {
-    // Three of the four rows have nothing to say here. Blanking them is better
-    // than leaving the previous panel's numbers under the cursor.
+  if (noWind) {
+    // There is no wind on either of these panels, so those two rows have
+    // nothing to say. Blanking them is better than leaving the previous
+    // panel's numbers under the cursor.
     $('r-temp').textContent = sampleCubic(CUR.msl, col, row).toFixed(1) + ' hPa';
     $('r-wind').textContent = '—';
     $('r-dir').textContent = '—';
-    $('r-prec').textContent = '—';
+    // The rain row is the one difference between the two: the surface panel has
+    // nothing to put in it, the rainfall panel has the whole point of itself.
+    $('r-prec').textContent = isRain
+      ? sampleShade('r24', CUR.r24, col, row).toFixed(1) + ' mm'
+      : '—';
     const pspec = LUTS[state.field];
     const pmark = $('cbar-mark');
     if (pspec) {
-      const f = barPos(pspec, sampleShade('msl', CUR.msl, col, row));
+      // Keyed to whatever is being shaded rather than to msl. Hard-coded, the
+      // rainfall panel's marker read the pressure at the cursor and placed it
+      // on a rainfall bar.
+      const f = barPos(pspec, sampleShade(state.field, CUR[state.field], col, row));
       pmark.style.opacity = '1';
       pmark.style.left = (f * 100) + '%';
     } else {
@@ -3918,6 +4061,21 @@ const DESCS = {
         + 'chart is read for.'),
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
+  // Plain prose, no emphasis marks: this string is set as textContent, so an
+  // asterisk is an asterisk on screen rather than italics.
+  r24: (d) => `Rainfall accumulated over the ${d.window || 24} hours ending at the `
+    + 'time shown, which is a total for the day rather than a snapshot of it, '
+    + 'from the IFS total-precipitation field differenced across the '
+    + 'window — rain and melted snow together, convective and large-scale together. '
+    + 'Consecutive frames overlap: at six-hourly steps two neighbouring charts '
+    + 'share eighteen hours of the same rain, which is what a running daily total '
+    + 'is rather than a fault in it. The loop therefore starts at +24 h, the first '
+    + 'hour that has a full day behind it. Isobars every 4 hPa over the top, '
+    + 'unlabelled here, so the band can be read against the system that is '
+    + 'producing it. Treat the totals as a pattern rather than a measurement: at '
+    + '0.25° a convective cell is smaller than a grid box, so the model spreads '
+    + 'what would fall in an hour over a wider, gentler area, and orography that '
+    + 'is smoothed to 25 km under-rains the windward slope it is smoothed off.',
   msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. Fronts are derived, not analysed: no model carries a fronts field, so these come from the thermal front parameter on 850 hPa wet-bulb potential temperature, typed by which way the wind is advecting it. Troughs are the valley lines of the pressure field itself, drawn as a plain heavy line and only where no front is already marking the same feature. Expect all of it to disagree with a hand analysis — occlusions are not separated out, and neither are upper fronts, upper troughs or convergence lines. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending.',
   /* A function, because three of its numbers are the build's rather than the
      page's: which levels the integral spanned and which level the contours
@@ -4016,6 +4174,8 @@ function syncDesc() {
   // numbers belong to the build rather than to the page.
   const entry = DESCS[state.field];
   const lead = state.field !== 'none' ? (typeof entry === 'function' ? entry(D) : entry)
+    : D.shading.includes('r24')
+      ? 'Isobars alone, without the rainfall shading under them. No fronts here — those are derived on the surface-pressure panel, which is the chart for them.'
     : D.keys.includes('msl')
       ? 'Isobars and fronts, without the pressure shading behind them.'
       : D.vector
@@ -5088,7 +5248,13 @@ function buildMgRangeButtons() {
       if (key === state.mgRange) return;
       state.mgRange = key;
       mgApplyRange();
+      // The crosshair is an index, and the two views do not number the same
+      // hour alike — frame 100 exists in one and not the other. Dropped rather
+      // than remapped: the pointer is still on the chart and the next move
+      // picks it up again.
       MG.hover = null;
+      MG.hoverY = null;
+      $('mg-tip').style.opacity = '0';
       showView('mgram');
     };
     box.appendChild(b);
@@ -5985,7 +6151,7 @@ function drawMeteogram() {
   }
 
   /* --- 5. the day header ------------------------------------------------- */
-  drawMgHeader(c, d, P, L, pal, xJoin);
+  drawMgHeader(c, d, P, L, pal);
 
   /* --- 6. the sky ribbon --------------------------------------------------
      Cloud cover and daylight in one 16 px strip: this is where day and night
@@ -6442,7 +6608,11 @@ function drawMeteogram() {
    trailing sliver of two or three hours is too narrow to summarise honestly,
    so it is merged into the previous cell's content and keeps only its tint and
    its midnight rule. */
-function drawMgHeader(c, d, P, L, pal, xJoin) {
+/* No join position is passed in. There used to be one and nothing here ever
+   read it, which only surfaced when the caller's variable was renamed for the
+   second join and this became a reference to something that no longer existed —
+   silently, since the argument was never touched. */
+function drawMgHeader(c, d, P, L, pal) {
   const ink = pal.ink;
   const hy = L.headY, hh = L.headH;
   const n = d.steps.length;
@@ -7017,7 +7187,10 @@ function satCarto(c, w, h) {
   const yTop = fy(ex.north), ySpan = fy(ex.north) - fy(ex.south);
   const X = (lon) => ((lon - ex.west) / (ex.east - ex.west)) * w;
   const Y = (lat) => ((yTop - fy(lat)) / ySpan) * h;
-  const css = getComputedStyle(document.documentElement);
+  // Paper, like every other map on the page. The imagery under this graticule
+  // is the satellite's own colour and never followed the theme; drawing the
+  // one themed thing on top of it in pale ink was the odd case out.
+  const css = mapCss();
 
   c.save();
   c.setLineDash([3, 4]);
