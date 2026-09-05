@@ -769,6 +769,12 @@ title: "Weather"
         <label>Place</label>
         <div class="btns" id="mg-places"></div>
       </div>
+      <!-- Hidden entirely when the payload has no long section, rather than
+           shown with one button: an empty choice is not a choice. -->
+      <div class="group" style="margin-left:14px" id="mg-range-group" hidden>
+        <label>Range</label>
+        <div class="btns" id="mg-ranges"></div>
+      </div>
       <span class="spacer"></span>
       <div class="mg-now" id="mg-now"></div>
     </div>
@@ -1207,16 +1213,17 @@ function adoptSource(modelKey, g, domainKey) {
       ...common, accumHours: null,
       keys: ['u', 'v', 'pv', 'van'],
       shading: ['van', 'spd', 'none'],
-      /* Streaklines over both shadings, which is the opposite of the 500 hPa
-         panel's rule and for a reason that inverts cleanly. There the contours
-         *are* the flow — height gradient is geostrophic wind — so streaks
-         redrew what the isohypses had already drawn. Here the contours are PV,
-         which says where the tropopause is, not which way the air is going; and
-         the shading is a v-wind anomaly, which says how far from normal the
-         flow is bent but nothing about its speed or its direction along the
-         jet. The wind is genuinely a third variable on this chart, so it is
-         available over either. */
-      flowFields: ['van', 'spd'],
+      /* No streaklines, on any shading. This chart already asks a reader to
+         hold two fields at once — a contoured PV surface and a diverging
+         anomaly under it — and the PV contours are fine, closely spaced curves
+         rather than the broad isohypses the other panels carry. Animated
+         streaks over them read as a third field competing with the two that
+         matter, and the moving ink crosses the very lines the chart is for.
+
+         The wind has not gone: it is still under the cursor as speed and
+         direction, and it is still a shading option in its own right. What is
+         gone is drawing it on top of everything else at 60 fps. */
+      flowFields: [],
       /* Every whole PVU, labelled. 2 PVU is conventionally the dynamical
          tropopause and the line a reader is looking for, but it is not
          emphasised: on this frame the 2 PVU contour runs the width of the map
@@ -1673,6 +1680,9 @@ const state = {
   // second opinion on the panel, not the panel.
   satOvl: false,
   mgPlace: 'valletta',
+  // The chart opens at the range it has always had. The extra nine days are
+  // asked for, not defaulted into — see mgClip.
+  mgRange: 'short',
   // The synoptic level the tab reopens on. 500 hPa is where a reader starts
   // reading a synoptic situation, so it is where the tab starts.
   synoptic: 'europe',
@@ -3897,7 +3907,15 @@ const DESCS = {
      identifies it — by the field it carries. */
   spd: (d) => (d.keys.includes('sig') ? '500 hPa'
     : d.level ? `${d.level} hPa` : '10 m')
-    + ' wind speed shaded, with the flow itself drawn as advected streaklines over it.',
+    + ' wind speed shaded'
+    // A source may decline the streaklines, and one now does. Promising them
+    // in the sentence while the panel refuses to draw them is the kind of
+    // small lie that makes a reader distrust the rest of the caption.
+    + ((!d.flowFields || d.flowFields.includes('spd'))
+      ? ', with the flow itself drawn as advected streaklines over it.'
+      : '. The flow is not animated over this chart: the contours above it are '
+        + 'finer than the other panels\' and moving ink crosses the lines the '
+        + 'chart is read for.'),
   p: 'Precipitation totalled over each interval, differenced from the model\'s accumulation since initialisation, over land and sea. Dry ground is left unshaded.',
   sig: '500 hPa height anomaly in standard deviations from the 1981–2010 NCEP/NCAR daily climatology, contoured every 6 dam with the 552 dam line picked out, and the 500 hPa flow as streaklines.',
   msl: 'Mean sea level pressure, contoured every 4 hPa as on a surface analysis chart, with the highs and lows labelled to the nearest whole hectopascal. Centres are found in the field rather than from the isobars, so a shallow feature that closes no contour is still named. Fronts are derived, not analysed: no model carries a fronts field, so these come from the thermal front parameter on 850 hPa wet-bulb potential temperature, typed by which way the wind is advecting it. Troughs are the valley lines of the pressure field itself, drawn as a plain heavy line and only where no front is already marking the same feature. Expect all of it to disagree with a hand analysis — occlusions are not separated out, and neither are upper fronts, upper troughs or convergence lines. IFS rather than ICON-EU because ICON-EU\'s grid stops at 23.5° W and this chart is about what the Atlantic is sending.',
@@ -3935,8 +3953,8 @@ const DESCS = {
     'normal for the date, so an amplified trough and ridge show as a ' +
     'blue-and-orange couplet and a fast but zonal jet barely registers at ' +
     'all. That is what makes Rossby wave packets and blocking legible — the ' +
-    'streaklines say how fast the wind is going, this says how far it is ' +
-    'being bent. Contours are potential vorticity averaged over the ' +
+    'wind-speed shading says how fast the flow is going, this says how far it ' +
+    'is being bent. Contours are potential vorticity averaged over the ' +
     (d.pvLayer ? d.pvLayer.join('–') : '300–200') + ' hPa layer, every 1 PVU ' +
     'and labelled. The 2 PVU line is conventionally the dynamical tropopause, ' +
     'so where it dips equatorward the tropopause is low and the air beneath ' +
@@ -4003,7 +4021,7 @@ function syncDesc() {
       : D.vector
         ? 'The transport vectors as streaklines over the 700 hPa height contours, without the shading behind them. Direction without magnitude: where the moisture is going, with nothing said about how much of it there is.'
         : D.keys.includes('van')
-          ? 'Potential vorticity contours and the ' + (D.level || 250) + ' hPa flow, without the anomaly shading behind them. The 2 PVU line alone, which is the tropopause and often all a reader wants from this chart.'
+          ? 'Potential vorticity contours alone, without the anomaly shading behind them. The 2 PVU line on an empty frame, which is the tropopause and often all a reader wants from this chart.'
           : DESCS.none;
   /* Named only while the overlay is switched on. Keyed to the toggle rather
      than to whether this particular hour has a picture, so that scrubbing does
@@ -4936,7 +4954,7 @@ $('gif-go').onclick = makeGif;
    reads off the chart; the number stays in the hover readout.
    --------------------------------------------------------------------------- */
 
-const MG = { data: null, layout: null, hover: null, hoverY: null };
+const MG = { full: null, data: null, layout: null, hover: null, hoverY: null };
 
 const mgCanvas = $('mg-canvas');
 const mgCtx = mgCanvas.getContext('2d');
@@ -4949,11 +4967,76 @@ const MG_PLACES = {
   zurich: { label: 'Zürich', file: 'meteogram_zurich.js', global: 'MGRAM_ZURICH', domain: 'zurich' },
 };
 
+/* Two ranges out of one payload.
+
+   The chart runs to +360 h now, and drawn all at once that is a poor default:
+   the x axis is linear in time, so the hourly ICON-2I head — the part anyone
+   asking "what is it doing tomorrow" actually came for — would be squeezed into
+   a fifth of the width to make room for nine days it cannot resolve anyway.
+
+   So the default view is the forecast as it was before the long range existed,
+   and the extra days are a button rather than a tax. Both come out of the same
+   download; this only decides where to stop reading it.
+
+   The cut is `extendedFrom` from the payload — the index where IFS takes over —
+   rather than an hour. The ordinary range ends at +120 h with the ICON-EU tail
+   and at +72 h without it, and a hard-coded boundary would hide two days of
+   ICON-2I behind the button on a cycle when DWD was late. */
+const MG_SERIES = ['steps', 'span', 'temp', 'dew', 'wind', 'gust', 'dir',
+                   'precip', 'cloud', 'pres'];
+const MG_CLIPS = new WeakMap();
+
+function mgSplit(d) {
+  if (!d || !d.steps) return 0;
+  if (Number.isInteger(d.extendedFrom)) return d.extendedFrom;
+  // Older payloads, from before the pipeline said so: the last handover, but
+  // only when the chart actually runs past where it used to end.
+  const js = mgJoins(d);
+  const last = js[js.length - 1];
+  return last && d.steps[d.steps.length - 1] > 120 ? last.from : 0;
+}
+
+/* True when there is a longer view to offer at all. A cycle where ECMWF could
+   not be reached has none, and the control hides itself rather than offering a
+   second view identical to the first. */
+const mgHasExtended = (d) => { const s = mgSplit(d); return s > 1 && s < d.steps.length; };
+
+function mgClip(full, range) {
+  if (!full || range === 'long' || !mgHasExtended(full)) return full;
+  /* Memoised, and it has to be: mgPrepare caches on object identity, and a
+     fresh clip per draw would recompute every day boundary and every sunrise
+     on every animation frame. */
+  let c = MG_CLIPS.get(full);
+  if (c) return c;
+  const n = mgSplit(full);
+  c = { ...full };
+  for (const k of MG_SERIES) if (Array.isArray(full[k])) c[k] = full[k].slice(0, n);
+  c.joins = mgJoins(full).filter((j) => j.from < n);
+  delete c.extendedFrom;
+  // The legacy pair kept in step with the clipped joins, since `tail` on the
+  // day cards is still read off tailFrom.
+  if (c.joins.length) {
+    c.tailFrom = c.joins[0].from;
+    c.tailModel = c.joins[0].model;
+    c.tailShort = c.joins[0].short;
+  } else {
+    delete c.tailFrom; delete c.tailModel; delete c.tailShort;
+  }
+  MG_CLIPS.set(full, c);
+  return c;
+}
+
+/* MG.full is the payload as downloaded; MG.data is the part on show. Everything
+   that renders reads MG.data and needs to know nothing about the split. */
+function mgApplyRange() {
+  MG.data = mgClip(MG.full, state.mgRange || 'short');
+}
+
 function ensureMgram(key) {
   key = key || state.mgPlace || 'valletta';
   const p = MG_PLACES[key];
   if (!p) return Promise.reject(new Error('unknown place ' + key));
-  const take = () => { MG.data = window[p.global]; state.mgPlace = key; };
+  const take = () => { MG.full = window[p.global]; mgApplyRange(); state.mgPlace = key; };
   if (window[p.global]) { take(); return Promise.resolve(); }
   return loadScript(`${DATA_BASE}/${p.file}`).then(take);
 }
@@ -4974,6 +5057,39 @@ function buildMgPlaceButtons() {
         .then(() => { buildMgPlaceButtons(); showView('mgram'); })
         .catch((e) => console.error(e))
         .finally(() => setBusy(false));
+    };
+    box.appendChild(b);
+  }
+}
+
+/* The two ranges, named for what they are to a reader rather than for the
+   models behind them. "Forecast" is the chart as it was before the long range
+   existed; "Extended" is that plus everything IFS will still say. */
+const MG_RANGES = {
+  short: { label: 'Forecast' },
+  long: { label: 'Extended' },
+};
+
+function buildMgRangeButtons() {
+  const box = $('mg-ranges'), group = $('mg-range-group');
+  if (!box || !group) return;
+  const has = mgHasExtended(MG.full);
+  group.hidden = !has;
+  if (!has) return;
+  box.innerHTML = '';
+  for (const [key, r] of Object.entries(MG_RANGES)) {
+    const b = document.createElement('button');
+    b.textContent = r.label;
+    b.dataset.range = key;
+    b.setAttribute('aria-pressed', String(key === (state.mgRange || 'short')));
+    // Both ranges are already in memory, so this is a redraw and not a load —
+    // no busy state, and no promise to wait on.
+    b.onclick = () => {
+      if (key === state.mgRange) return;
+      state.mgRange = key;
+      mgApplyRange();
+      MG.hover = null;
+      showView('mgram');
     };
     box.appendChild(b);
   }
@@ -7706,6 +7822,7 @@ function showView(name) {
   else {
     const d = MG.data;
     buildMgPlaceButtons();
+    buildMgRangeButtons();
     $('mg-place').textContent = d ? d.place : 'Point forecast';
     if (d) {
       const init = new Date(d.init);
@@ -7810,8 +7927,13 @@ function syncHash() {
   if (state.view === 'sat') { satHash(); return; }
   let hash;
   if (state.view === 'mgram') {
-    // The meteogram shows the whole run at once, so it has no frame to address.
-    hash = '#meteogram/malta';
+    /* The meteogram shows the whole run at once, so it has no frame to address
+       — but it does have a place and a range, and both have to survive being
+       copied out of the address bar. The place was hard-coded to malta here,
+       which meant a link sent from the Zürich chart opened Valletta. */
+    const place = MG_PLACES[state.mgPlace || 'valletta'];
+    hash = `#meteogram/${place ? place.domain : 'malta'}`
+      + (state.mgRange === 'long' && mgHasExtended(MG.full) ? '/extended' : '');
   } else {
     const hours = Math.round(validAt(state.tf).hours);
     const model = state.model === modelFor(state.domain) ? '' : `/${MODEL_SLUG[state.model]}`;
@@ -7860,11 +7982,26 @@ function applyHash() {
     showView('map'); toDefaultModel(); return;
   }
 
+  /* The meteogram is matched before the general pattern rather than through it.
+     Its third segment is a range, where every other product's is a model slug,
+     and folding both into one alternation would let #t2m/malta/extended parse
+     as something meaningful. */
+  const mg = /^#meteogram(?:\/([\w-]+))?(?:\/(extended))?$/.exec(BOOT_HASH);
+  if (mg) {
+    const [, domainSlug, ext] = mg;
+    const place = Object.entries(MG_PLACES)
+      .find(([, p]) => p.domain === domainSlug);
+    if (place) state.mgPlace = place[0];
+    // Honoured only if this payload has a long section; a stale link must not
+    // leave the range buttons pressed on a view that does not exist.
+    state.mgRange = ext ? 'long' : 'short';
+    openMeteogram();
+    return;
+  }
+
   const m = /^#([\w-]+)\/([\w-]+)(?:\/(icon-eu|icon-2i|ifs))?(?:\/([fp]?)(\d+))?$/.exec(BOOT_HASH);
   if (!m) { showView('map'); toDefaultModel(); return; }
   const [, product, domain, modelSlug, hourSign, hourText] = m;
-
-  if (product === 'meteogram') { openMeteogram(); return; }
 
   // Validated rather than trusted: a link can outlive the cycle it pointed at,
   // and a domain, model or product that does not exist must fall back rather
