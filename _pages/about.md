@@ -22,26 +22,155 @@ Before my PhD, I completed a fellowship in Earth Observation at the [European Sp
 
 
 
-<section class="content-box" markdown="1">
+<style>
+.ri {
+  --ri-card-bg: #fff;
+  --ri-chip-bg: #eceff1;
+  --ri-accent: #2a7793;
+}
+html[data-theme="dark"] .ri {
+  --ri-card-bg: rgba(255, 255, 255, .045);
+  --ri-chip-bg: rgba(255, 255, 255, .08);
+  --ri-accent: #5cc6e4;
+}
+.ri-lead {
+  font-size: 1.04rem;
+  line-height: 1.62;
+  color: var(--global-text-color);
+  max-width: 46em;
+  margin: 0 0 1.5em;
+}
+.ri-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+  margin: 0 0 1.9em;
+}
+.ri-card {
+  border: 1px solid var(--global-border-color);
+  border-radius: 11px;
+  background: var(--ri-card-bg);
+  padding: 16px 17px 17px;
+  transition: border-color .15s ease;
+}
+.ri-card:hover { border-color: var(--ri-accent); }
+.ri-icon {
+  display: block;
+  font-size: .95rem;
+  color: var(--ri-accent);
+  margin: 0 0 10px;
+}
+.ri-title {
+  font-size: .97rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -.008em;
+  color: var(--global-text-color);
+  margin: 0 0 6px;
+}
+.ri-desc {
+  font-size: .85rem;
+  line-height: 1.55;
+  color: var(--global-text-color-light);
+  margin: 0;
+}
+.ri-kicker {
+  display: flex;
+  align-items: center;
+  gap: .85em;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: .68rem;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--global-text-color-light);
+  margin: 0 0 .95em;
+}
+.ri-kicker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--global-border-color);
+}
+.ri-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ri-chips li {
+  font-size: .8rem;
+  line-height: 1.2;
+  color: var(--global-text-color-light);
+  background: var(--ri-chip-bg);
+  border-radius: 999px;
+  padding: 6px 12px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ri-card { transition: none; }
+}
+</style>
 
-## Research
+<section class="content-box">
 
-My main research interests include:
+<h2>Research</h2>
 
-- Earth System Modelling
-- Aerosol-cloud interactions
-- Cloud physics
-- Aerosol-climate interactions
-- Vegetation-atmosphere interactions
-- Convection
+<div class="ri">
 
-Other research interests:
+<p class="ri-lead">My work sits at the intersection of atmospheric physics and chemistry, climate science and Earth-system modelling &mdash; with a particular interest in the processes that shape clouds, and the part they play in the climate system.</p>
 
-- Earth Observation
-- Satellite remote sensing
-- Shipping emissions
-- Light pollution
+<div class="ri-grid">
 
+<div class="ri-card">
+<i class="fas fa-earth-europe ri-icon" aria-hidden="true"></i>
+<h3 class="ri-title">Earth-system modelling</h3>
+<p class="ri-desc">Coupled global models, used to follow how a change in one part of the system propagates through the rest.</p>
+</div>
+
+<div class="ri-card">
+<i class="fas fa-cloud ri-icon" aria-hidden="true"></i>
+<h3 class="ri-title">Aerosol&ndash;cloud interactions</h3>
+<p class="ri-desc">How particles seed droplets and ice crystals &mdash; still the largest single uncertainty in the climate forcing record.</p>
+</div>
+
+<div class="ri-card">
+<i class="fas fa-snowflake ri-icon" aria-hidden="true"></i>
+<h3 class="ri-title">Cloud physics</h3>
+<p class="ri-desc">The microphysics inside a cloud: nucleation, growth, freezing, and the step from droplet to precipitation.</p>
+</div>
+
+<div class="ri-card">
+<i class="fas fa-sun ri-icon" aria-hidden="true"></i>
+<h3 class="ri-title">Aerosol&ndash;climate interactions</h3>
+<p class="ri-desc">The response of the climate system to aerosol, from direct scattering of sunlight through to circulation change.</p>
+</div>
+
+<div class="ri-card">
+<i class="fas fa-leaf ri-icon" aria-hidden="true"></i>
+<h3 class="ri-title">Vegetation&ndash;atmosphere interactions</h3>
+<p class="ri-desc">Biogenic volatile organic compounds, and the chemistry that couples the land biosphere to aerosol and cloud.</p>
+</div>
+
+<div class="ri-card">
+<i class="fas fa-cloud-bolt ri-icon" aria-hidden="true"></i>
+<h3 class="ri-title">Convection</h3>
+<p class="ri-desc">How convection organises, carries moisture and aerosol upward, and drives extreme rainfall.</p>
+</div>
+
+</div>
+
+<p class="ri-kicker">Also</p>
+
+<ul class="ri-chips">
+<li>Earth observation</li>
+<li>Satellite remote sensing</li>
+<li>Shipping emissions</li>
+<li>Light pollution</li>
+</ul>
+
+</div>
 
 </section>
 
