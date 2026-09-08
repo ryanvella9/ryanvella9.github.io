@@ -55,6 +55,19 @@ $medium-wide                : 900px !default;
 $large                      : 925px !default;
 $x-large                    : 1280px !default;
 
+/* Width of the centred page container, deliberately separate from $x-large.
+   $x-large is the breakpoint that switches the container on; widening that
+   would push the switch further out rather than widen the page, so the two
+   have to be different numbers. At 1280px a 1920px screen wore ~320px of
+   empty margin down each side. */
+$container-max-width        : 1600px !default;
+
+/* Measure cap for body copy. The container above is wider than prose wants to
+   be -- filling it puts body text at ~130 characters a line, well past the
+   45-90 that reads comfortably -- so text blocks are held to this and centred
+   in the column, while the cover, figures and cards take the full width. */
+$measure                    : 56rem !default;
+
 /* ==========================================================================
    Grid
    ========================================================================== */

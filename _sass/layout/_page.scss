@@ -12,7 +12,7 @@
   animation-delay: 0.35s;
 
   @include breakpoint($x-large) {
-    max-width: $x-large;
+    max-width: $container-max-width;
   }
 }
 
@@ -35,6 +35,22 @@
     .page__meta,
     .page__share {
       @include full();
+    }
+
+    /* full() above stretches these across the whole container, which is wider
+       than prose wants to be: at $container-max-width that is ~130 characters
+       a line. Hold the reading column to $measure and centre it. The float has
+       to go with it -- auto margins do not centre a floated box. .page__cover
+       is deliberately left out, being the one element that gains from the
+       extra width. */
+    > header,
+    > .page__content,
+    > .page__meta,
+    > .page__share {
+      float: none;
+      max-width: $measure;
+      margin-left: auto;
+      margin-right: auto;
     }
   }
 }
@@ -140,7 +156,7 @@
       padding-right: 1em;
 
       @include breakpoint($x-large) {
-        max-width: $x-large;
+        max-width: $container-max-width;
       }
     }
 
