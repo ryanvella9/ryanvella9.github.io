@@ -6,11 +6,17 @@ author_profile: true
 ---
 
 <style>
+/* Fixed-width columns rather than 1fr, so two photos stay thumbnail-sized
+   instead of stretching to fill half the page each. */
 .ph-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(auto-fill, 210px);
+  justify-content: start;
+  gap: 16px;
   margin: 1.4em 0 0;
+}
+@media (max-width: 480px) {
+  .ph-grid { grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
 }
 .ph-item {
   display: block;
