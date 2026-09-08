@@ -18,6 +18,9 @@ main:
   - title: "Outreach"
     url: /outreach/
 
+  - title: "Photography"
+    url: /photography/
+
   - title: "Projects"
     url: /projects/
     children:
