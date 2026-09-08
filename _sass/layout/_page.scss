@@ -17,10 +17,15 @@
 }
 
 .page {
+  /* No suffix here. A suffix(2 of 12) used to sit below, which is a 16.95%
+     padding-right -- 211px of dead space at 1920px that held the text column
+     to 770px however wide the screen got, and pushed it left of centre. It
+     also left this narrower than .archive, which spans the same 10 of 12 with
+     the same prefix and no suffix; the landing page came out 210px narrower
+     than /outreach/. Keep the two in step. */
   @include breakpoint($large) {
     @include span(10 of 12 last);
     @include prefix(0.5 of 12);
-    @include suffix(2 of 12);
   }
 
   .page__inner-wrap {
