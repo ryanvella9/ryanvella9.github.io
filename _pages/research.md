@@ -29,7 +29,7 @@ html[data-theme="dark"] .rx {
   aspect-ratio: 16 / 9;
   border-radius: 10px;
   overflow: hidden;
-  background: #05070a center / cover no-repeat;
+  background: #14181b center / cover no-repeat;
 }
 .rx-vis-video { width: 100%; height: 100%; object-fit: cover; display: block; }
 .rx-vis-cap {
@@ -190,9 +190,9 @@ html[data-theme="dark"] .rx {
 
 <div class="rx">
 <figure class="rx-vis">
-<div class="rx-vis-frame" style="background-image: url('/images/icon-ham-poster.jpg');">
-<video class="rx-vis-video" autoplay muted loop playsinline preload="metadata" poster="/images/icon-ham-poster.jpg">
-<source src="/images/icon-ham.mp4" type="video/mp4">
+<div class="rx-vis-frame" style="background-image: url('/images/icon-ham-globes-poster.jpg');">
+<video class="rx-vis-video" autoplay muted loop playsinline preload="metadata" poster="/images/icon-ham-globes-poster.jpg">
+<source src="/images/icon-ham-globes.mp4" type="video/mp4">
 </video>
 </div>
 <figcaption class="rx-vis-cap"><b>Aerosols, clouds and precipitation in a global ICON-HAM simulation, 1999&ndash;2010.</b> Aerosol optical depth at 550&nbsp;nm split by species (left), total cloud cover (centre) and precipitation rate (right).</figcaption>
