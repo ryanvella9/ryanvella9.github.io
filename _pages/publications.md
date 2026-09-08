@@ -19,7 +19,7 @@ html[data-theme="dark"] .pub-list {
   --pub-hover: rgba(255, 255, 255, .06);
   --pub-sep: rgba(255, 255, 255, .28);
 }
-.pub-list a.pub {
+.pub-list .pub {
   display: grid;
   grid-template-columns: 112px 1fr 22px;
   gap: 20px;
@@ -30,8 +30,8 @@ html[data-theme="dark"] .pub-list {
   text-decoration: none;
   transition: background .15s ease, border-color .15s ease;
 }
-.pub-list a.pub + a.pub { border-top: 1px solid var(--global-border-color); }
-.pub-list a.pub + a.pub.yb { border-top: 2px solid var(--pub-sep); margin-top: 9px; padding-top: 22px; }
+.pub-list .pub + .pub { border-top: 1px solid var(--global-border-color); }
+.pub-list .pub + .pub.yb { border-top: 2px solid var(--pub-sep); margin-top: 9px; padding-top: 22px; }
 .pub-list a.pub:hover {
   background: var(--pub-hover);
   border-left-color: var(--global-link-color);
@@ -89,7 +89,7 @@ html[data-theme="dark"] .pub-list {
   transition: opacity .15s ease, transform .15s ease;
 }
 @media (max-width: 520px) {
-  .pub-list a.pub { grid-template-columns: 1fr; gap: 6px; padding: 15px 12px; }
+  .pub-list .pub { grid-template-columns: 1fr; gap: 6px; padding: 15px 12px; }
   .pub-meta { padding-top: 0; }
   .pub-meta .pub-y { display: inline; font-size: .85rem; margin-right: 8px; }
   .pub-arrow { display: none; }
@@ -97,6 +97,10 @@ html[data-theme="dark"] .pub-list {
 </style>
 
 <div class="pub-list">
+<div class="pub">
+<div class="pub-meta"><span class="pub-y">2026</span>Atmos. Res.</div>
+<div class="pub-main"><div class="pub-title">A multi-station climatology of the Maltese Islands: coastal, topographic, and urban drivers of intra-island variability<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Ciarlo, J. M., <strong>Vella, R.</strong>, Cauchi, J. P., Camilleri, S., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.</div></div>
+</div>
 <a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2961/">
 <div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Aerosol&ndash;cloud interactions influence the climate response to AMOC weakening<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Lohmann, U.</div></div>
