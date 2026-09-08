@@ -85,6 +85,9 @@ body.ph-locked { overflow: hidden; }
 </style>
 
 <div class="ph-grid">
+<button type="button" class="ph-item" aria-label="Enlarge: the Milky Way over Death Valley">
+<img src="/images/photography/final_milkyway_plus_background.jpg" alt="The Milky Way rising over a dark ridge in Death Valley, California" width="1344" height="2000" loading="lazy">
+</button>
 <button type="button" class="ph-item" aria-label="Enlarge: dragonfly resting on a bramble stem">
 <img src="/images/photography/dsc05911.jpg" alt="A dragonfly resting on a bramble stem against a green background" width="2000" height="2000" loading="lazy">
 </button>
