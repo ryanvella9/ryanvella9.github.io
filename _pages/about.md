@@ -32,7 +32,7 @@ My main research interests include:
 - Aerosol-cloud interactions
 - Cloud physics
 - Aerosol-climate interactions
-- Land-biosphere-atmosphere interactions
+- Vegetation-atmosphere interactions
 - Convection
 
 Other research interests:

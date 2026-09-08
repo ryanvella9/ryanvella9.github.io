@@ -66,3 +66,14 @@ html[data-theme="dark"] {
     --global-text-color-light           : #{$text-muted};
     --global-thead-color                : #{$border};
 }
+
+/* The GitHub mark carries its brand colour (#171516), which is all but
+   invisible against the page. GitHub's own guidance is to invert the mark on
+   dark backgrounds, so paint it white in the sidebar and the footer. */
+html[data-theme="dark"] .social-icons {
+    .fa-github,
+    .fa-github-alt,
+    .fa-github-square {
+        color: #fff;
+    }
+}
