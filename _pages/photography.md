@@ -99,6 +99,9 @@ body.ph-locked { overflow: hidden; }
 </div>
 
 <script>
+/* The site's HTML compressor collapses this block onto a single line, so only
+   block comments are safe here: a double-slash comment would swallow the whole
+   rest of the script and break it. */
 (function () {
   var box = document.querySelector(".ph-lb");
   var full = box.querySelector("img");
@@ -116,7 +119,7 @@ body.ph-locked { overflow: hidden; }
   function close() {
     box.classList.remove("is-open");
     document.body.classList.remove("ph-locked");
-    // Drop the source so a large image is not held in memory while closed.
+    /* Drop the source so a large image is not held in memory while closed. */
     full.src = "";
     if (opener) { opener.focus(); opener = null; }
   }
@@ -129,7 +132,7 @@ body.ph-locked { overflow: hidden; }
   });
 
   closeBtn.addEventListener("click", close);
-  // Clicking the photo itself should not dismiss, only the surrounding backdrop.
+  /* Clicking the photo itself should not dismiss, only the surrounding backdrop. */
   box.addEventListener("click", function (e) { if (e.target !== full) close(); });
   document.addEventListener("keydown", function (e) {
     if (e.key === "Escape" && box.classList.contains("is-open")) close();
