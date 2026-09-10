@@ -677,6 +677,7 @@ title: "Weather"
         <label>Source</label>
         <div class="btns" id="sat-sources">
           <button data-source="mtg" aria-pressed="true">Malta</button>
+          <button data-source="medit" aria-pressed="false">Central Med</button>
           <button data-source="disc" aria-pressed="false">Full disc</button>
         </div>
       </div>
@@ -893,6 +894,7 @@ title: "Weather"
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_geo.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/panel_data.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_malta.js"></script>
+<script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_medit.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sat_disc.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/sentinel_malta.js"></script>
 <script src="https://ryanvella9.github.io/malta-forecast-charts/sat/ndvi_malta.js"></script>
@@ -6907,6 +6909,7 @@ $('mg-wrap').addEventListener('pointerleave', () => {
    that positioned the forecast silently repositioned the loop. Same feature,
    collision removed. */
 const SAT = window.SAT_MALTA || null;
+const SAT_MEDIT = window.SAT_MEDIT || null;
 const SAT_DISC = window.SAT_DISC || null;
 const SAT_CACHE = new Map();
 const SAT_BAD = new Set();
@@ -6921,9 +6924,19 @@ const SAT_BAD = new Set();
    Registered only when it has frames. A fetcher that has never run, or one
    whose window has aged out, leaves its button hidden rather than offering a
    source that selects an empty timeline. */
+/* Registered in zoom order — islands, basin, hemisphere — which is the order
+   the source row reads in and the order a reader widens out through. */
 const SAT_LOOPS = {};
 if (SAT && SAT.frames.length) SAT_LOOPS.mtg = SAT;
+if (SAT_MEDIT && SAT_MEDIT.frames.length) SAT_LOOPS.medit = SAT_MEDIT;
 if (SAT_DISC && SAT_DISC.frames.length) SAT_LOOPS.disc = SAT_DISC;
+
+/* Which coastline each loop wants drawn over it, by PANEL_GEO domain.
+   Keyed rather than hardcoded to the Malta box because the geometry has to
+   follow the frame: a loop's own domain generalised to its own scale. A loop
+   absent from here gets no coastline, which is the right answer for the disc —
+   see satCarto, where both halves of that reasoning live. */
+const SAT_GEO = { mtg: 'malta', medit: 'medit' };
 
 const satLoop = () => SAT_LOOPS[satState.source] || null;
 const satLoopKeys = () => Object.keys(SAT_LOOPS);
@@ -7163,11 +7176,6 @@ function satDraw() {
    frames are resampled server-side into this exact Mercator box, which is what
    lets a plain drawImage put the coast on the coast. */
 function satCarto(c, w, h) {
-  /* GEOALL.malta, not GEO. GEO is whichever domain the map last loaded, so a
-     reader who looked at the 500 hPa chart and came back got the Europe
-     coastline — generalised to continental scale and clipped to that box — drawn
-     over Malta: the islands became a four-sided blob. The frames are always the
-     Malta domain, so the geometry always is too. */
   /* Nothing is drawn over the disc. On a geostationary projection no straight
      line is a meridian and no straight line is a parallel — both curve, and
      the curvature is the whole point of the picture — so the graticule every
@@ -7176,9 +7184,8 @@ function satCarto(c, w, h) {
      lit, green and ochre by day and city-lit by night, against black. */
   if (satProjection() === 'geos') return;
 
-  const geo = (typeof GEOALL !== 'undefined' && GEOALL.malta) || GEO;
   const ex = satExtent();
-  if (!geo || !ex) return;
+  if (!ex) return;
   // The full disc arrives equirectangular, so its parallels are evenly spaced
   // rather than stretched towards the pole. Running it through merc() would
   // put the 60th parallel about a fifth of the frame from where it belongs.
@@ -7217,12 +7224,25 @@ function satCarto(c, w, h) {
      hides the harbours it is meant to locate, and turns the sharpest thing in
      the frame into something that looks stickered on.
 
-     The full disc is out for both reasons at once. GEOALL.malta is a Malta-box
-     coastline, so on a hemisphere it would draw the islands' outline across a
-     few pixels of the Mediterranean and nothing else — and it would not be
-     needed anyway, since Geo Colour renders land itself: green and ochre by
-     day, and the cities lit at night. */
-  if (satIsStill() || satState.source !== 'mtg') return;
+     The full disc is out for both reasons at once, which is why it has no entry
+     in SAT_GEO: there is no coastline at hemisphere scale that would help, and
+     Geo Colour renders land itself anyway — green and ochre by day, and the
+     cities lit at night.
+
+     The central Med is the case that made this a lookup rather than a test for
+     'mtg'. It is Geo Colour like the disc, so by day it locates its own
+     continents; but half the loop is night, and after dark Geo Colour's
+     infrared side is grey cloud over grey sea with only the cities to read
+     position from. Its own domain's coastline is drawn at its own scale, so
+     unlike the Malta geometry on a hemisphere it is the right shoreline in the
+     right place.
+
+     GEOALL, never GEO: GEO is whichever domain the map last loaded, so a reader
+     who looked at the 500 hPa chart and came back once got the Europe coastline
+     — generalised to continental scale — drawn over Malta, and the islands
+     became a four-sided blob. */
+  const geo = (typeof GEOALL !== 'undefined' && GEOALL[SAT_GEO[satState.source]]) || null;
+  if (satIsStill() || !geo) return;
 
   // Brighter than the map's coastline: it is drawn over a photograph rather
   // than over a smooth field, so a hairline disappears into the texture.
@@ -7625,6 +7645,14 @@ const SAT_DESCS = {
     'MTG FCI over Malta, the last 24 hours. True colour while the sun is up, ' +
     '10.5 µm infrared after dark — inverted so cloud is white in both. ' +
     'Observation only: this loop ends at the newest scan and has no forecast.',
+  medit:
+    'The central Mediterranean, the last 24 hours — the same frame as the ' +
+    'Central Mediterranean surface panels, so the observed cloud and the ' +
+    'forecast field are of the same place. Geo Colour: true colour by day ' +
+    'blended into infrared and city lights after dark, which is what lets one ' +
+    'loop cover a box wide enough to be half lit at dusk. The scale the Malta ' +
+    'loop cannot show — where tonight’s cloud is coming from — and the ' +
+    'one the disc shows too small.',
   disc:
     'The whole Meteosat disc, the last two hours at ten-minutely. Geo Colour: ' +
     'true colour in daylight blended into infrared and city lights across the ' +
@@ -8135,14 +8163,15 @@ function applyHash() {
   if (/^#satellite(\/|$)/.test(BOOT_HASH)) {
     if (satLoopKeys().length || satStills().length) {
       /* #satellite/s2, /s3 and /ndvi select a still; #satellite/disc the full-disc
-         loop; a bare #satellite/YYYYMMDDTHHMM the Malta loop, which is what
-         that form has always meant. A named loop may carry a stamp after it.
+         loop and /medit the central Med; a bare #satellite/YYYYMMDDTHHMM the
+         Malta loop, which is what that form has always meant. A named loop may
+         carry a stamp after it.
 
          The stamp used to be parsed and then dropped — every link opened on
          the newest scan, so sending someone the shower you were looking at
          sent them the weather at the moment they clicked instead. It is now
          honoured, which is the only reason the address bar was writing it. */
-      const want = /^#satellite\/(?:(s2|s3|ndvi|disc|mtg)(?:\/(\d{8}T\d{4}))?|(\d{8}T\d{4}))$/
+      const want = /^#satellite\/(?:(s2|s3|ndvi|disc|medit|mtg)(?:\/(\d{8}T\d{4}))?|(\d{8}T\d{4}))$/
         .exec(BOOT_HASH);
       // showView first: satSetSource re-lays-out the panel, and satResize is a
       // no-op while the section is still hidden and has no width.
