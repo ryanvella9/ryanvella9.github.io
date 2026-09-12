@@ -379,7 +379,7 @@ title: "Weather"
   footer summary { cursor: pointer; color: var(--accent); font-size: 11.5px; }
   footer .body { margin-top: 6px; }
 
-  /* ---------------------------------------------------------- GIF export -- */
+  /* -------------------------------------------------------------- exports -- */
 
   .modal {
     position: fixed; inset: 0; background: rgba(16, 32, 39, .45);
@@ -402,7 +402,39 @@ title: "Weather"
   .sheet .actions { display: flex; align-items: center; margin-top: 16px; }
   .sheet button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
   .sheet .bar { height: 6px; border-radius: 3px; background: var(--grid, var(--accent-soft)); margin-top: 12px; overflow: hidden; }
+  /* The header's own .bar is a flex row, and a class selector setting `display`
+     beats the `hidden` attribute — so a progress bar that had been switched off
+     stayed on screen as an empty track. Both sheets used the attribute and
+     neither was getting it. */
+  .sheet .bar[hidden] { display: none; }
   .sheet .bar i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .15s; }
+  /* The daily sheet is wider than the GIF one because it is not a form: it is a
+     list of finished images, and a thumbnail small enough to fit a 460 px sheet
+     beside its caption is too small to tell a wet day from a dry one — which is
+     the one thing the reader is picking between. */
+  .sheet.wide { width: min(760px, 100%); }
+  .days { display: grid; gap: 8px; margin-top: 12px; max-height: 46vh; overflow-y: auto; }
+  .day {
+    display: flex; align-items: center; gap: 12px; padding: 8px;
+    border: 1px solid var(--border); border-radius: 8px;
+  }
+  /* Checkerboard under the thumbnail, not the panel colour: a dry day renders
+     as bare cartography over transparency, and on a flat backdrop that is
+     indistinguishable from an image that failed to render. */
+  .day img {
+    width: 168px; flex: 0 0 auto; border-radius: 4px; display: block;
+    border: 1px solid var(--border);
+    background: repeating-conic-gradient(var(--accent-soft) 0 25%, transparent 0 50%) 0 0 / 14px 14px;
+  }
+  .day .meta { min-width: 0; flex: 1 1 auto; }
+  .day .meta b { display: block; font-size: 13px; }
+  .day .meta span { display: block; font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+  .day .meta em { font-style: normal; color: var(--faint); }
+  @media (max-width: 760px) {
+    .day { flex-wrap: wrap; }
+    .day img { width: 100%; }
+  }
+
   kbd {
     background: var(--accent-soft); border: 1px solid var(--border); border-bottom-width: 2px;
     border-radius: 3px; padding: 1px 5px; font-size: 11px; font-family: inherit;
@@ -529,7 +561,15 @@ title: "Weather"
     </div>
     <div class="group">
       <label>Export</label>
-      <div class="btns"><button id="gif-open">GIF…</button></div>
+      <div class="btns">
+        <button id="gif-open">GIF…</button>
+        <!-- Hidden, not disabled, on a panel with no precipitation in it: a
+             greyed button invites the reader to find out why it is greyed, and
+             on the upper-air frames the answer is only "this chart has no rain
+             field", which is not worth a tooltip on every visit. loadSource
+             sets it. -->
+        <button id="day-open">Daily rain…</button>
+      </div>
     </div>
   </div>
 
@@ -569,6 +609,41 @@ title: "Weather"
         <button id="gif-cancel">Close</button>
         <span class="spacer"></span>
         <button id="gif-go" class="primary">Create GIF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Daily rainfall stills. The animation answers "when", and it is the only
+       thing this panel could answer it with; a reader who wants "how much, on
+       which day" has to watch seventy-two hourly frames go past and add them up
+       by eye, which nobody does. One image per local day is the same data asked
+       the other question, and unlike the loop it is a thing that can be put in a
+       message or a report. -->
+  <div class="modal" id="day-modal" hidden>
+    <div class="sheet wide">
+      <h2>Daily rainfall totals</h2>
+      <div class="fields">
+        <label>Image width
+          <select id="day-width">
+            <option value="800">800 px</option>
+            <option value="1000" selected>1000 px</option>
+            <option value="1400">1400 px</option>
+          </select>
+        </label>
+      </div>
+      <p class="est" id="day-est"></p>
+      <div class="bar" id="day-bar" hidden><i id="day-fill"></i></div>
+      <div class="days" id="day-list"></div>
+      <p class="note" id="day-note">One image per local day, accumulated from the
+        model's own rain buckets forward of the run hour — so a run's first and
+        last day are usually part days. A bucket is counted whole, on the day it
+        fell in, which on a three- or six-hourly model puts the day boundary at
+        the bucket edge nearest midnight rather than on it. Every image names the
+        window it covers, and carries its scale, its day and its model.</p>
+      <div class="actions">
+        <button id="day-cancel">Close</button>
+        <span class="spacer"></span>
+        <button id="day-all" class="primary">Download all</button>
       </div>
     </div>
   </div>
@@ -957,6 +1032,15 @@ if (DOMAIN_META.zurich) DOMAIN_META.zurich.defaultModel = 'icon_2i';
    `key` is the field in the payload; 'spd' is derived from u and v. */
 const FIELD_SPECS = {
   t: { slug: 't2m', label: 'Temperature', unit: ' °C' },
+  /* Departure of the 2 m temperature from the 1981-2010 daily mean, in degrees
+     rather than in sigma — which is the one thing that makes this unlike the
+     two anomalies below it, and it is not a style choice. There is no published
+     standard deviation for 2 m temperature to divide by; pipeline/config.py
+     T2M_CLIM_URL has the detail. So the unit here is the same ' °C' the
+     temperature itself carries, and the two read against each other directly.
+     Central Mediterranean only, for a reason that is about the climatology's
+     resolution rather than about this panel — see T2M_ANOM_DOMAINS. */
+  ta: { slug: 't2m_anom', label: 'Temperature anomaly', unit: ' °C' },
   spd: { slug: 'wind10m', label: 'Wind speed', unit: ' m/s' },
   p: { slug: 'precip', label: 'Precipitation', unit: ' mm' },
   c: { slug: 'cloud', label: 'Cloud cover', unit: ' %' },
@@ -1154,6 +1238,29 @@ for (const [k, d] of Object.entries(PANEL.domains)) {
      ICON-EU panels: the data was in the file and the viewer had been told, in
      four places, that it was not. */
   const hasCloud = Array.isArray(d.c);
+  /* The temperature anomaly is offered on exactly the same terms, and decided
+     the same way: the pipeline ships `ta` on the Mediterranean domain and not
+     on the close-ups, so reading the array is what settles it here. Naming the
+     domain in this file instead would put the argument for that restriction in
+     two places and let them drift — pipeline/config.py T2M_ANOM_DOMAINS has it,
+     and it is a claim about what a 1.9 deg climatology can support rather than
+     a preference about buttons. */
+  const hasAnom = Array.isArray(d.ta);
+  /* Built up rather than written as a pair of ternaries. With one optional
+     field that idiom was readable; with two it is four spellings of the same
+     list, and the payload is about to disagree with one of them. */
+  const keys = ['u', 'v', 't', 'p'];
+  const data = { u: d.u, v: d.v, t: d.t, p: d.p };
+  if (hasCloud) { keys.push('c'); data.c = d.c; }
+  if (hasAnom) { keys.push('ta'); data.ta = d.ta; }
+  // Button order. The anomaly sits next to the temperature it is derived from,
+  // which is where a reader comparing the two wants it; 'none' stays last,
+  // because it is the absence of the others rather than one of them.
+  const shading = ['t'];
+  if (hasAnom) shading.push('ta');
+  shading.push('spd', 'p');
+  if (hasCloud) shading.push('c');
+  shading.push('none');
   SOURCES[srcKey(k, 'icon_eu')] = {
     model: PANEL.model, credit: 'DWD', init: PANEL.init, steps: PANEL.steps,
     scale: PANEL.scale, accumHours: 3,
@@ -1161,12 +1268,9 @@ for (const [k, d] of Object.entries(PANEL.domains)) {
     // Which shading options this source can offer, and what the contour overlay
     // draws. A source declares these rather than the viewer assuming them,
     // which is what lets an upper-air source share the same engine.
-    keys: hasCloud ? ['u', 'v', 't', 'p', 'c'] : ['u', 'v', 't', 'p'],
-    shading: hasCloud ? ['t', 'spd', 'p', 'c', 'none'] : ['t', 'spd', 'p', 'none'],
+    keys, shading,
     contour: { key: 't', label: 'Isotherms', unit: '°C' },
-    data: hasCloud
-      ? { u: d.u, v: d.v, t: d.t, p: d.p, c: d.c }
-      : { u: d.u, v: d.v, t: d.t, p: d.p },
+    data,
   };
 }
 
@@ -1477,6 +1581,48 @@ const RAIN24_COLORS = [
   '#33a869', '#88c93f', '#f0dc2c', '#f6a52a', '#ee6e2b', '#d5242b',
 ];
 
+/* The 2 m temperature anomaly, in degrees. Diverging about zero with white at
+   the middle, like the sigma ladder below — and deliberately NOT the same
+   colours as it.
+
+   The rule the pressure ramp states is that two panels showing different
+   quantities must not be painted identically, and the jet panel is an explicit
+   exception to it because a sigma anomaly of v-wind and a sigma anomaly of
+   height are the same quantity of different fields. This is not that case: a
+   departure in degrees and a departure in standard deviations are different
+   quantities, and +4 means "warm" on one ladder and "extraordinary" on the
+   other. Painting them alike would invite exactly the misreading of a summer
+   Mediterranean +4 degC — which is a warm afternoon — as the deep orange the
+   sigma ladder reserves for something worth a phone call.
+
+   So: blue for cold, red for warm, white at normal. That is what every
+   temperature-anomaly product a reader has already seen uses, and it needs no
+   learning. The sigma ramp's purple cold end is what keeps the two apart at a
+   glance when the height anomaly is one tab away.
+
+   Uneven, tightening to 1 degC rungs between -6 and +6. That is where almost
+   every cell on almost every frame sits — the observed spread over this frame
+   is around 3.5 degC — so it is where the resolution has to be. Outside it the
+   rungs widen to 2 and then 3, because the difference between +10 and +12 is
+   "remarkable either way" and does not need its own colour. The ends clamp
+   rather than restretch, the same bargain the pressure ramp makes with a
+   940 hPa low: a single mountain cell must not rescale the whole basin.
+
+   The outermost rungs are at ±15 rather than ±12 for a reason worth recording.
+   An ordinary September frame already reaches -12.9 degC over the Atlas, and
+   that is not weather — it is the reanalysis orography disagreeing with
+   ICON-EU's, the caveat sources.t2m_anomaly documents. Clamping that to the
+   last colour at 12 would paint a permanent saturated ridge along every
+   mountain chain in the frame and make it look like a finding. */
+const TANOM_LEVELS = [-15, -12, -10, -8, -6, -5, -4, -3, -2, -1, 0,
+                      1, 2, 3, 4, 5, 6, 8, 10, 12, 15];
+const TANOM_COLORS = [
+  '#1f1259', '#2a2f80', '#2d55a0', '#3379b8', '#4f9bcb', '#7bb8db',
+  '#a6d0e8', '#c9e2f1', '#e6f1f8', '#ffffff', '#ffffff', '#fdeed4',
+  '#fbdca8', '#f9c47c', '#f6a855', '#f08a3e', '#e56a30', '#d44a28',
+  '#b52a20', '#7a0f16',
+];
+
 /* The 500 hPa anomaly, also from charts.py. Diverging about zero with white at
    the middle, and unevenly spaced — the levels tighten between 1 and 3 sigma,
    which is the range where a departure stops being weather and starts being
@@ -1633,6 +1779,11 @@ function ladderPos(levels, v, transparentBelow) {
 const precipPos = (mm) => ladderPos(PRECIP_LEVELS, mm, true);
 const rain24Pos = (mm) => ladderPos(RAIN24_LEVELS, mm, true);
 const sigmaPos = (s) => ladderPos(SIGMA_LEVELS, s, false);
+// `false` like sigma and unlike rain: below the lowest rung means "colder than
+// this ladder reaches", which is the most emphatic thing the field can say. The
+// transparent-below behaviour the precipitation ladders use would punch a hole
+// in the map exactly where the anomaly is largest.
+const tanomPos = (c) => ladderPos(TANOM_LEVELS, c, false);
 const ivtPos = (kg) => ladderPos(IVT_LEVELS, kg, true);
 
 /* The ladders resolved once into tables indexed by the stored integer itself —
@@ -1652,6 +1803,12 @@ const PRECIP_IDX = ladderTable(2001, (i) => i / 10, precipPos);          // 0..2
 // ended there would clamp the very frames this chart is opened for.
 const RAIN24_IDX = ladderTable(5001, (i) => i / 10, rain24Pos);          // 0..500 mm
 const SIGMA_IDX = ladderTable(2001, (i) => (i - 1000) / 100, sigmaPos);  // -10..+10 sigma
+// Tenths of a degree, which is how the payload stores the anomaly — the same
+// precision as the temperature it is a departure from, so the two agree when a
+// reader checks one against the other. The table spans well past the ladder's
+// own ±15 so that the clamp happens on the ladder, where it is a colour, rather
+// than at the edge of the table, where it would be an index.
+const TANOM_IDX = ladderTable(601, (i) => (i - 300) / 10, tanomPos);    // -30..+30 degC
 // Whole kg m⁻¹ s⁻¹, which is also how the payload stores it. 2500 is well past
 // the strongest transport ever observed; the table clamps rather than wrapping.
 const IVT_IDX = ladderTable(2501, (i) => i, ivtPos);                    // 0..2500
@@ -2079,6 +2236,26 @@ function loadSource(domainKey, modelKey) {
       tick: [1, 2, 5, 10].find((s) => (T_RANGE[1] - T_RANGE[0]) / s <= 7) ?? 10,
       clip: T_CLIP,
     };
+    /* Keyed off the array the source carries, like the cloud entry under it,
+       so the one domain that ships an anomaly is the one that gets a ladder.
+       Unlike the temperature ramp above, nothing here is fitted to the loop:
+       zero is normal and ±5 degC means the same thing in January and July, so
+       the scale is absolute and a colour keeps its meaning across cycles. That
+       is the whole point of an anomaly — a ramp restretched per loop would
+       encode "how unusual for this week" and undo it. */
+    if (D.keys.includes('ta')) {
+      LUTS.ta = {
+        lut: buildLUT(TANOM_COLORS),
+        range: [TANOM_LEVELS[0], TANOM_LEVELS[TANOM_LEVELS.length - 1]],
+        title: '2 m temperature anomaly (°C vs 1981–2010)',
+        levels: TANOM_LEVELS, ladder: true, unit: ' °C',
+        // Nine of twenty-one rungs, chosen so the labels are symmetric about
+        // zero and land on the numbers a reader reasons in. Even spacing would
+        // label ±8 and skip ±5, which is the threshold that matters.
+        ticks: [-15, -10, -5, -2, 0, 2, 5, 10, 15],
+        idx: TANOM_IDX, idxOffset: 300, idxScale: 10,
+      };
+    }
     if (D.keys.includes('c')) {
       LUTS.c = {
         lut: buildLUT(CLOUD_COLORS),
@@ -2142,6 +2319,12 @@ function loadSource(domainKey, modelKey) {
      vapour panel for the Malta one and coming back lands where the reader
      left rather than resetting to 500 hPa. */
   if (isSynoptic(domainKey)) state.synoptic = domainKey;
+  /* The daily rainfall export is offered wherever the source carries a
+     precipitation field to accumulate — the three close-up panels — and nowhere
+     else. Asked of the source rather than of the domain, because IFS reaches
+     every one of those frames and a future source might not carry rain on all
+     of them. */
+  $('day-open').hidden = !D.shading.includes('p');
   syncControlGroups();
   /* Re-locked here rather than at boot alone. It was called once, against the
      Malta source, so every branch inside it that asks what the source carries
@@ -2261,7 +2444,11 @@ function sampleCubic(a, col, row) {
 // a rain band can come back negative. Clamped, because "-0.4 mm fell" is not a
 // reading, and on a ladder whose first rung is above zero it would draw as a
 // hole in the field rather than as dry ground.
-const NONNEG = { p: true, c: true, spd: true, r24: true };
+// `rday` is the daily-total field the still export builds. It is a sum of
+// buckets that are each already clamped at zero, so the only way it reaches a
+// negative is the overshoot above — and a day's total is exactly where that
+// would be most visible, a dry halo ringing the one shower on the map.
+const NONNEG = { p: true, c: true, spd: true, r24: true, rday: true };
 function sampleShade(key, a, col, row) {
   const v = sampleCubic(a, col, row);
   return (NONNEG[key] && v < 0) ? 0 : v;
@@ -2312,6 +2499,12 @@ const ctxF = cvFlow.getContext('2d');
    half the step puts the edge where the contour actually is. */
 const RASTER_STEP = 4;
 const RASTER_STEP_BANDED = 2;
+/* An export overrides both. The argument above is an argument about a field
+   that repaints on every scrub tick and is then looked at from a metre away;
+   a still is rendered once and then looked at closely, and on a ladder the
+   thing being looked at closely *is* the band edge. Null everywhere but inside
+   the still export, which sets it to one raster sample per exported pixel. */
+let rasterStep = null;
 const off = document.createElement('canvas');
 const ctxO = off.getContext('2d');
 let imgData = null;
@@ -2427,7 +2620,7 @@ function sizeRaster(step) {
 function drawRaster() {
   const spec = LUTS[state.field];
   if (!spec) return;
-  sizeRaster(spec.ladder ? RASTER_STEP_BANDED : RASTER_STEP);
+  sizeRaster(rasterStep ?? (spec.ladder ? RASTER_STEP_BANDED : RASTER_STEP));
 
   const { lut, range } = spec;
   const ow = off.width, oh = off.height;
@@ -4043,6 +4236,12 @@ stage.addEventListener('pointerleave', () => {
 
 const DESCS = {
   t: '2 m temperature shaded, with 10 m wind drawn as advected streaklines — each streak is a parcel of air moved by the wind field, so its length is the wind speed and its direction is the wind direction.',
+  /* Says what the reference is, and says what it cannot resolve. The second
+     half is not a disclaimer bolted on: a reader looking at a warm ridge along
+     the Atlas or the Apennines is owed the knowledge that part of it is the
+     climatology's coarse terrain rather than the forecast's weather, because
+     nothing on the map distinguishes the two. */
+  ta: 'Departure of the forecast 2 m temperature from the 1981–2010 NCEP/NCAR daily mean for the same day of the year, in degrees Celsius, with 10 m wind as advected streaklines. Blue is colder than normal and red warmer. The climatology is a 1.9° grid — far coarser than the forecast over it — so read this for the basin-wide pattern rather than for detail: sharp structure in the shading is the forecast’s, not a departure that has been resolved, and some of the signal over the Atlas, the Apennines and the Alpine rim is the reanalysis and the model disagreeing about where the mountains are.',
   /* A function because this shading is offered at three different heights and
      the sentence named only one of them. It has said "10 m" on the 500 hPa
      panel for as long as that panel has offered wind speed; adding a third
@@ -4649,6 +4848,16 @@ $('tg-iso').onclick = () => {
 addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT') return;
   const k = e.key;
+  /* An open sheet owns the keyboard. Space over the GIF sheet was starting the
+     animation behind it, which at best exports a loop the reader did not ask
+     for the first frame of; over the rainfall sheet it would scrub the panel
+     the render is drawing into. Escape closes, which is what a dialog is
+     expected to do and what the backdrop click was the only way to say. */
+  for (const m of [gifModal, dayModal]) {
+    if (m.hidden) continue;
+    if (k === 'Escape') m.hidden = true;
+    return;
+  }
   if (state.view === 'sat') {
     // A still has one frame, so stepping and playing mean nothing on it. The
     // keys are ignored rather than remapped to switching source: arrows that
@@ -4871,6 +5080,13 @@ function gifEncode(frames, w, h, delayMs, pal, used, onProgress) {
 /* ------------------------------------------------------------ GIF capture - */
 
 const HEADER_H = 46, BAR_H = 34;
+/* The chrome at a given scale. A GIF is written at 640 px and read on a phone,
+   where 46 px of header is already generous; a still is written at up to 1400
+   and would carry the same 46 px as a thin strip of text above a large map, so
+   the header and the bar grow with the image rather than staying where they
+   were fitted. Rounded, because the map is placed at the sum of the two and a
+   fractional offset resamples every pixel of it. */
+const chromeH = (s) => [Math.round(HEADER_H * s), Math.round(BAR_H * s)];
 
 const gifModal = $('gif-modal');
 /* Clamped, not trusted. The capture loop advances by `stride`, so a zero or a
@@ -4908,11 +5124,34 @@ function thinTicks(values, max) {
   return out;
 }
 
-/* One GIF frame: the map and the flow as they are already drawn, scaled down,
-   with the valid time and the colour bar drawn in. A GIF leaves the page it was
-   made on, so the things the page was providing around the map — what time this
-   is, what the colours mean — have to travel inside the image. */
-function composeFrame(ctx, w, h, mapH) {
+/* What the header says about a frame of the loop: the hour it is valid at, in
+   both clocks, and the lead time. A still says something else — see dayCaption —
+   which is why this is a function rather than a block inside the composer. */
+function frameCaption() {
+  const { date, hours } = validAt(state.tf);
+  return {
+    big: fmtLocal.format(date),
+    small: fmtDay.format(date),
+    right: `${fmtUTC.format(date)} UTC · ${frameLabel(hours)}`,
+  };
+}
+
+/* One exported image: the map and the flow as they are already drawn, scaled to
+   the export size, with the caption and the colour bar drawn in. An export
+   leaves the page it was made on, so the things the page was providing around
+   the map — what time this is, what the colours mean — have to travel inside
+   the image.
+
+   `opt.cap` overrides what the header says and `opt.scale` how large it is
+   drawn; both default to the animation's answers, which is what every GIF frame
+   wants. The daily stills are the same composition asked a different question,
+   and giving them a composer of their own would have been two colour bars to
+   keep in step — the one place an export has ever been wrong. */
+function composeFrame(ctx, w, h, mapH, opt = {}) {
+  const s = opt.scale || 1;
+  const [head, barH] = chromeH(s);
+  const cap = opt.cap || frameCaption();
+
   const css = getComputedStyle(document.documentElement);
   const ink = css.getPropertyValue('--text').trim();
   const muted = css.getPropertyValue('--muted').trim();
@@ -4922,60 +5161,62 @@ function composeFrame(ctx, w, h, mapH) {
   ctx.fillStyle = panel;
   ctx.fillRect(0, 0, w, h);
 
-  const { date, hours } = validAt(state.tf);
   ctx.textBaseline = 'alphabetic';
   ctx.fillStyle = ink;
-  ctx.font = '650 25px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(fmtLocal.format(date), 12, 31);
-  const tw = ctx.measureText(fmtLocal.format(date)).width;
-  ctx.font = '550 14px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(fmtDay.format(date), 12 + tw + 9, 31);
-  ctx.font = '12px ui-sans-serif, system-ui, sans-serif';
+  ctx.font = `650 ${25 * s}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText(cap.big, 12 * s, 31 * s);
+  const tw = ctx.measureText(cap.big).width;
+  ctx.font = `550 ${14 * s}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText(cap.small, 12 * s + tw + 9 * s, 31 * s);
+  ctx.font = `${12 * s}px ui-sans-serif, system-ui, sans-serif`;
   ctx.fillStyle = muted;
-  const right = `${fmtUTC.format(date)} UTC · ${frameLabel(hours)}`;
-  ctx.fillText(right, w - ctx.measureText(right).width - 12, 30);
+  ctx.fillText(cap.right, w - ctx.measureText(cap.right).width - 12 * s, 30 * s);
   // What the colours mean goes on the header's second line, not beside the bar:
   // at 480 px the title and the credit were fighting for the same right-hand
   // corner and overlapping.
   const specNow = LUTS[state.field];
-  const sub = [MODELS[state.model].label, DOMAIN_META[state.domain].label,
+  const sub = cap.sub || [MODELS[state.model].label, DOMAIN_META[state.domain].label,
                specNow ? specNow.title
                  : D.vector ? 'vapour transport flow' : 'wind flow'].join(' · ');
-  ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
-  ctx.fillText(sub, 12, 43);
+  ctx.font = `${11 * s}px ui-sans-serif, system-ui, sans-serif`;
+  ctx.fillText(sub, 12 * s, 43 * s);
 
-  ctx.drawImage(cvMap, 0, HEADER_H, w, mapH);
-  if (flowOn()) ctx.drawImage(cvFlow, 0, HEADER_H, w, mapH);
+  ctx.drawImage(cvMap, 0, head, w, mapH);
+  if (flowOn()) ctx.drawImage(cvFlow, 0, head, w, mapH);
 
   // Colour bar, drawn from the same LUT the shading used.
-  const by = HEADER_H + mapH;
-  ctx.fillStyle = panel; ctx.fillRect(0, by, w, BAR_H);
+  const by = head + mapH;
+  ctx.fillStyle = panel; ctx.fillRect(0, by, w, barH);
   ctx.strokeStyle = border; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.moveTo(0, by + 0.5); ctx.lineTo(w, by + 0.5); ctx.stroke();
 
   // The credit is measured first and the bar sized around it, rather than both
   // being given fixed widths and left to collide at the narrow export size.
   const cred = (SRC.credit === 'DWD' ? 'DWD ICON-EU' : SRC.credit) + ' · © Ryan Vella';
-  ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+  ctx.font = `${10 * s}px ui-sans-serif, system-ui, sans-serif`;
   const credW = ctx.measureText(cred).width;
 
   const spec = LUTS[state.field];
   if (spec) {
-    const x0 = 12, bh = 9, y0 = by + 9;
-    const bw = Math.max(120, Math.min(340, w - x0 - credW - 32));
+    const x0 = 12 * s, bh = 9 * s, y0 = by + 9 * s;
+    const bw = Math.max(120 * s, Math.min(340 * s, w - x0 - credW - 32 * s));
     for (let i = 0; i < bw; i++) {
       const k = Math.round((i / (bw - 1)) * 255);
       ctx.fillStyle = `rgb(${spec.lut[k * 3]},${spec.lut[k * 3 + 1]},${spec.lut[k * 3 + 2]})`;
       ctx.fillRect(x0 + i, y0, 1, bh);
     }
-    ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+    ctx.font = `${10 * s}px ui-sans-serif, system-ui, sans-serif`;
     ctx.fillStyle = muted;
     /* The scale's own rungs, thinned to what a 120-340 px bar can carry. The
        five millimetre values that used to be hard-coded here were the rainfall
        ladder's, printed on whichever ladder was showing: the upper-air panel
        exported a sigma scale labelled 5, 20 and 100, three of them clamped to
-       an end the ladder reaches at 6. */
-    const vals = spec.ladder ? thinTicks(spec.ticks, 5)
+       an end the ladder reaches at 6.
+
+       A still's bar is wider in proportion to its type, so it carries more of
+       them — the day ladder thinned to five labels 1, 10, 50 and 100, dropping
+       the 5 and the 20 that most of a Maltese wet day lands between. */
+    const vals = spec.ladder ? thinTicks(spec.ticks, s > 1.2 ? 8 : 5)
       : [spec.range[0], (spec.range[0] + spec.range[1]) / 2, spec.range[1]];
     for (const v of vals) {
       const f = barPos(spec, v);
@@ -4983,12 +5224,12 @@ function composeFrame(ctx, w, h, mapH) {
       const lw = ctx.measureText(label).width;
       let x = x0 + f * bw - lw / 2;
       x = Math.max(x0, Math.min(x0 + bw - lw, x));
-      ctx.fillText(label, x, y0 + bh + 11);
+      ctx.fillText(label, x, y0 + bh + 11 * s);
     }
   }
-  ctx.font = '10px ui-sans-serif, system-ui, sans-serif';
+  ctx.font = `${10 * s}px ui-sans-serif, system-ui, sans-serif`;
   ctx.fillStyle = muted;
-  ctx.fillText(cred, w - credW - 12, by + BAR_H - 11);
+  ctx.fillText(cred, w - credW - 12 * s, by + barH - 11 * s);
 }
 
 let gifBusy = false;
@@ -5095,6 +5336,342 @@ $('gif-cancel').onclick = () => { gifModal.hidden = true; };
 gifModal.onclick = (e) => { if (e.target === gifModal) gifModal.hidden = true; };
 for (const id of ['gif-width', 'gif-stride', 'gif-delay']) $(id).onchange = gifEstimate;
 $('gif-go').onclick = makeGif;
+
+/* ------------------------------------------------------- daily rain stills -
+
+   One image per local day, shading what fell in that day rather than in one
+   model step.
+
+   The loop already carries every millimetre of this — it is the same `p` field,
+   summed — but summing it is exactly what a reader cannot do from an animation.
+   Seventy-two hourly frames of a shower crossing Malta say when it rained and
+   never say how much, and the three-hourly ladder they are shaded on tops out
+   at 30 mm because that is a downpour in three hours, which makes a wet day and
+   a very wet day the same picture. A day's total on the day ladder is the
+   question a forecast is usually being asked.
+
+   Three things decide what a "day" is here, and each of them is a choice:
+
+   * It is a *local* day, Malta midnight to Malta midnight. The model's own
+     accumulation is in UTC, but nobody plans a Saturday in UTC, and the page's
+     whole time axis is already local-first for that reason.
+
+   * A bucket that straddles midnight is counted whole, on the day it ends in,
+     except one that ends exactly at midnight, which belongs to the day it fell
+     in. That is the meteogram's rule, verbatim, and it has to be: the two
+     products are on one page, and a Saturday that is 12 mm on the point
+     forecast and 9 mm on the map is a page contradicting itself. On ICON-2I the
+     question does not arise, since hourly buckets never straddle a midnight.
+
+   * It accumulates the forecast only — buckets from the run hour onward. The
+     past window looks like more of the same axis and is not: on ICON-2I those
+     frames are replayed from the archive at three-hourly offsets out of an
+     hourly series, so each one carries the rain of a single hour and the two
+     hours between them are in no bucket at all. Summing the window as if it
+     tiled would quietly report a third of the rain that fell. The cost is that
+     a run's first day starts at the run hour rather than at midnight, which is
+     why a part day says so on its own face. */
+
+/* The day ladder, not the panel's own — the argument RAIN24_LEVELS makes about
+   a day's total against a three-hour bucket is this product's whole reason for
+   existing. Built once: it is fixed, where the panel's LUTS are refitted to
+   each source. */
+const DAY_SPEC = {
+  lut: buildStepLUT(RAIN24_COLORS),
+  range: [RAIN24_LEVELS[0], RAIN24_LEVELS[RAIN24_LEVELS.length - 1]],
+  title: 'Rainfall (mm / day)',
+  levels: RAIN24_LEVELS, ladder: true, base: true, unit: ' mm',
+  ticks: [1, 5, 10, 20, 50, 100],
+  idx: RAIN24_IDX, idxOffset: 0, idxScale: 10,
+};
+DAY_SPEC.ink = buildInkLUT(DAY_SPEC.lut);
+
+const dayModal = $('day-modal');
+/* en-CA because it formats as 2026-09-13, which is both the key days are
+   grouped on and the stamp the file is named with — one formatter, and a
+   filename that sorts. */
+const fmtDayISO = new Intl.DateTimeFormat('en-CA', {
+  year: 'numeric', month: '2-digit', day: '2-digit', timeZone: 'Europe/Malta',
+});
+
+const dayIsFull = (d) => Math.abs(d.hours - 24) < 0.01;
+
+/* The forecast's rain, gathered into local days. Returns one entry per day with
+   its own grid of totals in millimetres, the window it actually covers, and the
+   heaviest cell in the frame. */
+function dailyRain() {
+  if (!FIELDS.p || NT < 2) return [];
+  const n = NX * NY;
+  const scale = (D.scales && D.scales.p) || SCALE;
+  const days = [];
+  let cur = null;
+
+  for (let i = 1; i < NT; i++) {
+    // The bucket at step i is what accumulated since step i-1, so it is the
+    // *start* of the interval that has to be forward of the run hour, not its
+    // end: the bucket ending at +1 h begins at the run and is the first honest
+    // one there is.
+    const from = SRC.steps[i - 1], to = SRC.steps[i];
+    if (from < 0) continue;
+    const end = INIT.getTime() + to * 3600e3;
+    // One millisecond back is "the day it fell in" in a form a date formatter
+    // can answer: an interval ending at 00:00 local closes the day before it,
+    // and one ending at 01:00 opens the day it ends in.
+    const key = fmtDayISO.format(new Date(end - 1));
+    if (!cur || cur.key !== key) {
+      cur = { key, at: new Date(end - 1), from, to, hours: 0,
+              mm: new Float32Array(n), peak: 0 };
+      days.push(cur);
+    }
+    cur.to = to;
+    // Tallied rather than taken as to-from, so a source that ever drops a
+    // forecast step reports the hours it has instead of the hours it spans.
+    cur.hours += to - from;
+    // Summed in the payload's own tenths and divided once at the end: the
+    // buckets are integers, so this stays exact where a per-bucket division
+    // would accumulate a rounding error over seventy-two of them.
+    const P = FIELDS.p[i];
+    for (let k = 0; k < n; k++) cur.mm[k] += P[k];
+  }
+
+  for (const d of days) {
+    let peak = 0;
+    for (let k = 0; k < n; k++) {
+      const v = d.mm[k] / scale;
+      d.mm[k] = v;
+      if (v > peak) peak = v;
+    }
+    d.peak = peak;
+  }
+  return days;
+}
+
+/* The window a day's total covers, in local clock time. A full day ends at
+   "24:00" rather than at "00:00": the end of Saturday and the start of Sunday
+   are the same instant, and only one of them is what this image is of. */
+function dayWindow(d) {
+  const a = fmtLocal.format(new Date(INIT.getTime() + d.from * 3600e3));
+  const b = fmtLocal.format(new Date(INIT.getTime() + d.to * 3600e3));
+  return `${a}–${b === '00:00' ? '24:00' : b}`;
+}
+
+const dayCover = (d) => dayIsFull(d) ? '24 h' : `${Math.round(d.hours)} of 24 h`;
+
+/* What the still says about itself. The peak is in the header because a dry day
+   is otherwise an empty map: the ladder draws nothing below 1 mm, so 0.4 mm
+   over the whole island and a genuinely rainless day are the same picture, and
+   only the caption can tell them apart. */
+function dayCaption(d) {
+  return {
+    big: fmtDay.format(d.at),
+    /* "Daily total" is claimed only by a day that actually runs midnight to
+       midnight, which is every ICON-2I day and no IFS one: counting whole
+       buckets on the day they fell in puts a six-hourly model's day boundary at
+       20:00, and a reader who took "daily" literally there would be four hours
+       out at both ends. The window beside it says which four hours. */
+    small: !dayIsFull(d) ? 'part day'
+      : fmtLocal.format(new Date(INIT.getTime() + d.from * 3600e3)) === '00:00'
+        ? 'daily total' : '24 h total',
+    right: `${dayWindow(d)} local · ${dayCover(d)}`,
+    sub: [MODELS[state.model].label, DOMAIN_META[state.domain].label,
+          'accumulated rainfall',
+          d.peak >= 0.05 ? `peak ${d.peak.toFixed(1)} mm` : 'nothing above 0.05 mm'
+         ].join(' · '),
+  };
+}
+
+let dayBusy = false;
+let dayShots = [];
+
+/* The object URLs live until the next render rather than being revoked when the
+   sheet closes: a download that is still being written when its URL is revoked
+   fails silently, and closing the sheet is exactly when a reader has just
+   pressed one. The next render frees them, and so does leaving the page. */
+function clearShots() {
+  for (const s of dayShots) URL.revokeObjectURL(s.url);
+  dayShots = [];
+  $('day-list').innerHTML = '';
+}
+
+const canvasBlob = (cv) => new Promise((res) => cv.toBlob(res, 'image/png'));
+
+function saveShot(shot) {
+  const a = document.createElement('a');
+  a.href = shot.url;
+  a.download = shot.name;
+  a.click();
+}
+
+function dayCard(shot) {
+  const d = shot.day;
+  const el = document.createElement('div');
+  el.className = 'day';
+
+  const img = document.createElement('img');
+  img.src = shot.url;
+  img.alt = `Rainfall total for ${fmtDay.format(d.at)}`;
+
+  const meta = document.createElement('div');
+  meta.className = 'meta';
+  const title = document.createElement('b');
+  title.textContent = fmtDay.format(d.at);
+  const line = document.createElement('span');
+  line.textContent = d.peak >= 0.05
+    ? `Peak ${d.peak.toFixed(1)} mm in frame`
+    : 'No cell above 0.05 mm';
+  const when = document.createElement('span');
+  when.textContent = `${dayWindow(d)} local · ${dayCover(d)}`;
+  if (!dayIsFull(d)) {
+    const why = document.createElement('em');
+    why.textContent = ' · part day';
+    when.appendChild(why);
+  }
+  meta.append(title, line, when);
+
+  const btn = document.createElement('button');
+  btn.textContent = 'Download';
+  btn.onclick = () => saveShot(shot);
+
+  el.append(img, meta, btn);
+  return el;
+}
+
+/* Render every day of this run and hang the results in the sheet.
+
+   The map is drawn at the size it is being written out at, not at the size it
+   is on screen and then enlarged. The loop can afford to be upscaled — it is
+   watched, not studied — but a still is downloaded to be looked at, and on a
+   banded scale the thing being looked at is the band edge, which an upscale
+   turns into a four-pixel gradient. Both halves of that are here: DPR takes the
+   cartography and the labels up to the export's resolution, and rasterStep
+   takes the field up with them. */
+async function makeDays() {
+  if (dayBusy) return;
+  dayBusy = true;
+  clearShots();
+
+  const est = $('day-est'), bar = $('day-bar'), fill = $('day-fill');
+  const all = $('day-all'), list = $('day-list');
+  all.disabled = true;
+
+  const days = dailyRain();
+  if (!days.length) {
+    // Reachable on a first build of a run whose past window is all there is,
+    // and on any source with no precipitation — which the button is hidden on,
+    // but the hiding is a courtesy and this is the guarantee.
+    est.textContent = 'This run has no forecast hours to accumulate.';
+    bar.hidden = true;
+    dayBusy = false;
+    return;
+  }
+
+  // Clamped like the GIF's options and for the same reason: a select whose
+  // value is not one of its options must not be able to allocate an arbitrary
+  // canvas.
+  const w = Math.max(320, Math.min(2000, Math.round(+$('day-width').value) || 1000));
+  const s = Math.max(1, w / 640);
+  const [head, barH] = chromeH(s);
+  // The stage's own ratio rather than ASPECT, which it is within a pixel of:
+  // taking it from the canvas is what makes the map land one-to-one instead of
+  // being resampled by half a pixel on the way out.
+  const mapH = Math.round(w * H / W);
+  const h = mapH + head + barH;
+
+  const was = {
+    field: state.field, wind: state.wind, clouds: state.clouds,
+    sat: state.satOvl, playing: state.playing, dpr: DPR,
+  };
+  setPlaying(false);
+  bar.hidden = false;
+  const say = (msg, frac) => {
+    est.textContent = msg;
+    fill.style.width = Math.round(frac * 100) + '%';
+    return new Promise((r) => setTimeout(r, 0));   // let the browser paint
+  };
+
+  try {
+    LUTS.rday = DAY_SPEC;
+    state.field = 'rday';
+    /* Every instantaneous layer off. Streaklines, the model's cloud sheet and
+       the satellite are all pictures of one moment, and laid over a total they
+       would be a claim that the rain fell under that cloud, in that wind, at
+       whichever hour the scrubber happened to be parked on. */
+    state.wind = false; state.clouds = false; state.satOvl = false;
+
+    DPR = Math.max(1, Math.min(3, w / W));
+    for (const cv of [cvMap, cvFlow]) {
+      cv.width = Math.round(W * DPR);
+      cv.height = Math.round(H * DPR);
+    }
+    ctxG.setTransform(DPR, 0, 0, DPR, 0, 0);
+    ctxF.setTransform(DPR, 0, 0, DPR, 0, 0);
+    rasterStep = W / w;
+
+    const out = document.createElement('canvas');
+    out.width = w; out.height = h;
+    const octx = out.getContext('2d');
+    octx.imageSmoothingEnabled = true;
+    octx.imageSmoothingQuality = 'high';
+
+    for (let i = 0; i < days.length; i++) {
+      const d = days[i];
+      await say(`Rendering ${fmtDay.format(d.at)}…`, i / days.length);
+      // Shaded straight out of the day's own grid. blendFrame only ever writes
+      // the keys the source declares, so nothing overwrites this between here
+      // and the draw.
+      CUR.rday = d.mm;
+      rasterKey = null;
+      drawMap();
+      composeFrame(octx, w, h, mapH, { scale: s, cap: dayCaption(d) });
+      const blob = await canvasBlob(out);
+      const shot = {
+        day: d, size: blob.size, url: URL.createObjectURL(blob),
+        name: `${state.domain}_${state.model}_rain24_${d.key}.png`,
+      };
+      dayShots.push(shot);
+      list.appendChild(dayCard(shot));
+    }
+    const full = days.filter(dayIsFull).length;
+    est.textContent = `${days.length} image${days.length === 1 ? '' : 's'} · `
+      + `${w} × ${h} px · ${full} full day${full === 1 ? '' : 's'}`;
+  } catch (err) {
+    console.error(err);
+    est.textContent = 'Failed: ' + err.message;
+  } finally {
+    // The field first: the restore below redraws, and a state.field the LUT has
+    // just been taken out from under leaves the panel with no shading at all.
+    state.field = was.field;
+    state.wind = was.wind; state.clouds = was.clouds; state.satOvl = was.sat;
+    delete LUTS.rday;
+    delete CUR.rday;
+    rasterStep = null;
+    DPR = was.dpr;
+    bar.hidden = true;
+    all.disabled = !dayShots.length;
+    dayBusy = false;
+    // resize() is the whole restore: it puts the canvases back at screen
+    // resolution, re-fits the raster and redraws.
+    resize();
+    syncTime();
+    if (was.playing) setPlaying(true);
+  }
+}
+
+/* One click, several files. Browsers ask once before writing more than one file
+   from a single gesture, which is the right prompt to get — and they drop
+   downloads fired in the same tick, hence the spacing. */
+async function saveAllShots() {
+  for (const shot of dayShots) {
+    saveShot(shot);
+    await new Promise((r) => setTimeout(r, 250));
+  }
+}
+
+$('day-open').onclick = () => { dayModal.hidden = false; makeDays(); };
+$('day-cancel').onclick = () => { dayModal.hidden = true; };
+dayModal.onclick = (e) => { if (e.target === dayModal) dayModal.hidden = true; };
+$('day-width').onchange = () => makeDays();
+$('day-all').onclick = saveAllShots;
 
 /* ------------------------------------------------------------- meteogram --
 
