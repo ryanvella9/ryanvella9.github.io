@@ -77,6 +77,50 @@ author_profile: true
   opacity: .75;
 }
 .ph-close:hover, .ph-close:focus-visible { opacity: 1; }
+
+/* Step buttons, so the lightbox is somewhere to browse from rather than a
+   one-shot view that has to be closed and reopened for every photograph.
+   Deliberately sitting over the image rather than outside it: at 94vh tall
+   there is no reliable margin to put them in, and a faint scrim keeps them
+   legible over a bright frame as easily as over a dark one. */
+.ph-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 52px;
+  height: 76px;
+  font-size: 2.2rem;
+  line-height: 1;
+  color: #fff;
+  background: rgba(8, 10, 12, .38);
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  opacity: .6;
+}
+.ph-nav:hover, .ph-nav:focus-visible { opacity: 1; background: rgba(8, 10, 12, .62); }
+.ph-prev { left: 10px; }
+.ph-next { right: 10px; }
+/* Which of thirteen you are looking at. Without it, wrapping from the last
+   photograph to the first reads as the gallery having glitched rather than as
+   having come full circle. */
+.ph-count {
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  transform: translateX(-50%);
+  font-size: .85rem;
+  letter-spacing: .04em;
+  color: #fff;
+  opacity: .68;
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+}
+@media (max-width: 480px) {
+  /* Smaller, because on a phone the swipe is the primary control and these
+     become the fallback — but still past the 44 px minimum tap target. */
+  .ph-nav { width: 44px; height: 64px; font-size: 1.7rem; }
+}
 body.ph-locked { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .ph-item img { transition: none; }
@@ -128,7 +172,10 @@ body.ph-locked { overflow: hidden; }
 
 <div class="ph-lb" role="dialog" aria-modal="true" aria-label="Enlarged photograph">
 <button type="button" class="ph-close" aria-label="Close">&times;</button>
+<button type="button" class="ph-nav ph-prev" aria-label="Previous photograph">&#8249;</button>
 <img src="" alt="">
+<button type="button" class="ph-nav ph-next" aria-label="Next photograph">&#8250;</button>
+<span class="ph-count" aria-live="polite"></span>
 </div>
 
 <script>
@@ -139,11 +186,38 @@ body.ph-locked { overflow: hidden; }
   var box = document.querySelector(".ph-lb");
   var full = box.querySelector("img");
   var closeBtn = box.querySelector(".ph-close");
-  var opener = null;
+  var prevBtn = box.querySelector(".ph-prev");
+  var nextBtn = box.querySelector(".ph-next");
+  var count = box.querySelector(".ph-count");
+  var items = Array.prototype.slice.call(document.querySelectorAll(".ph-item"));
+  /* Which photograph is open, or -1 for none. Replaces the old `opener`
+     reference: the index answers both "what do I show next" and "what do I
+     hand focus back to", where a bare element answered only the second. */
+  var at = -1;
 
-  function open(thumb) {
+  /* Fetch the neighbours as soon as one is shown, so stepping is a swap of an
+     already-decoded image rather than a fresh download with a blank frame in
+     the middle of it. The grid holds the same files, but those are lazy and a
+     photograph further down the page may never have been fetched at all. */
+  function preload(i) {
+    var img = items[i] && items[i].querySelector("img");
+    if (img) { new Image().src = img.src; }
+  }
+
+  function show(i) {
+    /* Wraps in both directions, so the end of the gallery is not a dead end.
+       The counter below is what keeps that from reading as a glitch. */
+    at = (i + items.length) % items.length;
+    var thumb = items[at].querySelector("img");
     full.src = thumb.src;
     full.alt = thumb.alt;
+    count.textContent = (at + 1) + " / " + items.length;
+    preload((at + 1) % items.length);
+    preload((at - 1 + items.length) % items.length);
+  }
+
+  function open(i) {
+    show(i);
     box.classList.add("is-open");
     document.body.classList.add("ph-locked");
     closeBtn.focus();
@@ -154,21 +228,52 @@ body.ph-locked { overflow: hidden; }
     document.body.classList.remove("ph-locked");
     /* Drop the source so a large image is not held in memory while closed. */
     full.src = "";
-    if (opener) { opener.focus(); opener = null; }
+    /* Back to whichever thumbnail was last shown rather than the one that was
+       first clicked — after stepping through six photographs, returning focus
+       to the sixth is what puts the keyboard where the eye already is. */
+    if (at >= 0) { items[at].focus(); at = -1; }
   }
 
-  document.querySelectorAll(".ph-item").forEach(function (btn) {
-    btn.addEventListener("click", function () {
-      opener = btn;
-      open(btn.querySelector("img"));
-    });
+  items.forEach(function (btn, i) {
+    btn.addEventListener("click", function () { open(i); });
   });
 
   closeBtn.addEventListener("click", close);
-  /* Clicking the photo itself should not dismiss, only the surrounding backdrop. */
-  box.addEventListener("click", function (e) { if (e.target !== full) close(); });
+  prevBtn.addEventListener("click", function () { show(at - 1); });
+  nextBtn.addEventListener("click", function () { show(at + 1); });
+
+  /* Only the backdrop dismisses. This used to test against the photo alone,
+     which was right when the photo was the only thing on the backdrop; the
+     step buttons sit on it too, so a click on one would have closed the
+     lightbox instead of advancing it. Testing for the backdrop itself is the
+     form that stays correct as controls are added. */
+  box.addEventListener("click", function (e) { if (e.target === box) close(); });
+
   document.addEventListener("keydown", function (e) {
-    if (e.key === "Escape" && box.classList.contains("is-open")) close();
+    if (!box.classList.contains("is-open")) { return; }
+    if (e.key === "Escape") { close(); }
+    else if (e.key === "ArrowRight") { e.preventDefault(); show(at + 1); }
+    else if (e.key === "ArrowLeft") { e.preventDefault(); show(at - 1); }
   });
+
+  /* Swipe, so a phone can flick through without aiming at a 44 px arrow.
+     Threshold in pixels rather than a fraction of the width: it is guarding
+     against a shaky tap, which is the same few pixels on any screen. */
+  var x0 = null;
+  box.addEventListener("touchstart", function (e) {
+    x0 = e.changedTouches[0].clientX;
+  }, { passive: true });
+  box.addEventListener("touchend", function (e) {
+    if (x0 === null) { return; }
+    var dx = e.changedTouches[0].clientX - x0;
+    x0 = null;
+    if (Math.abs(dx) > 45) { show(dx < 0 ? at + 1 : at - 1); }
+  });
+
+  /* A gallery of one has nothing to step through, and arrows that wrap to the
+     same photograph would look broken. */
+  if (items.length < 2) {
+    prevBtn.hidden = nextBtn.hidden = count.hidden = true;
+  }
 })();
 </script>
