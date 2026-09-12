@@ -111,6 +111,183 @@ html[data-theme="dark"] .ri {
 @media (prefers-reduced-motion: reduce) {
   .ri-card { transition: none; }
 }
+
+.obs {
+  --obs-card-bg: #fff;
+  --obs-metric-bg: #eceff1;
+  --obs-accent: #2a7793;
+  --obs-green: #2e7d5b;
+  --obs-warm: #d97706;
+  --obs-purple: #7c3aed;
+}
+html[data-theme="dark"] .obs {
+  --obs-card-bg: rgba(255, 255, 255, .045);
+  --obs-metric-bg: rgba(255, 255, 255, .08);
+  --obs-accent: #5cc6e4;
+  --obs-green: #48b98a;
+  --obs-warm: #f59e0b;
+  --obs-purple: #a78bfa;
+}
+.obs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 14px;
+  margin: 0 0 1em;
+}
+.obs-card {
+  border: 1px solid var(--global-border-color);
+  border-radius: 11px;
+  background: var(--obs-card-bg);
+  padding: 18px;
+  transition: border-color .15s ease;
+  display: flex;
+  flex-direction: column;
+}
+.obs-card:hover { border-color: var(--obs-accent); }
+.obs-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.obs-title {
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 0 0 4px;
+}
+.obs-sub {
+  font-size: 0.78rem;
+  color: var(--global-text-color-light);
+  margin: 0;
+}
+.obs-badge {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: var(--obs-metric-bg);
+  color: var(--global-text-color-light);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.obs-badge.is-live {
+  color: var(--obs-green);
+  background: rgba(46, 125, 91, 0.12);
+}
+html[data-theme="dark"] .obs-badge.is-live {
+  background: rgba(72, 185, 138, 0.16);
+}
+.obs-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--obs-green);
+  display: inline-block;
+}
+.obs-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin: 10px 0 12px;
+  padding: 10px 12px;
+  background: var(--obs-metric-bg);
+  border-radius: 8px;
+}
+.obs-m-item {
+  display: flex;
+  flex-direction: column;
+}
+.obs-m-lbl {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  color: var(--global-text-color-light);
+  margin-bottom: 2px;
+}
+.obs-m-val {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.obs-m-unit {
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--global-text-color-light);
+}
+.obs-bortle {
+  margin: 8px 0 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--global-border-color);
+}
+.obs-bortle-top {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  color: var(--global-text-color-light);
+  margin-bottom: 5px;
+}
+.obs-bortle-bar {
+  height: 8px;
+  border-radius: 4px;
+  background: linear-gradient(to right, #eab308 0%, #ca8a04 25%, #475569 50%, #1e293b 75%, #020617 100%);
+  position: relative;
+}
+.obs-bortle-pip {
+  position: absolute;
+  top: -2px;
+  left: 75%;
+  width: 5px;
+  height: 12px;
+  border-radius: 2px;
+  background: #fff;
+  box-shadow: 0 0 4px rgba(255,255,255,0.8);
+  transition: left 0.3s ease;
+}
+.obs-img-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 10px 0 12px;
+  border: 1px solid var(--global-border-color);
+  background: #111418;
+}
+.obs-img-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.obs-img-tag {
+  position: absolute;
+  bottom: 6px;
+  left: 8px;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 0.65rem;
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+.obs-link {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .obs-card { transition: none; }
+}
 </style>
 
 <section class="content-box">
@@ -174,17 +351,140 @@ html[data-theme="dark"] .ri {
 
 </section>
 
+<section class="content-box">
+
+<h2>Malta Atmospheric Observatory</h2>
+
+<div class="obs">
+
+<p class="ri-lead">Autonomous environmental observing stations and numerical weather prediction pipelines operating continuously in the Maltese Islands.</p>
+
+<div class="obs-grid">
+
+<!-- Card 1: Live Sensors -->
+<div class="obs-card">
+  <div class="obs-top">
+    <div>
+      <h3 class="obs-title">Malta Live Sensors</h3>
+      <p class="obs-sub">Station: Mqabba &middot; Froggit WH3000, Airly, Unihedron SQM</p>
+    </div>
+    <span class="obs-badge is-live"><span class="obs-pulse"></span> LIVE</span>
+  </div>
+
+  <div class="obs-metrics">
+    <div class="obs-m-item">
+      <span class="obs-m-lbl">Temp</span>
+      <span class="obs-m-val" style="color: var(--obs-warm);" id="obs-temp">26.9<span class="obs-m-unit">°C</span></span>
+    </div>
+    <div class="obs-m-item">
+      <span class="obs-m-lbl">Humidity</span>
+      <span class="obs-m-val" style="color: var(--obs-accent);" id="obs-rh">89<span class="obs-m-unit">%</span></span>
+    </div>
+    <div class="obs-m-item">
+      <span class="obs-m-lbl">PM2.5</span>
+      <span class="obs-m-val" style="color: var(--obs-green);" id="obs-pm25">3.0<span class="obs-m-unit">µg</span></span>
+    </div>
+    <div class="obs-m-item">
+      <span class="obs-m-lbl">Sky</span>
+      <span class="obs-m-val" style="color: var(--obs-purple);" id="obs-sky">16.4<span class="obs-m-unit">mpsas</span></span>
+    </div>
+  </div>
+
+  <div class="obs-bortle">
+    <div class="obs-bortle-top">
+      <span>Night Sky Brightness (SQM)</span>
+      <span>Dark Sky Indicator</span>
+    </div>
+    <div class="obs-bortle-bar">
+      <div class="obs-bortle-pip" id="obs-bortle-pip" title="SQM reading position"></div>
+    </div>
+  </div>
+
+  <a href="/environmental-monitoring/" class="obs-link">Open Live Dashboard &rarr;</a>
+</div>
+
+<!-- Card 2: Weather Forecast -->
+<div class="obs-card">
+  <div class="obs-top">
+    <div>
+      <h3 class="obs-title">Weather Forecasts</h3>
+      <p class="obs-sub">Central Med &middot; ECMWF IFS 0.25° + DWD ICON-EU 0.0625°</p>
+    </div>
+    <span class="obs-badge">00z / 12z</span>
+  </div>
+
+  <div class="obs-img-preview">
+    <img src="/images/S2-L-pressure.png" alt="Synoptic chart preview" loading="lazy">
+    <span class="obs-img-tag">500 hPa Height Anomaly &middot; Central Med</span>
+  </div>
+
+  <p class="ri-desc" style="margin-bottom: 14px;">Pre-rendered synoptic maps, high-resolution meteograms, and MTG satellite loops updated twice daily.</p>
+
+  <a href="/forecast/" class="obs-link">View Synoptic Weather Charts &rarr;</a>
+</div>
+
+</div>
+</div>
+
+<script>
+/* Safe from Jekyll HTML compressor: only block comments used here */
+(function() {
+  var LOCAL_URL = "/data/current.json";
+  var REMOTE_URL = "https://raw.githubusercontent.com/ryanvella9/ryanvella9.github.io/data/current.json";
+
+  function update(d) {
+    if (!d) return;
+    if (d.weather && d.weather.temp != null) {
+      var t = document.getElementById("obs-temp");
+      if (t) t.innerHTML = Number(d.weather.temp).toFixed(1) + '<span class="obs-m-unit">°C</span>';
+    }
+    if (d.weather && d.weather.rh != null) {
+      var r = document.getElementById("obs-rh");
+      if (r) r.innerHTML = Math.round(d.weather.rh) + '<span class="obs-m-unit">%</span>';
+    }
+    if (d.air && d.air.pm25 != null) {
+      var p = document.getElementById("obs-pm25");
+      if (p) p.innerHTML = Number(d.air.pm25).toFixed(1) + '<span class="obs-m-unit">µg</span>';
+    }
+    if (d.sky && d.sky.mag != null) {
+      var s = document.getElementById("obs-sky");
+      if (s) s.innerHTML = Number(d.sky.mag).toFixed(1) + '<span class="obs-m-unit">mpsas</span>';
+      var pip = document.getElementById("obs-bortle-pip");
+      if (pip) {
+        var mag = Number(d.sky.mag);
+        var pct = Math.max(0, Math.min(100, ((mag - 15.0) / (21.8 - 15.0)) * 100));
+        pip.style.left = pct.toFixed(1) + "%";
+      }
+    }
+  }
+
+  fetch(LOCAL_URL)
+    .then(function(res) { if (!res.ok) throw new Error(); return res.json(); })
+    .then(update)
+    .catch(function() {
+      fetch(REMOTE_URL)
+        .then(function(res) { return res.json(); })
+        .then(update)
+        .catch(function() {});
+    });
+})();
+</script>
+
+</section>
+
 <section class="content-box" markdown="1">
 
 ## Beyond Research
 
 I co-founded and managed the environmental NGO Għaqda Siġar Maltin in Malta, dedicating several years to promoting ecological sustainability. I am passionate about trees, birds, and the natural environment. I enjoy working with satellite data and also operate several personal environmental sensors in Malta. As part of my conservation work, I help to raise awareness about light pollution and advocate for the preservation of Malta’s remaining Dark Sky Heritage Areas. Beyond these projects, I enjoy biking, hiking, and capturing the beauty of nature through photography.
 
-
-
 </section>
 
-<p><a href="/files/rv_cv.pdf" download>Download my CV</a></p>
+<p style="margin: 2em 0 1.2em;">
+  <a href="/files/rv_cv.pdf" class="btn btn--primary" download style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 6px; font-weight: 600; text-decoration: none;">
+    <i class="fas fa-file-arrow-down" aria-hidden="true"></i> Download Curriculum Vitae (PDF)
+  </a>
+</p>
 
 <div style="text-align: right; font-style: italic;">
 Last updated on 30 August 2026
