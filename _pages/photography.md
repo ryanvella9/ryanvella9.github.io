@@ -94,6 +94,36 @@ body.ph-locked { overflow: hidden; }
 <button type="button" class="ph-item" aria-label="Enlarge: cumulus clouds building over a lake">
 <img src="/images/photography/img_5301.jpg" alt="Cumulus clouds building over a lake, seen from a wooded shoreline" width="2000" height="2000" loading="lazy">
 </button>
+<button type="button" class="ph-item" aria-label="Enlarge: a cumulus tower over a desert plateau">
+<img src="/images/photography/dsc07713.jpg" alt="A tall cumulus cloud building over a desert plateau, with red rock and distant mesas below" width="2000" height="2000" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: golden larches on a snow-dusted alpine slope">
+<img src="/images/photography/img_7682.jpg" alt="Larches in golden autumn colour on a snow-dusted alpine slope, below a waterfall and grey peaks" width="2000" height="2000" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: fireworks over a city waterfront at dusk">
+<img src="/images/photography/dsc06772.jpg" alt="Fireworks bursting in gold, red and green over a city waterfront at dusk" width="2000" height="2000" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: aerial view of a sandy bay and anchored boats">
+<img src="/images/photography/dsc02491.jpg" alt="An aerial view of a sandy bay, boats anchored over turquoise shallows that deepen to open blue" width="2000" height="2000" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: a narrow beach seen from directly above">
+<img src="/images/photography/40eb74f8-e7b8-40fc-8dc1-c8dfe2b2fb91.jpg" alt="A narrow sandy beach between scrubland and clear green shallows, seen from directly above" width="1875" height="1875" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: boats moored over turquoise shallows">
+<img src="/images/photography/dji_0808.jpg" alt="Small boats and a swimming pontoon moored over bright turquoise shallows, seen from directly above" width="2000" height="2000" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: a narrow inlet between limestone cliffs">
+<img src="/images/photography/a65aa8a8-8e55-4215-a6c2-bcde96cee74d.jpg" alt="A narrow inlet of deep blue water between pale limestone cliffs, seen from directly above" width="1875" height="1875" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: a red and white husky">
+<img src="/images/photography/dsc09492.jpg" alt="A red and white husky panting, photographed close up at an outdoor gathering" width="2000" height="2000" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: fossil scallop shells in limestone">
+<img src="/images/photography/img_0440.jpg" alt="Fossilised scallop shells embedded in weathered pale limestone" width="2000" height="2000" loading="lazy">
+</button>
+<button type="button" class="ph-item" aria-label="Enlarge: the Statue of Liberty against a pale sky">
+<img src="/images/photography/dsc05668.jpg" alt="The Statue of Liberty on its stone pedestal against a pale blue sky" width="2000" height="2000" loading="lazy">
+</button>
 </div>
 
 <div class="ph-lb" role="dialog" aria-modal="true" aria-label="Enlarged photograph">
