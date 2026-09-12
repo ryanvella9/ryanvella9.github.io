@@ -28,6 +28,8 @@ main:
         url: /environmental-monitoring/
       - title: "Weather"
         url: /forecast/
+      - title: "Malta Radar"
+        url: /radar/
 
   # CV is now a download button at the bottom of the About page. The /cv/ page
   # itself still builds, so old links to it (and to /resume) keep working:
