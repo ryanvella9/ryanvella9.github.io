@@ -1032,11 +1032,11 @@ if (DOMAIN_META.zurich) DOMAIN_META.zurich.defaultModel = 'icon_2i';
    `key` is the field in the payload; 'spd' is derived from u and v. */
 const FIELD_SPECS = {
   t: { slug: 't2m', label: 'Temperature', unit: ' °C' },
-  /* Departure of the 2 m temperature from the 1981-2010 daily mean, in degrees
-     rather than in sigma — which is the one thing that makes this unlike the
-     two anomalies below it, and it is not a style choice. There is no published
-     standard deviation for 2 m temperature to divide by; pipeline/config.py
-     T2M_CLIM_URL has the detail. So the unit here is the same ' °C' the
+  /* Departure of the 2 m temperature from the 1981-2010 normal for the same day
+     AND hour, in degrees rather than in sigma — which is the one thing that
+     makes this unlike the two anomalies below it, and it is not a style choice.
+     There is no published standard deviation for 2 m temperature to divide by;
+     pipeline/config.py T2M_CLIM_URL has the detail. So the unit here is the same ' °C' the
      temperature itself carries, and the two read against each other directly.
      Central Mediterranean only, for a reason that is about the climatology's
      resolution rather than about this panel — see T2M_ANOM_DOMAINS. */
@@ -2247,7 +2247,7 @@ function loadSource(domainKey, modelKey) {
       LUTS.ta = {
         lut: buildLUT(TANOM_COLORS),
         range: [TANOM_LEVELS[0], TANOM_LEVELS[TANOM_LEVELS.length - 1]],
-        title: '2 m temperature anomaly (°C vs 1981–2010)',
+        title: '2 m temperature anomaly (°C vs 1981–2010 normal for the hour)',
         levels: TANOM_LEVELS, ladder: true, unit: ' °C',
         // Nine of twenty-one rungs, chosen so the labels are symmetric about
         // zero and land on the numbers a reader reasons in. Even spacing would
@@ -4241,7 +4241,7 @@ const DESCS = {
      the Atlas or the Apennines is owed the knowledge that part of it is the
      climatology's coarse terrain rather than the forecast's weather, because
      nothing on the map distinguishes the two. */
-  ta: 'Departure of the forecast 2 m temperature from the 1981–2010 NCEP/NCAR daily mean for the same day of the year, in degrees Celsius, with 10 m wind as advected streaklines. Blue is colder than normal and red warmer. The climatology is a 1.9° grid — far coarser than the forecast over it — so read this for the basin-wide pattern rather than for detail: sharp structure in the shading is the forecast’s, not a departure that has been resolved, and some of the signal over the Atlas, the Apennines and the Alpine rim is the reanalysis and the model disagreeing about where the mountains are.',
+  ta: 'Departure of the forecast 2 m temperature from the 1981–2010 NCEP/NCAR normal for the same day of the year and the same time of day, in degrees Celsius, with 10 m wind as advected streaklines. Comparing against the hour rather than against the day is what makes this an anomaly: 2 m temperature swings 15 °C and more between night and afternoon over land, so a daily mean would report the Sahara warming up after dawn as a departure from normal. Blue is colder than normal and red warmer. The climatology is a 1.9° grid — far coarser than the forecast over it — so read this for the basin-wide pattern rather than for detail: sharp structure in the shading is the forecast’s, not a departure that has been resolved, and some of the signal over the Atlas, the Apennines and the Alpine rim is the reanalysis and the model disagreeing about where the mountains are.',
   /* A function because this shading is offered at three different heights and
      the sentence named only one of them. It has said "10 m" on the 500 hPa
      panel for as long as that panel has offered wind speed; adding a third
