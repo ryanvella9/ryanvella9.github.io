@@ -5468,26 +5468,24 @@ function dayWindow(d) {
 
 const dayCover = (d) => dayIsFull(d) ? '24 h' : `${Math.round(d.hours)} of 24 h`;
 
-/* What the still says about itself. The peak is in the header because a dry day
-   is otherwise an empty map: the ladder draws nothing below 1 mm, so 0.4 mm
-   over the whole island and a genuinely rainless day are the same picture, and
-   only the caption can tell them apart. */
+/* What the still says about itself: the day, the quantity, the window it covers
+   and the model it came from, and nothing else.
+
+   The domain is deliberately not named. The frame is the caption on that point —
+   a reader looking at the island, or at the whole central Mediterranean, can see
+   which of the two they have — and the words spent saying it were words the
+   header had to shrink around. Same argument for the peak, which the sheet still
+   lists beside each thumbnail: it belongs where a reader is choosing between
+   days, not written across a map that shows where the rain is. */
 function dayCaption(d) {
   return {
     big: fmtDay.format(d.at),
-    /* One label for every image, whatever the day covers. What the image is —
-       an accumulation over a day rather than one model step — does not change
-       between a full day and a part one, and the window beside it is where the
-       difference belongs: "14:00–24:00 local · 10 of 24 h" says the day is
-       short, and says by how much, which "part day" never did. */
-    small: 'Daily accumulated',
+    /* One label for every image, whatever the day covers, and the window beside
+       it is where a short day says so: "14:00–24:00 local · 10 of 24 h" both
+       names the gap and measures it. */
+    small: '24h accumulated precip',
     right: `${dayWindow(d)} local · ${dayCover(d)}`,
-    sub: [MODELS[state.model].label, DOMAIN_META[state.domain].label,
-          // Not "accumulated rainfall": the line above has just said
-          // accumulated, and saying it twice in two lines reads as a stutter.
-          'rainfall',
-          d.peak >= 0.05 ? `peak ${d.peak.toFixed(1)} mm` : 'nothing above 0.05 mm'
-         ].join(' · '),
+    sub: MODELS[state.model].label,
   };
 }
 
