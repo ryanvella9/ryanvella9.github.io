@@ -568,7 +568,7 @@ title: "Weather"
              on the upper-air frames the answer is only "this chart has no rain
              field", which is not worth a tooltip on every visit. loadSource
              sets it. -->
-        <button id="day-open">Daily rain…</button>
+        <button id="day-open">Daily rain frames</button>
       </div>
     </div>
   </div>
@@ -5198,8 +5198,16 @@ function composeFrame(ctx, w, h, mapH, opt = {}) {
 
   const spec = LUTS[state.field];
   if (spec) {
+    /* The unit, once, at the end of the ramp. The rungs themselves are bare
+       numbers, and a 20 on a rainfall ladder and a 20 on a temperature one are
+       the same glyph — on the page the scale's title carries the unit, and that
+       title is the one thing around the map that does not travel with the
+       image. Measured before the bar is sized, like the credit, so the ramp
+       gives up the width rather than being written over. */
+    const unit = (spec.unit || '').trim();
+    const unitW = unit ? ctx.measureText(unit).width + 7 * s : 0;
     const x0 = 12 * s, bh = 9 * s, y0 = by + 9 * s;
-    const bw = Math.max(120 * s, Math.min(340 * s, w - x0 - credW - 32 * s));
+    const bw = Math.max(120 * s, Math.min(340 * s, w - x0 - credW - unitW - 32 * s));
     for (let i = 0; i < bw; i++) {
       const k = Math.round((i / (bw - 1)) * 255);
       ctx.fillStyle = `rgb(${spec.lut[k * 3]},${spec.lut[k * 3 + 1]},${spec.lut[k * 3 + 2]})`;
@@ -5226,6 +5234,9 @@ function composeFrame(ctx, w, h, mapH, opt = {}) {
       x = Math.max(x0, Math.min(x0 + bw - lw, x));
       ctx.fillText(label, x, y0 + bh + 11 * s);
     }
+    // On the ramp's own line rather than under it with the numbers, so it reads
+    // as the scale's unit and not as another rung.
+    if (unit) ctx.fillText(unit, x0 + bw + 7 * s, y0 + bh);
   }
   ctx.font = `${10 * s}px ui-sans-serif, system-ui, sans-serif`;
   ctx.fillStyle = muted;
@@ -5464,17 +5475,17 @@ const dayCover = (d) => dayIsFull(d) ? '24 h' : `${Math.round(d.hours)} of 24 h`
 function dayCaption(d) {
   return {
     big: fmtDay.format(d.at),
-    /* "Daily total" is claimed only by a day that actually runs midnight to
-       midnight, which is every ICON-2I day and no IFS one: counting whole
-       buckets on the day they fell in puts a six-hourly model's day boundary at
-       20:00, and a reader who took "daily" literally there would be four hours
-       out at both ends. The window beside it says which four hours. */
-    small: !dayIsFull(d) ? 'part day'
-      : fmtLocal.format(new Date(INIT.getTime() + d.from * 3600e3)) === '00:00'
-        ? 'daily total' : '24 h total',
+    /* One label for every image, whatever the day covers. What the image is —
+       an accumulation over a day rather than one model step — does not change
+       between a full day and a part one, and the window beside it is where the
+       difference belongs: "14:00–24:00 local · 10 of 24 h" says the day is
+       short, and says by how much, which "part day" never did. */
+    small: 'Daily accumulated',
     right: `${dayWindow(d)} local · ${dayCover(d)}`,
     sub: [MODELS[state.model].label, DOMAIN_META[state.domain].label,
-          'accumulated rainfall',
+          // Not "accumulated rainfall": the line above has just said
+          // accumulated, and saying it twice in two lines reads as a stutter.
+          'rainfall',
           d.peak >= 0.05 ? `peak ${d.peak.toFixed(1)} mm` : 'nothing above 0.05 mm'
          ].join(' · '),
   };
