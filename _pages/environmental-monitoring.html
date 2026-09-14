@@ -224,7 +224,7 @@ footer a{color:var(--ink-2)}
     <div class="card board"><h3>Temperature</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-temp"></div></div>
     <div class="card board"><h3>Relative humidity</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-rh"></div></div>
     <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked with its Beaufort force. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
-    <div class="card board"><h3>Rainfall</h3><p class="cap">Daily totals, read from the gauge.</p><div class="plot" id="p-rain"></div><p class="accum" id="cap-rain"></p></div>
+    <div class="card board"><h3>Rainfall</h3><p class="cap">Hourly totals, with each day's total above.</p><div class="plot" id="p-rain"></div><p class="accum" id="cap-rain"></p></div>
   </section>
 
   <section id="sec-air">
@@ -973,29 +973,40 @@ function drawWeather(){
       }
     }});
 
-  /* rainfall bars, one per day.
+  /* rainfall: hourly bars, with each day's total printed above its day.
 
-     Daily rather than hourly because that is the quantity anyone reads a rain
-     chart for — "how much fell on Tuesday" — and because an hourly bar here is
-     mostly empty space: this station records rain on a handful of days a
-     season, so six of seven panels were a flat line with one spike in the
-     corner. The hourly series is still exported and still correct; it is just
-     not what this card answers.
+     The two answer different questions and the panel needs both. The bars say
+     when it rained and how hard — a 6 mm hour and a day of drizzle adding to
+     the same total are not the same weather. The number says how much, which
+     is what anyone actually quotes. It sits on the day label, the same slot
+     the wind panel uses for its daily direction and the air panels for their
+     daily means, so it costs no room inside the plot.
 
-     Bars are centred on local noon so each sits under its own day label,
-     between the midnight separators makePlot already draws. */
-  const rainDays = (w.daily || [])
-    .filter(d => isNum(d.rain))
-    .map(d => [dayKeyTs(d.date) + 43200, d.rain]);
+     Printed on dry days too. "0.0 mm" is a reading; a missing label is
+     ambiguous between no rain and no data, and this station is dry most of
+     the year.
+
+     The bars are true hourly totals, differenced from the gauge's own running
+     counter, so they sum to the figure printed above them. They read lower
+     than they once did, and that is the point: the old series multiplied an
+     instantaneous rain rate by the half hour that followed it, so a burst
+     peaking at 21 mm/h for a few minutes was billed as 10.6 mm. 13 September
+     came to 33.0 mm that way, against the gauge's own 9.4 mm. */
+  const rainPts = zip(h.t, h.rain).filter(p => isNum(p[1]));
   const rainHost = $("#p-rain");
-  if (!rainDays.length){ noData(rainHost, "No rainfall data"); }
+  if (!rainPts.length){ noData(rainHost, "No rainfall data"); }
   else {
-    const p = makePlot(rainHost, { domain: domain(), yLabel: "mm", yMin: 0,
-      extent: [Math.max(0.6, Math.max(...rainDays.map(x => x[1])))] });
-    /* Three quarters of a day wide, so the bars read as belonging to separate
-       days rather than as a continuous block. */
-    p.bars(rainDays, css("--c-rain"), 64800);
-    attachHover(rainHost, p, [{ name: "Rainfall", colour: css("--c-rain"), pts: rainDays }],
+    const p = makePlot(rainHost, { domain: domain(), yLabel: "mm/h", yMin: 0,
+      pad: { t: 26 },
+      extent: [Math.max(0.6, Math.max(...rainPts.map(x => x[1])))] });
+    p.bars(rainPts, css("--c-rain"), 3600);
+    for (const d of (w.daily || [])){
+      const mid = dayKeyTs(d.date) + 43200;
+      if (isNum(d.rain) && mid > p.t0 && mid < p.t1){
+        p.topLabel(mid, d.rain.toFixed(1) + " mm");
+      }
+    }
+    attachHover(rainHost, p, [{ name: "Rainfall", colour: css("--c-rain"), pts: rainPts }],
                 v => v.toFixed(1) + " mm");
   }
   const rs = w.rain_since;
