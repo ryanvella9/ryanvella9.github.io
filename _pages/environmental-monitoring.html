@@ -224,7 +224,7 @@ footer a{color:var(--ink-2)}
     <div class="card board"><h3>Temperature</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-temp"></div></div>
     <div class="card board"><h3>Relative humidity</h3><p class="cap">Hourly mean, with daily maximum and minimum marked.</p><div class="plot" id="p-rh"></div></div>
     <div class="card board"><h3>Wind speed</h3><p class="cap">Hourly mean, daily maximum marked with its Beaufort force. Dominant direction shown per day.</p><div class="plot" id="p-wind"></div></div>
-    <div class="card board"><h3>Rainfall</h3><p class="cap">Hourly totals.</p><div class="plot" id="p-rain"></div><p class="accum" id="cap-rain"></p></div>
+    <div class="card board"><h3>Rainfall</h3><p class="cap">Daily totals, read from the gauge.</p><div class="plot" id="p-rain"></div><p class="accum" id="cap-rain"></p></div>
   </section>
 
   <section id="sec-air">
@@ -973,17 +973,30 @@ function drawWeather(){
       }
     }});
 
-  /* rainfall bars */
-  const rainPts = zip(h.t, h.rain).filter(p => isNum(p[1]));
+  /* rainfall bars, one per day.
+
+     Daily rather than hourly because that is the quantity anyone reads a rain
+     chart for — "how much fell on Tuesday" — and because an hourly bar here is
+     mostly empty space: this station records rain on a handful of days a
+     season, so six of seven panels were a flat line with one spike in the
+     corner. The hourly series is still exported and still correct; it is just
+     not what this card answers.
+
+     Bars are centred on local noon so each sits under its own day label,
+     between the midnight separators makePlot already draws. */
+  const rainDays = (w.daily || [])
+    .filter(d => isNum(d.rain))
+    .map(d => [dayKeyTs(d.date) + 43200, d.rain]);
   const rainHost = $("#p-rain");
-  const total = rainPts.reduce((a, b) => a + b[1], 0);
-  if (!rainPts.length){ noData(rainHost, "No rainfall data"); }
+  if (!rainDays.length){ noData(rainHost, "No rainfall data"); }
   else {
-    const p = makePlot(rainHost, { domain: domain(), yLabel: "mm/h", yMin: 0,
-      extent: [Math.max(0.6, Math.max(...rainPts.map(x => x[1])))] });
-    p.bars(rainPts, css("--c-rain"), 3600);
-    attachHover(rainHost, p, [{ name: "Rainfall", colour: css("--c-rain"), pts: rainPts }],
-                v => v.toFixed(2) + " mm");
+    const p = makePlot(rainHost, { domain: domain(), yLabel: "mm", yMin: 0,
+      extent: [Math.max(0.6, Math.max(...rainDays.map(x => x[1])))] });
+    /* Three quarters of a day wide, so the bars read as belonging to separate
+       days rather than as a continuous block. */
+    p.bars(rainDays, css("--c-rain"), 64800);
+    attachHover(rainHost, p, [{ name: "Rainfall", colour: css("--c-rain"), pts: rainDays }],
+                v => v.toFixed(1) + " mm");
   }
   const rs = w.rain_since;
   $("#cap-rain").innerHTML = rs && isNum(rs.mm)
