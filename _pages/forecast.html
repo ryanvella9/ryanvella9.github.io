@@ -286,14 +286,17 @@ title: "Weather"
   .xmark.on { opacity: 1; }
 
   /* Radar is a self-contained observed-data view rather than a model field.
-     Keeping it in its own frame lets the published Pi loop retain its Malta
-     map geometry and animation controls without pretending it is another
-     forecast-domain/shading combination. */
+     Its card deliberately follows the Malta surface panel's 720 px map width:
+     opening Radar should feel like changing panel, not opening a larger app. */
   .radar-shell {
     background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
-    margin: 0 auto; max-width: 1120px; overflow: hidden;
+    margin: 0 auto; max-width: 720px; overflow: hidden;
   }
-  .radar-frame { background: var(--bg); border: 0; display: block; height: 1000px; width: 100%; }
+  .radar-frame {
+    background: var(--bg); border: 0; display: block;
+    height: min(770px, max(440px, calc((100vw - 40px) * 1.2)));
+    width: 100%;
+  }
 
   .hud { position: absolute; pointer-events: none; }
 
