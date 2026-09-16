@@ -8679,6 +8679,9 @@ function ndviShow(on) {
 function showView(name) {
   if (state.view === 'sat' && name !== 'sat') satSetPlaying(false);
   state.view = name;
+  // Radar has its own observed-data timestamp and source label inside the
+  // panel, so the active forecast model/run in the header is misleading here.
+  $('cycles').hidden = name === 'radar';
   $('view-map').hidden = name !== 'map';
   $('view-mgram').hidden = name !== 'mgram';
   $('view-sat').hidden = name !== 'sat';
