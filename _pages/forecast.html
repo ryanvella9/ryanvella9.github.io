@@ -485,15 +485,34 @@ title: "Weather"
   <div class="bar">
     <h1>Weather</h1>
     <nav class="tabs" id="tabs">
-      <button data-view="map" data-domain="malta" aria-pressed="true">Surface panels</button>
-      <button data-view="mgram" aria-pressed="false">Meteogram</button>
       <!-- One tab for the four Europe charts. They were three tabs, which put half
            the tab bar on one frame and read as three unrelated pages; they are
            one frame at four levels, and a reader who wants the synoptic
            picture wants to leaf through all three rather than pick one from a
            menu. Which of them is showing is chosen inside the view, by the
-           Chart row and by up/down. -->
+           Chart row and by up/down.
+
+           First in the row because it is where the page opens, and the tab bar
+           should read in the order a forecast is read: the synoptic pattern,
+           then the point forecast under it, then the close-up fields, then the
+           observation to check them against.
+
+           Not pressed here, even though it is where the page is heading. Boot
+           paints the Central Med panel and only then asks for the upper-air
+           payload, so for as long as that download takes the frame on screen
+           really is the surface one — and the tab bar saying otherwise is the
+           exact failure showView's comment describes. applyHash presses this
+           when the chart actually arrives. -->
       <button data-view="map" data-synoptic="1" aria-pressed="false">Synoptic charts</button>
+      <button data-view="mgram" aria-pressed="false">Meteogram</button>
+      <!-- Names no domain of its own, for the same reason the synoptic tab does
+           not: it reopens on whichever close-up frame the reader was last on,
+           which state.surface holds and which starts at the Central
+           Mediterranean rather than at Malta. Hard-coding one here is what made
+           pressing this tab while already on Malta throw the reader back out to
+           the basin — a lit tab that moves the page is worse than one that does
+           nothing. -->
+      <button data-view="map" aria-pressed="true">Surface panels</button>
       <button data-view="sat" aria-pressed="false">Satellite</button>
     </nav>
     <small id="cycles">loading…</small>
@@ -739,20 +758,24 @@ title: "Weather"
        positioned the forecast silently repositioned the loop. -->
   <section id="view-sat" hidden>
     <div class="controls">
-      <!-- Four sources: two geostationary loops and two polar stills. Malta is
-           first because it is the one that answers "what is happening here";
-           the full disc is the same instrument pulled back to the whole
-           hemisphere, on a shorter window and a faster cadence. The two
-           Sentinels are stills at resolutions FCI cannot reach, and selecting
-           one hides the animation controls rather than leaving a scrubber that
-           addresses a single frame.
+      <!-- Four sources: two geostationary loops and two polar stills. The row
+           runs in zoom order — islands, basin, hemisphere — which is the order
+           a reader widens out through; the full disc is the same instrument
+           pulled back to the whole hemisphere, on a shorter window and a faster
+           cadence. The two Sentinels are stills at resolutions FCI cannot
+           reach, and selecting one hides the animation controls rather than
+           leaving a scrubber that addresses a single frame.
            Labelled by what each one shows rather than by mission: three of the
-           four are MTG, so "MTG loop" stopped telling a reader which. -->
+           four are MTG, so "MTG loop" stopped telling a reader which.
+           Central Med is the one that opens, not the first in the row: it is
+           the frame the rest of the page is on, so arriving here from any other
+           tab shows the same weather photographed rather than modelled. See
+           satInit, which is where that choice is made. -->
       <div class="group" id="sat-source-group" hidden>
         <label>Source</label>
         <div class="btns" id="sat-sources">
-          <button data-source="mtg" aria-pressed="true">Malta</button>
-          <button data-source="medit" aria-pressed="false">Central Med</button>
+          <button data-source="mtg" aria-pressed="false">Malta</button>
+          <button data-source="medit" aria-pressed="true">Central Med</button>
           <button data-source="disc" aria-pressed="false">Full disc</button>
         </div>
       </div>
@@ -922,24 +945,21 @@ title: "Weather"
         Mercator, unlike the Lambert used by the rendered PNGs — a conformal
         projection is what lets the streaklines be advected in screen space
         without distorting direction.<br />
-        <b>Observed cloud.</b> The Satellite overlay on the map panels is one scan
-        per past step of whichever timeline is showing — 3-hourly over the last
-        day on the surface frames, 12-hourly over the last week on the synoptic
-        ones. Nothing is drawn over forecast hours.
+        <b>Observed cloud.</b> The Satellite overlay is one scan per past step of
+        the timeline it is drawn on, 3-hourly over the last day. Nothing is drawn
+        over forecast hours, and nothing is drawn on the synoptic charts: it was
+        offered there and has been taken off. A photograph of the cloud tops laid
+        over a height anomaly or an isobaric field answers no question either one
+        is asking — both are properties of the whole depth of the atmosphere —
+        and it buries the contours the chart exists for.
         Which imagery depends on how finely the frame is drawn. The close-ups
         are limited by the instrument, so they take MTG FCI's high-resolution
         fast imagery: 0.5 km in the visible, grey rather than colour because it
         is a single channel, falling back to the 10.5 µm window after dark. The
-        wide frames are limited by the size of image they can afford to carry
-        rather than by the instrument, so they take Geo Colour instead — true
-        colour by day blended into infrared and city lights across the
+        Central Mediterranean frame is limited by the size of image it can afford
+        to carry rather than by the instrument, so it takes Geo Colour instead —
+        true colour by day blended into infrared and city lights across the
         terminator, which a window spanning whole days needs.
-        The synoptic frame is two satellites. From 0° the Earth's limb crosses
-        it near 50° W, which would cut off the western half of the Atlantic the
-        chart exists to watch, so GOES-East at 75.2° W is composited in to fill
-        it — each pixel taken from whichever satellite sees it less obliquely,
-        feathered across the join near 38° W. Both are the same Geo Colour
-        product, which is what lets them meet without a seam.
         MSG is not used: EUMETView publishes no HRV, the SEVIRI channels it does
         publish are 3 km and visibly blocky at these zooms, and SEVIRI has no
         green channel, so there is no true-colour product for it at all.<br />
@@ -1937,8 +1957,14 @@ const state = {
   // asked for, not defaulted into — see mgClip.
   mgRange: 'short',
   // The synoptic level the tab reopens on. 500 hPa is where a reader starts
-  // reading a synoptic situation, so it is where the tab starts.
+  // reading a synoptic situation, so it is where the tab starts — and, since
+  // the page now opens on the synoptic chart, where the whole page starts.
   synoptic: 'europe',
+  // The same for the other map tab: the close-up frame it reopens on. The basin
+  // rather than Malta, because it is the frame that carries the weather the
+  // synoptic chart has just been describing — Malta is one press further in,
+  // and a reader who goes there is returned to it by this.
+  surface: 'medit',
   playing: false, speed: 1,
   hover: null,
 };
@@ -2315,10 +2341,14 @@ function loadSource(domainKey, modelKey) {
   $('r-prec-label').textContent = isRain ? `Rain ${D.window || 24} h`
     : (isPressure || vec) ? '—'
     : (isUpper || isJet) ? 'Anomaly' : `Rain ${SRC.accumHours} h`;
-  /* Which chart the Synoptic tab reopens on, remembered so that leaving the
-     vapour panel for the Malta one and coming back lands where the reader
-     left rather than resetting to 500 hPa. */
+  /* Which frame each map tab reopens on, remembered so that leaving the vapour
+     panel for the Malta one and coming back lands where the reader left rather
+     than resetting to 500 hPa — and the same in the other direction, so the
+     trip back does not reset them to the basin. Every path that changes frame
+     comes through here, which is why it is recorded here rather than in the
+     tab handler: the domain row and the deep links move the reader too. */
   if (isSynoptic(domainKey)) state.synoptic = domainKey;
+  else state.surface = domainKey;
   /* The daily rainfall export is offered wherever the source carries a
      precipitation field to accumulate — the three close-up panels — and nowhere
      else. Asked of the source rather than of the domain, because IFS reaches
@@ -2712,6 +2742,21 @@ const OVL = window.OVERLAY || null;
 
 const ovlBox = () => {
   if (!OVL) return null;
+  /* Never on the synoptic frame, whatever the manifest offers there.
+
+     The overlay earns its place on a close-up, where the model's cloud sheet
+     and the sky's are the same scale and disagreeing about the same shower. On
+     a 100-degree frame it is a different kind of statement: the chart under it
+     is a height anomaly or a pressure field — properties of the whole depth of
+     the atmosphere, contoured — and a photograph of the cloud tops laid over
+     them answers no question either one is asking. It also buries the isohypses
+     the chart exists for. So the toggle is gone from those panels rather than
+     left as a layer that makes the chart worse.
+
+     Refused here rather than by dropping the box from the manifest: the
+     payload is rebuilt every cycle by a pipeline this file does not control,
+     and a box that comes back has to stay refused. */
+  if (isSynoptic(state.domain)) return null;
   for (const b of Object.values(OVL.boxes)) {
     if (b.domains.includes(state.domain)) return b;
   }
@@ -4650,6 +4695,14 @@ function syncSatToggle() {
   const key = `${ok}|${!!box}|${future}|${state.domain}`;
   if (key === satToggleState) return;
   satToggleState = key;
+  /* Gone rather than greyed where no imagery covers this panel at all — the
+     synoptic charts, by the rule in ovlBox, and the rainfall frame, which never
+     had a box. Disabled is the right state for a button that will come back
+     when the reader scrubs; a button that can never be pressed on this panel is
+     furniture with a tooltip, and the reader has to hover it to find that out.
+     The preference in state.satOvl is untouched, so the close-ups still open
+     with the layer the reader left on. */
+  btn.hidden = !box;
   btn.disabled = !ok;
   // Lit for what is actually drawn, not for what was asked for — the same
   // distinction the flow toggle makes on the upper-air panel. The preference
@@ -7537,7 +7590,9 @@ const satLoopKeys = () => Object.keys(SAT_LOOPS);
 const satState = {
   i: 0, prev: null, fade: 1,
   playing: false, speed: 1, raf: null, stepAt: 0, step: null,
-  source: 'mtg', buffering: false,
+  // Provisional: satInit settles which loop actually opens, against what was
+  // published this cycle rather than against what is named here.
+  source: 'medit', buffering: false,
 };
 // Which loops have been fetched in full. Per source, so pressing Play on the
 // full disc buffers the disc rather than trusting a warm Malta cache.
@@ -8266,7 +8321,13 @@ function satInit() {
   for (const b of [...box.children]) {
     if (!SAT_LOOPS[b.dataset.source]) b.hidden = true;
   }
-  satState.source = hasLoop ? (SAT_LOOPS.mtg ? 'mtg' : loops[0]) : stills[0].key;
+  /* The basin loop is what the tab opens on — the same frame the surface
+     panels and the synoptic charts are read on, so switching to Satellite is a
+     change of instrument rather than a change of subject. Named rather than
+     taken as loops[0], because the row is in zoom order and the first entry in
+     it is Malta; falling back to whatever did publish is the point of the
+     ternary, and a cycle where the basin fetcher failed must still open. */
+  satState.source = hasLoop ? (SAT_LOOPS.medit ? 'medit' : loops[0]) : stills[0].key;
 
   /* The toggle appears only when there is something to toggle between. A
      fetcher that has never run, or a fortnight where no pass cleared the cloud
@@ -8639,9 +8700,9 @@ $('tabs').onclick = (e) => {
   if (!b) return;
   if (b.dataset.view === 'mgram') { openMeteogram(); return; }
   if (b.dataset.view === 'sat') { showView('sat'); return; }
-  // The synoptic tab names no domain of its own: it opens whichever of the
-  // three the reader was last on.
-  const dom = b.dataset.synoptic ? state.synoptic : b.dataset.domain;
+  // Neither map tab names a domain of its own: each opens whichever of its own
+  // frames the reader was last on.
+  const dom = b.dataset.synoptic ? state.synoptic : state.surface;
   const go = () => showView('map');
   if (dom === state.domain) go();
   else switchDomain(dom).then(go);
@@ -8742,6 +8803,28 @@ function applyHash() {
     return want && want !== state.model ? switchModel(want).catch(() => {}) : Promise.resolve();
   };
 
+  /* Where the page opens when the address bar says nothing, and where a link
+     that parses into no product falls back to: the synoptic chart, which
+     state.synoptic starts at 500 hPa.
+
+     That is the chart a forecast is read from first — what the pattern is,
+     before what it does to any one place — so it is the page rather than a tab
+     two presses in. The level is not named here: state.synoptic is the reader's
+     own place in the stack and it is already 500 hPa on a fresh visit, so
+     hard-coding 'europe' would forget where they left off for no gain. The
+     shading follows from the source, whose first option is the height anomaly.
+
+     It costs a download the close-up panels do not: the upper-air payload is
+     lazy, so the frame the boot already painted stays up until it lands. The
+     busy cursor is the only cue for that, which is deliberate — the panel
+     underneath is a real forecast, not a placeholder, and blanking it to prove
+     something is loading would trade a readable frame for an empty one. */
+  const toLanding = () => switchDomain(state.synoptic)
+    .then(() => { showView('map'); drawAll(); syncTime(); })
+    // Whatever went wrong, there is a painted panel underneath: leave the
+    // reader on it rather than on a view that never arrived.
+    .catch((e) => { console.error(e); showView('map'); toDefaultModel(); });
+
   /* Matched ahead of the field pattern below, which expects a domain and a
      forecast hour. Links from the version where satellite was a shading layer
      carry both; they mean nothing here, so the view just opens on its newest
@@ -8767,7 +8850,7 @@ function applyHash() {
       if (want) satSeek(want[2] || want[3]);
       return;
     }
-    showView('map'); toDefaultModel(); return;
+    toLanding(); return;
   }
 
   /* The meteogram is matched before the general pattern rather than through it.
@@ -8788,14 +8871,14 @@ function applyHash() {
   }
 
   const m = /^#([\w-]+)\/([\w-]+)(?:\/(icon-eu|icon-2i|ifs))?(?:\/([fp]?)(\d+))?$/.exec(BOOT_HASH);
-  if (!m) { showView('map'); toDefaultModel(); return; }
+  if (!m) { toLanding(); return; }
   const [, product, domain, modelSlug, hourSign, hourText] = m;
 
   // Validated rather than trusted: a link can outlive the cycle it pointed at,
   // and a domain, model or product that does not exist must fall back rather
   // than leave the panel blank.
   const field = SLUG_TO_FIELD[product];
-  if (field === undefined || !DOMAIN_META[domain]) { showView('map'); return; }
+  if (field === undefined || !DOMAIN_META[domain]) { toLanding(); return; }
 
   const base = modelFor(domain);
   const want = SLUG_MODEL[modelSlug];
@@ -8818,7 +8901,12 @@ function applyHash() {
 }
 
 state.view = 'map';
-loadSource('malta', 'icon_eu');
+/* The Central Mediterranean panel, not Malta. It is what the Surface panels tab
+   opens on, and — because every other landing here needs a download first — it
+   is also the frame that holds the page while one is in flight. ICON-EU over
+   this box is the one source already in the page, so this costs nothing beyond
+   the payload the <script> tag above has already paid for. */
+loadSource('medit', 'icon_eu');
 /* Open on the present, not on frame zero. Frame zero used to be three hours
    behind the run and reading it as "now" cost nothing; it is now a week behind,
    and a page that opens on last Tuesday looks like a page serving stale data.
