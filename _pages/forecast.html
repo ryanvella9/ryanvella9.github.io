@@ -285,6 +285,16 @@ title: "Weather"
   }
   .xmark.on { opacity: 1; }
 
+  /* Radar is a self-contained observed-data view rather than a model field.
+     Keeping it in its own frame lets the published Pi loop retain its Malta
+     map geometry and animation controls without pretending it is another
+     forecast-domain/shading combination. */
+  .radar-shell {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    margin: 0 auto; max-width: 1120px; overflow: hidden;
+  }
+  .radar-frame { background: var(--bg); border: 0; display: block; height: 1000px; width: 100%; }
+
   .hud { position: absolute; pointer-events: none; }
 
   .infobar {
@@ -513,6 +523,7 @@ title: "Weather"
            the basin — a lit tab that moves the page is worse than one that does
            nothing. -->
       <button data-view="map" aria-pressed="true">Surface panels</button>
+      <button data-view="radar" aria-pressed="false">Radar</button>
       <button data-view="sat" aria-pressed="false">Satellite</button>
     </nav>
     <small id="cycles">loading…</small>
@@ -847,6 +858,16 @@ title: "Weather"
     <p class="desc" id="sat-desc"></p>
   </section>
 
+  <!-- Observed radar has a different clock and provenance from the model map.
+       It is published as a compact, source-attributed static bundle alongside
+       the forecast payloads; keeping its renderer isolated avoids coupling its
+       ten-minute observation loop to the forecast timeline. -->
+  <section id="view-radar" hidden>
+    <div class="radar-shell">
+      <iframe class="radar-frame" id="radar-frame" title="Live Malta radar" loading="lazy"></iframe>
+    </div>
+  </section>
+
   <section id="view-mgram" hidden>
     <div class="mg-head">
       <div>
@@ -1027,6 +1048,9 @@ const BOOT_HASH = location.hash;
    loaded with <script> tags, which are not subject to CORS, so a second origin
    costs nothing. Rewritten by pipeline/make_page.py at publish time. */
 const DATA_BASE = 'https://ryanvella9.github.io/malta-forecast-charts';
+/* Rewritten for the published page by make_page.py.  Locally this resolves to
+   web/radar/, while the public viewer gets the bundle from the charts origin. */
+const RADAR_EMBED_URL = 'https://ryanvella9.github.io/malta-forecast-charts/radar/?embed=1';
 
 /* --------------------------------------------------------------- sources -- */
 
@@ -8653,6 +8677,7 @@ function showView(name) {
   $('view-map').hidden = name !== 'map';
   $('view-mgram').hidden = name !== 'mgram';
   $('view-sat').hidden = name !== 'sat';
+  $('view-radar').hidden = name !== 'radar';
   /* Which map tab a domain belongs to. There are two of them now: the three
      Europe levels light the synoptic tab, and every close-up frame lights the
      surface panels. Getting this wrong is not cosmetic — an earlier version
@@ -8666,6 +8691,7 @@ function showView(name) {
     b.setAttribute('aria-pressed', String(on));
   }
   if (name === 'sat') { syncMeta(); satResize(); satSync(); satIdlePreload(); return; }
+  if (name === 'radar') { ensureRadar(); syncHash(); return; }
   if (name === 'map') { resize(); syncTime(); }
   else {
     const d = MG.data;
@@ -8689,6 +8715,13 @@ function showView(name) {
   syncHash();
 }
 
+function ensureRadar() {
+  const frame = $('radar-frame');
+  if (frame.dataset.loaded) return;
+  frame.src = RADAR_EMBED_URL;
+  frame.dataset.loaded = 'true';
+}
+
 function openMeteogram() {
   setBusy(true);
   return ensureMgram().then(() => showView('mgram'))
@@ -8699,6 +8732,7 @@ $('tabs').onclick = (e) => {
   const b = e.target.closest('button');
   if (!b) return;
   if (b.dataset.view === 'mgram') { openMeteogram(); return; }
+  if (b.dataset.view === 'radar') { showView('radar'); return; }
   if (b.dataset.view === 'sat') { showView('sat'); return; }
   // Neither map tab names a domain of its own: each opens whichever of its own
   // frames the reader was last on.
@@ -8730,7 +8764,7 @@ function paintTheme() {
     if (satState.source === 'ndvi') { drawNdviBar(); drawNdvi(); }
   }
   else if (state.view === 'mgram') drawMeteogram();
-  else drawMap();
+  else if (state.view === 'map') drawMap();
 }
 $('theme').onclick = () => {
   document.documentElement.dataset.theme = isDark() ? 'light' : 'dark';
@@ -8773,6 +8807,12 @@ function syncHash() {
      address bar said #t2m/malta and anyone copying the URL sent a temperature
      chart to whoever they meant to send a satellite picture. */
   if (state.view === 'sat') { satHash(); return; }
+  if (state.view === 'radar') {
+    if (location.hash !== '#radar/malta') {
+      try { history.replaceState(null, '', '#radar/malta'); } catch (e) { /* file:// */ }
+    }
+    return;
+  }
   let hash;
   if (state.view === 'mgram') {
     /* The meteogram shows the whole run at once, so it has no frame to address
@@ -8824,6 +8864,11 @@ function applyHash() {
     // Whatever went wrong, there is a painted panel underneath: leave the
     // reader on it rather than on a view that never arrived.
     .catch((e) => { console.error(e); showView('map'); toDefaultModel(); });
+
+  if (/^#radar(?:\/malta)?$/.test(BOOT_HASH)) {
+    showView('radar');
+    return;
+  }
 
   /* Matched ahead of the field pattern below, which expects a domain and a
      forecast hour. Links from the version where satellite was a shading layer
@@ -8933,7 +8978,7 @@ syncTime();
 addEventListener('resize', () => {
   if (state.view === 'map') resize();
   else if (state.view === 'sat') satResize();
-  else drawMeteogram();
+  else if (state.view === 'mgram') drawMeteogram();
 });
 requestAnimationFrame((t) => { last = t; frame(t); });
 </script>
