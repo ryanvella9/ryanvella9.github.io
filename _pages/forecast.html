@@ -1053,7 +1053,9 @@ const BOOT_HASH = location.hash;
 const DATA_BASE = 'https://ryanvella9.github.io/malta-forecast-charts';
 /* Rewritten for the published page by make_page.py.  Locally this resolves to
    web/radar/, while the public viewer gets the bundle from the charts origin. */
-const RADAR_EMBED_URL = 'https://ryanvella9.github.io/malta-forecast-charts/radar/?embed=1';
+// Version the embedded bundle so a new radar renderer bypasses a stale static
+// asset cached at the charts origin after a deploy.
+const RADAR_EMBED_URL = 'https://ryanvella9.github.io/malta-forecast-charts/radar/?embed=1&v=compact-20260916';
 
 /* --------------------------------------------------------------- sources -- */
 
