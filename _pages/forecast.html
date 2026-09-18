@@ -469,6 +469,14 @@ title: "Weather"
     header { padding: 7px 10px; }
     h1 { font-size: 15px; }
     #cycles { display: none; }          /* the timebar already carries the run */
+    .bar { gap: 6px; min-width: 0; }
+    .tabs {
+      flex: 1 1 auto; min-width: 0; overflow-x: auto; overscroll-behavior-x: contain;
+      -webkit-overflow-scrolling: touch; scrollbar-width: none;
+    }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tabs button { flex: 0 0 auto; }
+    .bar > .spacer { flex: 0 0 0; }
 
     /* The control bar scrolls sideways instead of stacking into five rows.
        Wrapping is fine on a laptop, where it costs one extra row; on a phone it
