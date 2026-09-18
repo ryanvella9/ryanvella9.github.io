@@ -298,6 +298,17 @@ title: "Weather"
     width: 100%;
   }
 
+  /* The embedded observation view keeps the corrected physical Malta map
+     ratio and uses the wider close-up frame rather than Radar's 720 px card. */
+  .obs-shell {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 6px;
+    margin: 0 auto; max-width: 940px; overflow: hidden;
+  }
+  .obs-frame {
+    background: var(--bg); border: 0; display: block; width: 100%;
+    height: clamp(650px, calc((100vw - 40px) / 1.0977 + 168px), 1020px);
+  }
+
   .hud { position: absolute; pointer-events: none; }
 
   .infobar {
@@ -526,6 +537,7 @@ title: "Weather"
            the basin — a lit tab that moves the page is worse than one that does
            nothing. -->
       <button data-view="map" aria-pressed="true">Surface panels</button>
+      <button data-view="obs" aria-pressed="false">Malta Obs</button>
       <button data-view="radar" aria-pressed="false">Radar</button>
       <button data-view="sat" aria-pressed="false">Satellite</button>
     </nav>
@@ -866,6 +878,12 @@ title: "Weather"
     </div>
   </section>
 
+  <section id="view-obs" hidden>
+    <div class="obs-shell">
+      <iframe class="obs-frame" id="obs-frame" title="Live Malta observations" loading="lazy"></iframe>
+    </div>
+  </section>
+
   <section id="view-mgram" hidden>
     <div class="mg-head">
       <div>
@@ -1032,6 +1050,7 @@ const DATA_BASE = 'https://ryanvella9.github.io/malta-forecast-charts';
 // Version the embedded bundle so a new radar renderer bypasses a stale static
 // asset cached at the charts origin after a deploy.
 const RADAR_EMBED_URL = 'https://ryanvella9.github.io/malta-forecast-charts/radar/?embed=1&v=compact-overlay-20260916';
+const OBS_EMBED_URL = 'https://ryanvella9.github.io/malta-forecast-charts/obs/?embed=1&v=malta-obs-20260918';
 
 /* --------------------------------------------------------------- sources -- */
 
@@ -4678,7 +4697,7 @@ addEventListener('keydown', (e) => {
     else if (k === 'End') { satSetPlaying(false); satSetIndex(satMax()); }
     return;
   }
-  if (state.view === 'mgram') return;
+  if (state.view === 'mgram' || state.view === 'radar' || state.view === 'obs') return;
   if (k === ' ') { e.preventDefault(); setPlaying(!state.playing); }
   else if (k === 'ArrowRight') { setPlaying(false); setTime(Math.round(state.tf) + 1); syncTime(); }
   else if (k === 'ArrowLeft') { setPlaying(false); setTime(Math.round(state.tf) - 1); syncTime(); }
@@ -8406,11 +8425,12 @@ function showView(name) {
   state.view = name;
   // Radar has its own observed-data timestamp and source label inside the
   // panel, so the active forecast model/run in the header is misleading here.
-  $('cycles').hidden = name === 'radar';
+  $('cycles').hidden = name === 'radar' || name === 'obs';
   $('view-map').hidden = name !== 'map';
   $('view-mgram').hidden = name !== 'mgram';
   $('view-sat').hidden = name !== 'sat';
   $('view-radar').hidden = name !== 'radar';
+  $('view-obs').hidden = name !== 'obs';
   /* Which map tab a domain belongs to. There are two of them now: the three
      Europe levels light the synoptic tab, and every close-up frame lights the
      surface panels. Getting this wrong is not cosmetic — an earlier version
@@ -8425,6 +8445,7 @@ function showView(name) {
   }
   if (name === 'sat') { syncMeta(); satResize(); satSync(); satIdlePreload(); return; }
   if (name === 'radar') { ensureRadar(); syncHash(); return; }
+  if (name === 'obs') { ensureObs(); syncHash(); return; }
   if (name === 'map') { resize(); syncTime(); }
   else {
     const d = MG.data;
@@ -8455,6 +8476,13 @@ function ensureRadar() {
   frame.dataset.loaded = 'true';
 }
 
+function ensureObs() {
+  const frame = $('obs-frame');
+  if (frame.dataset.loaded) return;
+  frame.src = OBS_EMBED_URL;
+  frame.dataset.loaded = 'true';
+}
+
 function openMeteogram() {
   setBusy(true);
   return ensureMgram().then(() => showView('mgram'))
@@ -8466,6 +8494,7 @@ $('tabs').onclick = (e) => {
   if (!b) return;
   if (b.dataset.view === 'mgram') { openMeteogram(); return; }
   if (b.dataset.view === 'radar') { showView('radar'); return; }
+  if (b.dataset.view === 'obs') { showView('obs'); return; }
   if (b.dataset.view === 'sat') { showView('sat'); return; }
   // Neither map tab names a domain of its own: each opens whichever of its own
   // frames the reader was last on.
@@ -8546,6 +8575,12 @@ function syncHash() {
     }
     return;
   }
+  if (state.view === 'obs') {
+    if (location.hash !== '#observations/malta') {
+      try { history.replaceState(null, '', '#observations/malta'); } catch (e) { /* file:// */ }
+    }
+    return;
+  }
   let hash;
   if (state.view === 'mgram') {
     /* The meteogram shows the whole run at once, so it has no frame to address
@@ -8600,6 +8635,11 @@ function applyHash() {
 
   if (/^#radar(?:\/malta)?$/.test(BOOT_HASH)) {
     showView('radar');
+    return;
+  }
+
+  if (/^#(?:observations|obs)(?:\/malta)?$/.test(BOOT_HASH)) {
+    showView('obs');
     return;
   }
 
