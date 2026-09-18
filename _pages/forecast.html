@@ -477,6 +477,7 @@ title: "Weather"
     .tabs::-webkit-scrollbar { display: none; }
     .tabs button { flex: 0 0 auto; }
     .bar > .spacer { flex: 0 0 0; }
+    #theme { flex: 0 0 auto; }
 
     /* The control bar scrolls sideways instead of stacking into five rows.
        Wrapping is fine on a laptop, where it costs one extra row; on a phone it
@@ -8446,10 +8447,18 @@ function showView(name) {
      the reader they were on a page they were not on and the tab they had just
      pressed looked like it did nothing. */
   const syn = isSynoptic(state.domain);
+  let activeTab = null;
   for (const b of $('tabs').children) {
     const on = b.dataset.view === name &&
       (name !== 'map' || (b.dataset.synoptic ? syn : !syn));
     b.setAttribute('aria-pressed', String(on));
+    if (on) activeTab = b;
+  }
+  // On phones the tab row scrolls rather than widening the page. Keep the
+  // selected view in sight, especially when a deep link opens Malta Obs.
+  if (activeTab && innerWidth <= 760) {
+    const tabs = $('tabs');
+    tabs.scrollLeft = activeTab.offsetLeft - (tabs.clientWidth - activeTab.offsetWidth) / 2;
   }
   if (name === 'sat') { syncMeta(); satResize(); satSync(); satIdlePreload(); return; }
   if (name === 'radar') { ensureRadar(); syncHash(); return; }
