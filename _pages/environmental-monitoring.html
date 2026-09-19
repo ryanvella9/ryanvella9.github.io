@@ -255,8 +255,8 @@ footer a{color:var(--ink-2)}
   </section>
 
   <section id="sec-sky">
-    <div class="shead"><h2>Clouds &amp; Night Sky · TESS-W</h2><span class="meta" id="meta-sky"></span></div>
-    <div class="card board"><h3>Sky clarity</h3><p class="cap">100% is a cloudless sky, 0% overcast. Same measurement the daily rings below are built from, hour by hour.</p>
+    <div class="shead"><h2>Clouds &amp; Night Sky · TESS-W + pyranometer</h2><span class="meta" id="meta-sky"></span></div>
+    <div class="card board"><h3>Sky clarity</h3><p class="cap">100% is a cloudless sky, 0% overcast. By day it is the share of a cloudless sky's sunlight actually reaching the weather station; by night, how far the photometer's infrared sky temperature sits below the air temperature. Same measurement the daily rings below are built from, hour by hour.</p>
       <div class="plot" id="p-cloud"></div>
       <div class="legend">
         <span><i style="background:var(--band-clear)"></i>Clear sky</span>
@@ -693,21 +693,27 @@ function rainIcon(cls){
   return cloudPath("var(--band-over)", cls.hard ? 1 : .92) + drops;
 }
 
-function iconFor(cloudIdx, day, th, rainRate){
-  const clear = th ? th.clear : 20, cloudy = th ? th.cloudy : 6;
+/* clarity: 100 is a cloudless sky, 0 overcast — the same figure the sky-clarity
+   chart plots, cut at the same thresholds, so the icon and the chart can never
+   tell different stories. It used to classify the raw infrared depression in
+   degrees against thresholds the exporter had already retired, which is how a
+   solid deck cutting irradiance to a sixth of a clear sky came to be drawn as
+   patchy cloud. */
+function iconFor(clarity, day, th, rainRate){
+  const clear = (th && isNum(th.clarity_clear)) ? th.clarity_clear : 70;
+  const over = (th && isNum(th.clarity_overcast)) ? th.clarity_overcast : 35;
   const rain = rainClass(rainRate);
   let svg, desc;
   if (rain){
-    /* A measured rain rate beats the sky index: the photometer reports cloud
-       cover, and an overcast icon over a downpour is the less useful of the
-       two truths. */
+    /* A measured rain rate beats the sky index: an overcast icon over a
+       downpour is the less useful of the two truths. */
     svg = rainIcon(rain); desc = rain.name;
-  } else if (!isNum(cloudIdx)){
+  } else if (!isNum(clarity)){
     svg = cloudPath("var(--band-over)", .55); desc = "Sky condition unavailable";
-  } else if (cloudIdx >= clear){
+  } else if (clarity >= clear){
     svg = day ? sunIcon() : moonIcon();
     desc = day ? "Clear skies" : "Clear night sky";
-  } else if (cloudIdx > cloudy){
+  } else if (clarity > over){
     svg = (day ? `<circle cx="24" cy="24" r="9" fill="var(--sun)"/>`
                : `<path d="M30 12a14 14 0 1 0 9 24A15 15 0 0 1 30 12z" fill="var(--moon)"/>`)
         + cloudPath("var(--band-over)", .85);
@@ -888,7 +894,7 @@ function renderNow(){
     if (!h || !h.t.length) return noData(host, "Weather sensor unavailable");
     const i = h.t.length - 1;
     const th = HIST.sky && HIST.sky.thresholds;
-    const cIdx = lastValid(HIST.sky && HIST.sky.ok ? zip(HIST.sky.hourly.t, HIST.sky.hourly.cloud) : []);
+    const cIdx = lastValid(HIST.sky && HIST.sky.ok ? zip(HIST.sky.hourly.t, HIST.sky.hourly.clarity) : []);
     /* The archive carries no instantaneous rate, so rain falls back to the last
        whole hour's total — mm in one hour, which is a mm/h rate by another
        name, and enough to keep the rain icon honest while the Pi is down. */
@@ -898,14 +904,17 @@ function renderNow(){
       rain_hour: h.rain ? h.rain[i] : null,
       rain_today: today ? today.rain : null }, cIdx ? cIdx[1] : null, th, true);
   }
-  paintNow(host, w, sky ? sky.cloud : null,
+  /* sky.clarity is the classified figure — the pyranometer's clear-sky index
+     by day, the photometer's by night. sky.cloud beside it is the raw infrared
+     depression, kept for diagnosis and deliberately not classified here. */
+  paintNow(host, w, sky && isNum(sky.clarity) ? sky.clarity : null,
            HIST && HIST.sky ? HIST.sky.thresholds : null, false);
 }
 function lastValid(pts){
   for (let i = pts.length - 1; i >= 0; i--) if (isNum(pts[i][1])) return pts[i];
   return null;
 }
-function paintNow(host, w, cloudIdx, th, stale){
+function paintNow(host, w, clarity, th, stale){
   const t = w.time || Date.now() / 1000;
   const day = isDaytime(t);
 
@@ -916,7 +925,7 @@ function paintNow(host, w, cloudIdx, th, stale){
   const wet = rate != null ? rate > 0 : (lastH != null && lastH > 0);
   const todayMm = isNum(w.rain_today) ? w.rain_today : null;
 
-  const ic = iconFor(cloudIdx, day, th, rate != null ? rate : lastH);
+  const ic = iconFor(clarity, day, th, rate != null ? rate : lastH);
   const bf = beaufort(w.wind);
   const dir = w.dir || cardinal(w.dir_deg);
 
@@ -1448,7 +1457,8 @@ function setNote(){
   $("#foot-txt").innerHTML =
     `Weather from a Froggit WH3000 via the Ecowitt API · particulates from an SDS011 on
      <a href="https://sensor.community/">sensor.community</a> · sky from a TESS-W photometer on the
-     <a href="https://tess.stars4all.eu/">STARS4ALL</a> network.
+     <a href="https://tess.stars4all.eu/">STARS4ALL</a> network, with daytime cloud measured by the
+     station's own pyranometer against a clear-sky reference learned from this site's brightest recent days.
      History exported nightly${gen ? " (last build " + fmtFull(gen) + ")" : ""};
      current conditions and air quality refresh every 10 minutes.`;
 }
