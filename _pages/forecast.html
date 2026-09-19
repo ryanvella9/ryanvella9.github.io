@@ -3890,8 +3890,8 @@ function buildTicks() {
   if (NT < 2) return;
 
   // The day boundaries are collected before any of them is drawn, because how
-  // many there are decides how many can be. A timeline that runs a week either
-  // side of the present crosses a fortnight of days, and thirteen three-letter
+  // many there are decides how many can be. A timeline that mirrors a fifteen-day
+  // forecast into the past crosses a month of days, and thirty-one three-letter
   // labels on one track is a smear. Thinning by a fixed stride rather than by
   // collision keeps the survivors evenly spaced — dropping whichever pair
   // happened to overlap would leave the gaps in arbitrary places.
@@ -3904,12 +3904,24 @@ function buildTicks() {
     lastDay = day;
     marks.push({ i, d });
   });
-  const every = Math.max(1, Math.ceil(marks.length / 8));
+
+  // A weekday alone only locates a frame on a track short enough not to repeat
+  // one, and mirroring put every panel but the ICON-2I close-ups past that.
+  // The synoptic charts run a month end to end, where "Wed" appears four times
+  // and names nothing. Past a week the label carries the date instead — the
+  // threshold is where the ambiguity starts rather than where it becomes
+  // annoying, because a repeated label is worse than a wider one. The wider one
+  // is why these tracks get six labels rather than eight.
+  const spanDays = (SRC.steps[NT - 1] - SRC.steps[0]) / 24;
+  const dated = spanDays > 7;
+  const every = Math.max(1, Math.ceil(marks.length / (dated ? 6 : 8)));
 
   const ni = nowIndex();
   const nowF = ni === null ? null : ni / (NT - 1);
 
-  const fmt = new Intl.DateTimeFormat('en-GB', { weekday: 'short', timeZone: 'UTC' });
+  const fmt = new Intl.DateTimeFormat('en-GB', dated
+    ? { day: 'numeric', month: 'short', timeZone: 'UTC' }
+    : { weekday: 'short', timeZone: 'UTC' });
   marks.forEach((m, k) => {
     if (k % every) return;
     const f = m.i / (NT - 1);
