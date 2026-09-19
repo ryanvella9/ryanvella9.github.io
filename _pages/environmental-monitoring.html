@@ -41,6 +41,10 @@ try {
   --good:#48b98a; --moderate:#e0b53c; --poor:#e56b66;
   --pill:#222831; --nsb-dark:#5b6ea8; --nsb-bright:#d9a94a;
   --sun:#f0b64b; --moon:#9aa6c4;
+  /* WHO UV bands. Low and moderate borrow the air-quality colours so the same
+     green/amber means the same thing on both hero cards; high and above need
+     two more steps than air quality has. */
+  --uv-high:#e08a3c; --uv-extreme:#a86cd8;
 }
 :root[data-theme="light"]{
   --bg:#f4f5f7; --surface:#ffffff; --hairline:#e3e5ea;
@@ -53,6 +57,7 @@ try {
   --good:#2f9e6e; --moderate:#d9a520; --poor:#d1443f;
   --pill:#eef0f4; --nsb-dark:#3a4a7a; --nsb-bright:#c9922e;
   --sun:#e8a33b; --moon:#7f8aa8;
+  --uv-high:#cf7420; --uv-extreme:#8b47c4;
 }
 :root{ color-scheme:dark; }
 :root[data-theme="light"]{ color-scheme:light; }
@@ -109,7 +114,14 @@ h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
 .now .bigtemp{font-size:46px;line-height:1;letter-spacing:-.02em}
 .now .bigtemp .u{font-size:22px;color:var(--ink-2)}
 .now .desc{color:var(--ink-2);font-size:14px;margin-top:5px}
-.statrow{display:flex;gap:26px;flex-wrap:wrap;margin-top:16px;padding-top:15px;border-top:1px solid var(--hairline)}
+/* A grid, not a flex row: with rain and UV joining sun and moon, four stats of
+   unequal width wrapped into a ragged 3 + 1. Two fixed columns give an even
+   2x2 at every width the hero card actually takes, and leave the rise/set pair
+   — the widest value on the card — a column it fits in. Below 400px even that
+   is too narrow for it, so the stats stack. */
+.statrow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px 18px;
+         margin-top:16px;padding-top:15px;border-top:1px solid var(--hairline)}
+@media (max-width:400px){ .statrow{grid-template-columns:1fr} }
 /* Humidity and wind ride alongside the temperature — they are the conditions
    right now, so they belong with the reading rather than under a rule with the
    almanac. margin-left:auto pushes them to the far edge on a wide card; on a
@@ -127,6 +139,15 @@ h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
 .stat .sun-up{color:var(--sun);margin-right:1px}
 .stat .sun-dn{color:var(--moon);margin:0 1px 0 8px}
 .compass{width:44px;height:44px;flex:none}
+/* The drops on the rain icon fall. Slow and small — it is a state indicator,
+   not decoration — and it stops entirely for readers who ask for less motion. */
+@keyframes drop-fall{
+  0%{transform:translateY(-3px);opacity:0}
+  22%{opacity:1}
+  100%{transform:translateY(7px);opacity:0}
+}
+.icon .drop{transform-box:fill-box;transform-origin:center;animation:drop-fall 1.25s linear infinite}
+@media (prefers-reduced-motion:reduce){ .icon .drop{animation:none;opacity:.95} }
 .pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
 .pm .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
 .pm .val{font-size:31px;line-height:1.05;letter-spacing:-.01em}
@@ -646,10 +667,42 @@ function sunIcon(){ return `<circle cx="32" cy="32" r="12" fill="var(--sun)"/>` 
     return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--sun)" stroke-width="3.2" stroke-linecap="round"/>`;}).join(""); }
 function moonIcon(){ return `<path d="M40 14a20 20 0 1 0 12 34A22 22 0 0 1 40 14z" fill="var(--moon)"/>`; }
 const cloudPath = (f, o) => `<path d="M22 44h22a10 10 0 0 0 0-20 14 14 0 0 0-26-4 9 9 0 0 0 4 24z" fill="${f}" opacity="${o==null?1:o}"/>`;
-function iconFor(cloudIdx, day, th){
+
+/* Rain intensity in the conventional mm/h steps. The station reports a rate
+   every cycle, so "is it raining" is a measurement here, not an inference from
+   the sky index — which is why rain outranks the TESS reading in iconFor. */
+function rainClass(rate){
+  if (!isNum(rate) || rate <= 0) return null;
+  if (rate < 0.5)  return { n: 2, name: "Light rain" };
+  if (rate < 4)    return { n: 3, name: "Rain" };
+  if (rate < 16)   return { n: 4, name: "Heavy rain" };
+  return { n: 4, name: "Torrential rain", hard: true };
+}
+/* Drops hang below the cloud, spaced across its width and staggered in the
+   fall so they do not pulse in unison. */
+function rainIcon(cls){
+  const xs = { 2: [28, 39], 3: [25, 34, 43], 4: [23, 31, 39, 47] }[cls.n];
+  /* The drops start at y=47 and are short enough that a full fall still ends
+     inside the 64-unit box — an SVG root clips, and a drop losing its tail on
+     the way down is more noticeable than the motion itself. */
+  const len = cls.hard ? 10 : 8.5;
+  const drops = xs.map((x, i) =>
+    `<line class="drop" x1="${x}" y1="47" x2="${x - 2.6}" y2="${(47 + len).toFixed(1)}"
+       stroke="var(--c-rain)" stroke-width="${cls.hard ? 3.6 : 3.1}" stroke-linecap="round"
+       style="animation-delay:${(i * 0.29).toFixed(2)}s"/>`).join("");
+  return cloudPath("var(--band-over)", cls.hard ? 1 : .92) + drops;
+}
+
+function iconFor(cloudIdx, day, th, rainRate){
   const clear = th ? th.clear : 20, cloudy = th ? th.cloudy : 6;
+  const rain = rainClass(rainRate);
   let svg, desc;
-  if (!isNum(cloudIdx)){
+  if (rain){
+    /* A measured rain rate beats the sky index: the photometer reports cloud
+       cover, and an overcast icon over a downpour is the less useful of the
+       two truths. */
+    svg = rainIcon(rain); desc = rain.name;
+  } else if (!isNum(cloudIdx)){
     svg = cloudPath("var(--band-over)", .55); desc = "Sky condition unavailable";
   } else if (cloudIdx >= clear){
     svg = day ? sunIcon() : moonIcon();
@@ -777,6 +830,45 @@ function sunArcSvg(ts){
   </svg>`;
 }
 
+/* Rain gauge. The droplet fills from the bottom in proportion to the day's
+   total, capped at 10 mm — enough range that an ordinary Maltese wet day reads
+   as a part-full drop instead of pinning at the first shower. A dry day gets a
+   grey outline, so an empty gauge cannot be read as a missing one. */
+function rainSvg(todayMm, wet){
+  const D = "M22 8 C 15.5 18.5, 11 24.6, 11 29 a 11 11 0 0 0 22 0 c 0-4.4 -4.5-10.5 -11-21 Z";
+  const lvl = clamp((isNum(todayMm) ? todayMm : 0) / 10, 0, 1);
+  const top = 40 - lvl * 32;                     /* the droplet spans y 8..40 */
+  return `<svg class="compass" viewBox="0 0 44 44" aria-hidden="true">
+    <clipPath id="rain-fill"><rect x="0" y="${top.toFixed(1)}" width="44" height="44"/></clipPath>
+    <path d="${D}" fill="none" stroke="${lvl > 0 || wet ? "var(--c-rain)" : "var(--ink-3)"}" stroke-width="2"/>
+    ${lvl > 0 ? `<path d="${D}" fill="var(--c-rain)" opacity=".85" clip-path="url(#rain-fill)"/>` : ""}
+  </svg>`;
+}
+
+/* WHO UV index bands. */
+const UV_BANDS = [[3, "Low", "var(--good)"], [6, "Moderate", "var(--moderate)"],
+                  [8, "High", "var(--uv-high)"], [11, "Very high", "var(--poor)"]];
+function uvBand(u){
+  if (!isNum(u)) return null;
+  for (const [lim, name, colour] of UV_BANDS) if (u < lim) return { name, colour };
+  return { name: "Extreme", colour: "var(--uv-extreme)" };
+}
+/* A 240 deg dial, open at the bottom, filled to the index over a scale that
+   ends at 11 — the top of the WHO scale, not of the sensor. */
+function uvSvg(u){
+  const band = uvBand(u), R = 15, cx = 22, cy = 23, A0 = -210, SWEEP = 240;
+  const pt = a => [cx + R * Math.cos(a * Math.PI / 180), cy + R * Math.sin(a * Math.PI / 180)];
+  const f = clamp((isNum(u) ? u : 0) / 11, 0, 1);
+  const n = v => v.toFixed(2);
+  const [sx, sy] = pt(A0), [ex, ey] = pt(A0 + SWEEP), [vx, vy] = pt(A0 + SWEEP * f);
+  return `<svg class="compass" viewBox="0 0 44 44" aria-hidden="true">
+    <path d="M ${n(sx)} ${n(sy)} A ${R} ${R} 0 1 1 ${n(ex)} ${n(ey)}" fill="none"
+      stroke="var(--hairline)" stroke-width="3.4" stroke-linecap="round"/>
+    ${f > 0 ? `<path d="M ${n(sx)} ${n(sy)} A ${R} ${R} 0 ${SWEEP * f > 180 ? 1 : 0} 1 ${n(vx)} ${n(vy)}"
+      fill="none" stroke="${band.colour}" stroke-width="3.4" stroke-linecap="round"/>` : ""}
+  </svg>`;
+}
+
 const themeIcon = dark => dark
   ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>`
   : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>`;
@@ -797,8 +889,14 @@ function renderNow(){
     const i = h.t.length - 1;
     const th = HIST.sky && HIST.sky.thresholds;
     const cIdx = lastValid(HIST.sky && HIST.sky.ok ? zip(HIST.sky.hourly.t, HIST.sky.hourly.cloud) : []);
+    /* The archive carries no instantaneous rate, so rain falls back to the last
+       whole hour's total — mm in one hour, which is a mm/h rate by another
+       name, and enough to keep the rain icon honest while the Pi is down. */
+    const today = (HIST.weather.daily || []).find(d => d.date === todayKey());
     return paintNow(host, { time: h.t[i], temp: h.temp[i], rh: h.rh[i],
-      wind: h.wind[i], dir_deg: h.dir[i] }, cIdx ? cIdx[1] : null, th, true);
+      wind: h.wind[i], dir_deg: h.dir[i],
+      rain_hour: h.rain ? h.rain[i] : null,
+      rain_today: today ? today.rain : null }, cIdx ? cIdx[1] : null, th, true);
   }
   paintNow(host, w, sky ? sky.cloud : null,
            HIST && HIST.sky ? HIST.sky.thresholds : null, false);
@@ -808,16 +906,64 @@ function lastValid(pts){
   return null;
 }
 function paintNow(host, w, cloudIdx, th, stale){
-  const day = isDaytime(w.time || Date.now() / 1000);
-  const ic = iconFor(cloudIdx, day, th);
+  const t = w.time || Date.now() / 1000;
+  const day = isDaytime(t);
+
+  /* Rain: the live reading is an instantaneous rate, the archived fallback is
+     an hourly total. Both are mm/h, so either can drive the icon. */
+  const rate = isNum(w.rain_rate) ? w.rain_rate : null;
+  const lastH = isNum(w.rain_hour) ? w.rain_hour : null;
+  const wet = rate != null ? rate > 0 : (lastH != null && lastH > 0);
+  const todayMm = isNum(w.rain_today) ? w.rain_today : null;
+
+  const ic = iconFor(cloudIdx, day, th, rate != null ? rate : lastH);
   const bf = beaufort(w.wind);
   const dir = w.dir || cardinal(w.dir_deg);
+
+  /* Feels-like only earns its place when it disagrees with the thermometer;
+     printing "29.0, feels 29.1" is noise. */
+  const feels = isNum(w.feels) && isNum(w.temp) && Math.abs(w.feels - w.temp) >= 1
+    ? `feels ${w.feels.toFixed(1)} °C` : null;
+  const gust = isNum(w.gust) && w.gust > (isNum(w.wind) ? w.wind : 0)
+    ? `gusts ${w.gust.toFixed(1)}` : null;
+  const windSm = [dir, gust, bf ? `Bft ${bf.f} ${bf.name}` : null].filter(Boolean).join(" · ");
+
+  const rainSm = wet
+    ? (rate != null ? `${rate.toFixed(1)} mm/h now` : `${lastH.toFixed(1)} mm last hour`)
+    : (todayMm > 0 ? "earlier today" : "dry so far");
+  /* Hidden outright when the gauge reports nothing, rather than showing a dash:
+     a rain row is only worth a column when there is a number in it. */
+  const rainStat = (todayMm != null || wet) ? `
+      <div class="stat">
+        ${rainSvg(todayMm, wet)}
+        <div>
+          <div class="lab">Rain today</div>
+          <div class="val mono">${todayMm != null ? todayMm.toFixed(1) : "--"}<span class="u"> mm</span></div>
+          <div class="sm mono">${rainSm}</div>
+        </div>
+      </div>` : "";
+
+  /* UV is a daytime number; after dark it is zero for a reason nobody needs a
+     dial to understand, so the column goes away instead. */
+  const uvb = day ? uvBand(w.uvi) : null;
+  const uvStat = uvb ? `
+      <div class="stat">
+        ${uvSvg(w.uvi)}
+        <div>
+          <div class="lab">UV index</div>
+          <div class="val mono">${Math.round(w.uvi)}</div>
+          <div class="sm mono"><span style="color:${uvb.colour}">${uvb.name}</span>${
+            isNum(w.solar) ? ` · ${Math.round(w.solar)} W/m²` : ""}</div>
+        </div>
+      </div>` : "";
+
   host.innerHTML = `
     <div class="now">
       ${ic.svg}
       <div>
         <div class="bigtemp mono">${isNum(w.temp) ? w.temp.toFixed(1) : "--"}<span class="u"> °C</span></div>
-        <div class="desc">${ic.desc}${stale ? " · from last archived reading" : ""}</div>
+        <div class="desc">${ic.desc}${feels ? " · " + feels : ""}${
+          stale ? " · from last archived reading" : ""}</div>
       </div>
       <div class="now-stats">
         <div class="stat">
@@ -831,25 +977,27 @@ function paintNow(host, w, cloudIdx, th, stale){
           <div>
             <div class="lab">Wind</div>
             <div class="val mono">${isNum(w.wind) ? w.wind.toFixed(1) : "--"}<span class="u"> km/h</span></div>
-            <div class="sm mono">${dir || "--"}${bf ? ` · Bft ${bf.f} ${bf.name}` : ""}</div>
+            <div class="sm mono">${windSm || "--"}</div>
           </div>
         </div>
       </div>
     </div>
     <div class="statrow">
+      ${rainStat}
+      ${uvStat}
       <div class="stat">
-        ${sunArcSvg(w.time || Date.now() / 1000)}
+        ${sunArcSvg(t)}
         <div>
           <div class="lab">Sun</div>
-          <div class="val mono sun-times">${sunTimesLabel(w.time || Date.now() / 1000)}</div>
+          <div class="val mono sun-times">${sunTimesLabel(t)}</div>
         </div>
       </div>
       <div class="stat">
-        ${moonSvg(w.time || Date.now() / 1000)}
+        ${moonSvg(t)}
         <div>
           <div class="lab">Moon</div>
-          <div class="val mono">${Math.round(moonPhase(w.time || Date.now() / 1000).illum * 100)}<span class="u"> % lit</span></div>
-          <div class="sm mono">${moonName(moonPhase(w.time || Date.now() / 1000).frac)}</div>
+          <div class="val mono">${Math.round(moonPhase(t).illum * 100)}<span class="u"> % lit</span></div>
+          <div class="sm mono">${moonName(moonPhase(t).frac)}</div>
         </div>
       </div>
     </div>`;
