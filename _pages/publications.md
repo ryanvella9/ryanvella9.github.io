@@ -101,6 +101,11 @@ html[data-theme="dark"] .pub-list {
 <div class="pub-meta"><span class="pub-y">2026</span>Atmos. Res.</div>
 <div class="pub-main"><div class="pub-title">A multi-station climatology of the Maltese Islands: coastal, topographic, and urban drivers of intra-island variability<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Ciarlo, J. M., <strong>Vella, R.</strong>, Cauchi, J. P., Camilleri, S., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.</div></div>
 </div>
+<a class="pub" href="https://doi.org/10.22541/essoar.15009270/v1">
+<div class="pub-meta"><span class="pub-y">2026</span>JGR Atmos. &middot; preprint</div>
+<div class="pub-main"><div class="pub-title">Mixed-phase cloud response to dust INP perturbations strongly depends on ice nucleation scheme choice<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Ferrachat, S., Lohmann, U., Villanueva, D.</div></div>
+<span class="pub-arrow" aria-hidden="true">&rarr;</span>
+</a>
 <a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2961/">
 <div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Aerosol&ndash;cloud interactions influence the climate response to AMOC weakening<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Lohmann, U.</div></div>
@@ -111,14 +116,14 @@ html[data-theme="dark"] .pub-list {
 <div class="pub-main"><div class="pub-title">Global atmospheric aerosol distributions and composition from the Earth&rsquo;s surface to the stratosphere<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Kohl, M., Br&uuml;hl, C., Tost, H., Xenofontos, C., Christoudias, T., Gromov, S., Appel, O., Borrmann, S., Bourassa, A., Campuzano-Jost, P., Cheng, Y., Eppers, O., Froyd, K. D., Holanda, B. A., Jimenez, J. L., J&ouml;ckel, P., Joppe, P., Kaiser, K., Katich, J. M., Klingm&uuml;ller, K., K&ouml;llner, F., Kupc, A., Martin, A., P&ouml;hlker, C., P&ouml;hlker, M. L., P&ouml;schl, U., Rieger, L., Ruhl, S., Schill, G. P., Schneider, J., Schulz, C., Schwarz, J. P., Tsimpidi, A. P., <strong>Vella, R.</strong>, Williamson, C. J., Yang, Y., Zawada, D., Lelieveld, J., Pozzer, A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
-<a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2417/">
-<div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
-<div class="pub-main"><div class="pub-title">The Geoengineering Model Intercomparison Project (GeoMIP) contribution to CMIP7 &ndash; description of new experimental protocols and preliminary results<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Visioni, D., Robock, A., Duffey, A., Henry, M., Hirasawa, H., Lee, W. R., Wang, C., Roberts, K., Watanabe, S., Reboita, M. S., Sugiyama, M., Kravitz, B., Haywood, J., Tilmes, S., Bonou, F., Chen, J., Sukhodolov, T., Vattioni, S., J&ouml;rimann, A., Villanueva, D., <strong>Vella, R.</strong>, Farron, P., Bednarz, E. M., Niemeier, U., Golja, C., Anel, J. A.</div></div>
-<span class="pub-arrow" aria-hidden="true">&rarr;</span>
-</a>
 <a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-4020/">
 <div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Oxidation mechanisms for volatile methylated sulfur compounds and the major contribution of methanesulfonic acid to Southern Ocean aerosol particles<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Ruhl, S., Kohl, M., Baalbaki, R., Xenofontos, C., <strong>Vella, R.</strong>, Gromov, S., He, X.-C., Shen, J., Alfaouri, D., Atabakhsh, S., Dada, L., DeVivo, J., Duplissy, J., El Haddad, I., Harder, H., Jokinen, T., Junninen, H., Kanawade, V. P., Sebastian, M. K., Klebach, H., Kulmala, M., Kunkler, F., Lelieveld, J., Lehtipalo, K., Lietzke, C. J., Liu, L., Mauldin, R., Mentler, B., M&ouml;hler, O., Pet&auml;j&auml;, T., Russell, D. M., Simon, M., Thakur, R. C., Yu, W., Zhang, J., Zheng, Z., Kirkby, J., Tost, H., Christoudias, T., Sander, R., Pozzer, A.</div></div>
+<span class="pub-arrow" aria-hidden="true">&rarr;</span>
+</a>
+<a class="pub" href="https://gmd.copernicus.org/articles/19/8469/2026/">
+<div class="pub-meta"><span class="pub-y">2026</span>Geosci. Model Dev.</div>
+<div class="pub-main"><div class="pub-title">The Geoengineering Model Intercomparison Project (GeoMIP) contribution to CMIP7 &ndash; description of new experimental protocols and preliminary results</div><div class="pub-auth">Visioni, D., Robock, A., Duffey, A., Henry, M., Hirasawa, H., Lee, W. R., Wang, C., Roberts, K., Watanabe, S., Reboita, M. S., Sugiyama, M., Kravitz, B., Haywood, J., Tilmes, S., Bonou, F., Chen, J., Sukhodolov, T., Vattioni, S., J&ouml;rimann, A., Villanueva, D., <strong>Vella, R.</strong>, Farron, P., Bednarz, E. M., Niemeier, U., Golja, C., A&ntilde;el, J. A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub" href="https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2025GL121309">
