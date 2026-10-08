@@ -107,10 +107,6 @@ html[data-theme="dark"] .pub-list {
 <div class="pub-main"><div class="pub-title">Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown</div><div class="pub-auth"><strong>Vella, R.</strong>, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
-<div class="pub">
-<div class="pub-meta"><span class="pub-y">2026</span>Atmos. Res.</div>
-<div class="pub-main"><div class="pub-title">A multi-station climatology of the Maltese Islands: coastal, topographic, and urban drivers of intra-island variability<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Ciarlo, J. M., <strong>Vella, R.</strong>, Cauchi, J. P., Camilleri, S., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.</div></div>
-</div>
 <a class="pub" href="https://doi.org/10.22541/essoar.15009270/v1">
 <div class="pub-meta"><span class="pub-y">2026</span>JGR Atmos. &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Mixed-phase cloud response to dust INP perturbations strongly depends on ice nucleation scheme choice<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Ferrachat, S., Lohmann, U., Villanueva, D.</div></div>
@@ -121,6 +117,10 @@ html[data-theme="dark"] .pub-list {
 <div class="pub-main"><div class="pub-title">Aerosol&ndash;cloud interactions influence the climate response to AMOC weakening<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Lohmann, U.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
+<div class="pub">
+<div class="pub-meta"><span class="pub-y">2026</span>Atmos. Res.</div>
+<div class="pub-main"><div class="pub-title">A multi-station climatology of the Maltese Islands: coastal, topographic, and urban drivers of intra-island variability<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Ciarlo, J. M., <strong>Vella, R.</strong>, Cauchi, J. P., Camilleri, S., Micallef, A., Coppola, E., Micallef, A., Mifsud, D.</div></div>
+</div>
 <a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-3649/">
 <div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Global atmospheric aerosol distributions and composition from the Earth&rsquo;s surface to the stratosphere<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Kohl, M., Br&uuml;hl, C., Tost, H., Xenofontos, C., Christoudias, T., Gromov, S., Appel, O., Borrmann, S., Bourassa, A., Campuzano-Jost, P., Cheng, Y., Eppers, O., Froyd, K. D., Holanda, B. A., Jimenez, J. L., J&ouml;ckel, P., Joppe, P., Kaiser, K., Katich, J. M., Klingm&uuml;ller, K., K&ouml;llner, F., Kupc, A., Martin, A., P&ouml;hlker, C., P&ouml;hlker, M. L., P&ouml;schl, U., Rieger, L., Ruhl, S., Schill, G. P., Schneider, J., Schulz, C., Schwarz, J. P., Tsimpidi, A. P., <strong>Vella, R.</strong>, Williamson, C. J., Yang, Y., Zawada, D., Lelieveld, J., Pozzer, A.</div></div>
