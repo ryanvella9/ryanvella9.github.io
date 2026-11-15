@@ -180,6 +180,116 @@ title: "Weather"
      second line under the wind figure. */
   .mg-tip-word { font-weight: 600; margin: 1px 0 4px; }
   .mg-tip-sub { color: var(--faint); font-size: 11px; }
+
+  /* ------------------------------------------------- the hour-by-hour grid --
+
+     Windguru's shape, because for "is Thursday afternoon sailable" it is the
+     right one: every parameter in a column, every hour in a row of its own, and
+     the answer found by reading down rather than by measuring a curve against
+     an axis.
+
+     The whole thing is one scroller with a frozen label column. The alternative
+     — labels in a separate table beside it — drifts out of vertical alignment
+     the moment a row wraps, and there is no way to keep two tables' row heights
+     in step that survives a font the reader has overridden. */
+  .mg-table-wrap {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 6px; overflow: hidden;
+  }
+  .mg-table-wrap[hidden] { display: none; }
+  .mg-table-scroll { overflow-x: auto; overflow-y: hidden; }
+  .mg-table {
+    border-collapse: separate; border-spacing: 0;
+    font-size: 11px; font-variant-numeric: tabular-nums;
+    /* The grid is read by scanning a row, and a proportional font makes a row
+       of numbers ripple. Everything here is a measurement. */
+    font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, Consolas, monospace);
+  }
+  .mg-table th, .mg-table td {
+    padding: 0 2px; text-align: center; white-space: nowrap;
+    border-right: 1px solid transparent; line-height: 1.55;
+  }
+  /* The frozen column. `left: 0` plus a background is the whole trick; the
+     z-index keeps it over the cells that scroll beneath it, and the right
+     border is what stops the two reading as one surface. */
+  .mg-table th.mg-lab {
+    position: sticky; left: 0; z-index: 2;
+    background: var(--panel); color: var(--muted);
+    text-align: right; padding: 0 9px 0 10px; font-weight: 500;
+    border-right: 1px solid var(--border);
+    /* Narrow enough to leave the data room on a phone, wide enough that
+       "Wind gusts km/h" does not wrap to three lines. */
+    min-width: 104px; max-width: 104px;
+  }
+  .mg-table th.mg-lab .u { color: var(--faint); font-size: 10px; }
+  /* Wide enough for a four-digit pressure with air around it. Everything else
+     in the grid is two or three characters; pressure is the row that sets the
+     column width, and at 27 px the 1020s ran into one another. */
+  .mg-table td { min-width: 30px; }
+  /* The day band across the top. One cell per local day, spanning its hours. */
+  .mg-table th.mg-day {
+    background: var(--panel); color: var(--text);
+    font-weight: 600; font-size: 11.5px; padding: 3px 0 2px;
+    border-bottom: 1px solid var(--border);
+  }
+  /* The label slides along inside its own day.
+
+     A day is up to 24 columns wide and the label was centred in it, so the
+     moment the grid was scrolled — which it is on open, to bring "now" into
+     view — the current day's name had gone off the left edge and the only
+     name on screen belonged to a day you were not looking at. Sticking the
+     label rather than the cell keeps it inside its day for as long as any of
+     that day is visible, and hands over exactly at the boundary. The offset
+     clears the frozen label column. */
+  .mg-table th.mg-day > span {
+    position: sticky; left: 108px; display: inline-block;
+  }
+  .mg-table th.mg-day.today { color: var(--accent); }
+  .mg-table th.mg-hr {
+    color: var(--faint); font-weight: 500; font-size: 10px;
+    padding-bottom: 2px; border-bottom: 1px solid var(--border);
+  }
+  /* The alternating day wash, and the rule at every local midnight. Both are
+     carried on the cells rather than drawn over them, so they scroll with the
+     data and never need a second pass to stay registered with it. */
+  .mg-table .alt { background: var(--mg-alt); }
+  .mg-table .dayedge { border-left: 1px solid var(--border); }
+  /* Where one model hands over to the next. Heavier than a midnight, dashed,
+     because it is a change in who is speaking rather than a change in time. */
+  .mg-table .joinedge { border-left: 2px dashed var(--mg-join); }
+  .mg-table tr.sep td, .mg-table tr.sep th.mg-lab { padding-top: 5px; }
+  .mg-table .dir { font-size: 15px; line-height: 1.1; color: var(--text); }
+  .mg-table .nil { color: var(--faint); }
+  /* The column under the pointer, lit the same way the chart's crosshair lights
+     one. The two views share a hover index, so moving between them keeps the
+     hour you were looking at. */
+  .mg-table .hot { box-shadow: inset 0 0 0 9999px var(--mg-hot); }
+  /* Now. A single column edge rather than a band: at six-hourly spacing out in
+     the long range a band would be six hours wide and claim a precision the
+     chart does not have. */
+  .mg-table .nowedge { border-left: 2px solid var(--accent); }
+  :root { --mg-alt: rgba(255,255,255,.030); --mg-hot: rgba(111,177,240,.13);
+          --mg-join: rgba(255,255,255,.34); }
+  :root[data-theme="light"] { --mg-alt: rgba(16,32,39,.028);
+          --mg-hot: rgba(13,71,161,.09); --mg-join: rgba(16,32,39,.34); }
+  /* The Beaufort key under the grid, and the same key under the wind panel of
+     the chart — one scale, stated once, in the one place both views can point
+     at. */
+  .mg-key {
+    display: flex; align-items: center; gap: 2px; flex-wrap: wrap;
+    font-size: 10px; color: var(--muted); padding: 7px 10px 8px;
+    border-top: 1px solid var(--border);
+  }
+  /* Outlined, because the bottom of the ramp is very nearly the page. Force 0
+     is a near-white tint by design — most hours of most weeks are calm, and a
+     scale that shouts at them has nothing left for the one gale — but in the
+     key that same tint is an invisible swatch beside a visible number. */
+  .mg-key .sw {
+    width: 22px; height: 11px; display: inline-block; border-radius: 2px;
+    box-shadow: inset 0 0 0 1px rgba(128,142,156,.45);
+  }
+  .mg-key .lab { margin: 0 7px 0 2px; }
+  .mg-key .cap { margin-right: 6px; color: var(--faint); }
   /* The NDVI panel's two extra pieces.
 
      The chart goes *under* the map rather than beside it because the two are
@@ -909,12 +1019,33 @@ title: "Weather"
         <label>Range</label>
         <div class="btns" id="mg-ranges"></div>
       </div>
+      <div class="group" style="margin-left:14px">
+        <label>View</label>
+        <div class="btns" id="mg-views"></div>
+      </div>
+      <div class="group" style="margin-left:14px">
+        <label>Wind</label>
+        <div class="btns" id="mg-units"></div>
+      </div>
       <span class="spacer"></span>
       <div class="mg-now" id="mg-now"></div>
     </div>
     <div class="mg-wrap" id="mg-wrap">
       <canvas id="mg-canvas"></canvas>
       <div class="mg-tip" id="mg-tip"></div>
+    </div>
+    <!-- The grid is a real table rather than a second canvas: its cells are
+         text a reader expects to be able to select, its row labels want to
+         stay put under a horizontal scroll (position: sticky does that for
+         free), and 133 columns of it scroll with momentum on a phone only
+         because the browser is doing the scrolling. -->
+    <div class="mg-table-wrap" id="mg-table-wrap" hidden>
+      <div class="mg-table-scroll" id="mg-table-scroll"></div>
+      <!-- Outside the scroller. Inside it, the key scrolled away with the
+           grid: the table opens scrolled to "now", which took the legend with
+           it and left forces 0–8 off the left edge of a legend that is the
+           whole point of the colouring. -->
+      <div class="mg-key" id="mg-key"></div>
     </div>
     <p class="desc" id="mg-desc"></p>
   </section>
@@ -964,6 +1095,33 @@ title: "Weather"
         drawn to be read as a pattern rather than as a forecast for an hour,
         and the summary line above the chart deliberately speaks only for the
         first five days.<br />
+        <b>Graphs and Table.</b> The same payload read two ways.
+        <i>Graphs</i> stacks temperature, rain and wind on a shared hour axis
+        under a day strip and a row of symbols, with daylight shaded behind
+        every panel so the time of day is read from position rather than from
+        the axis. <i>Table</i> is the hour-by-hour grid: parameters down the
+        side, hours across, each cell coloured by its own value. Neither
+        replaces the other — "when does the wind drop" is a question about a
+        shape, "what exactly is it doing at three on Thursday" is a question
+        about a cell. The wind colouring is the Beaufort scale in both, from
+        one ramp, so a colour means the same force in the grid as it does at
+        the matching height of the chart's wind fill; the chart carries the
+        scale down its right-hand gutter and the grid carries it under the
+        last row. Wind reads in km/h or m/s, remembered between visits — the
+        payload is m/s, which is what the models integrate in, and the colours
+        are keyed on force so they do not move when the unit does. The view
+        travels in the link (<code>#meteogram/malta/table</code>) but the unit
+        does not: the view is something you are showing someone, the unit is
+        something you prefer.<br />
+        <b>What is not here.</b> Precipitation <i>probability</i>, the cloud
+        split into high, mid and low, and the freezing level are all
+        parameters the reference sites show in this kind of grid and none of
+        them are in this payload — the first needs an ensemble and this is a
+        deterministic chain, the other two are fields the pipeline does not
+        currently download. The cloud row and the chart's cloud strip are
+        total cover only, and are drawn as a single band rather than as a
+        vertical cross-section so that nothing implies a profile that is not
+        there.<br />
         <b>24 h rainfall.</b> The IFS total-precipitation field differenced
         across a fixed 24-hour window, so each chart is the total for the day
         <i>ending</i> at the time shown — rain and melted snow, convective and
@@ -1975,6 +2133,23 @@ const frameBox = projectedBox;
 
 /* --------------------------------------------------------- per-domain state */
 
+/* A remembered choice, validated against the options that exist today.
+
+   Checked rather than trusted: a stored value outlives the code that wrote it,
+   so a key left over from a renamed view would otherwise put the page into a
+   state it can no longer draw. Wrapped in try/catch because localStorage throws
+   outright in a sandboxed iframe and on Safari with cookies blocked — a chart
+   must not fail to open over a preference. */
+function mgPref(key, fallback, allowed) {
+  try {
+    const v = localStorage.getItem(key);
+    return allowed.includes(v) ? v : fallback;
+  } catch (e) { return fallback; }
+}
+function mgSetPref(key, value) {
+  try { localStorage.setItem(key, value); } catch (e) { /* not fatal */ }
+}
+
 const state = {
   domain: 'medit', model: 'icon_eu',
   tf: 0, ia: 0, ib: 0, w: 0,
@@ -1986,6 +2161,21 @@ const state = {
   // The chart opens at the range it has always had. The extra nine days are
   // asked for, not defaulted into — see mgClip.
   mgRange: 'short',
+  /* Two readings of the same forecast. `graphs` is the stacked-panel chart and
+     the default, because a shape is what most people come to a point forecast
+     for; `table` is the hour-by-hour grid, which is what you switch to once you
+     are planning around a particular afternoon.
+
+     Both are restored from localStorage, because which of the two you want is a
+     property of the reader rather than of the run — and a reader who prefers
+     the grid should not have to re-choose it every visit. The URL still wins
+     when there is one, so a shared link opens on the view it was shared from.*/
+  mgView: mgPref('mgView', 'graphs', ['graphs', 'table']),
+  // Wind is m/s in the payload and in every model behind it. Neither of these
+  // is a conversion of "the real" unit: km/h is what the rest of this page has
+  // always shown a reader, m/s is what the data is, and the choice is kept for
+  // the same reason the view is.
+  mgUnit: mgPref('mgUnit', 'kmh', ['kmh', 'ms']),
   // The synoptic level the tab reopens on. 500 hPa is where a reader starts
   // reading a synoptic situation, so it is where the tab starts — and, since
   // the page now opens on the synoptic chart, where the whole page starts.
@@ -5696,6 +5886,72 @@ function buildMgRangeButtons() {
   }
 }
 
+/* ------------------------------------------------------- view and units --
+
+   Two presentations of one payload, and one choice of unit across both.
+
+   Neither is a mode in the usual sense: nothing is loaded, nothing is
+   recomputed from the model, and the hovered hour survives the switch. They
+   are two ways of looking at the same 133 numbers, which is why the place and
+   range controls sit above them and keep working unchanged. */
+const MG_VIEWS = {
+  graphs: { label: 'Graphs' },
+  table: { label: 'Table' },
+};
+
+/* Wind in the payload is m/s, which is what every model behind this chart
+   integrates in. km/h is the default because it is what the rest of this page
+   has always shown and what most readers of a land forecast think in; m/s is
+   one press away for anyone who would rather read the model's own number.
+
+   `dp` is not cosmetic. At one decimal place km/h implies a tenth of a km/h
+   from a field whose own error is metres per second, and a column of 11.3 /
+   14.8 / 9.6 is harder to scan than 11 / 15 / 10 for no gain. m/s keeps its
+   decimal because dropping it would quantise a 0–12 range into thirteen
+   steps and flatten exactly the variation the chart is about. */
+const MG_UNITS = {
+  kmh: { label: 'km/h', k: 3.6, dp: 0 },
+  ms: { label: 'm/s', k: 1, dp: 1 },
+};
+const mgU = () => MG_UNITS[state.mgUnit] || MG_UNITS.kmh;
+// m/s in, reader's unit out. Everything that prints a wind speed goes through
+// these two, so adding a third unit is one entry in the table above.
+const mgWind = (ms) => ms * mgU().k;
+const mgWindTxt = (ms) => mgWind(ms).toFixed(mgU().dp);
+
+function mgBuildToggle(boxId, table, cur, onPick) {
+  const box = $(boxId);
+  if (!box) return;
+  box.innerHTML = '';
+  for (const [key, v] of Object.entries(table)) {
+    const b = document.createElement('button');
+    b.textContent = v.label;
+    b.setAttribute('aria-pressed', String(key === cur));
+    b.onclick = () => { if (key !== cur) onPick(key); };
+    box.appendChild(b);
+  }
+}
+
+function buildMgViewButtons() {
+  mgBuildToggle('mg-views', MG_VIEWS, state.mgView || 'graphs', (key) => {
+    state.mgView = key;
+    mgSetPref('mgView', key);
+    /* The hover index is deliberately kept. Both views are indexed by the same
+       step array, so the hour under the pointer in the chart is the column
+       highlighted in the grid — switching view to check a number should not
+       cost you your place. */
+    showView('mgram');
+  });
+}
+
+function buildMgUnitButtons() {
+  mgBuildToggle('mg-units', MG_UNITS, state.mgUnit || 'kmh', (key) => {
+    state.mgUnit = key;
+    mgSetPref('mgUnit', key);
+    showView('mgram');
+  });
+}
+
 const TAU = Math.PI * 2;
 const MG_FONT = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif';
 const mgF = (spec) => `${spec} ${MG_FONT}`;
@@ -5982,6 +6238,44 @@ function mgCloud(c, x, y, w, fill, edge) {
   c.restore();
 }
 
+/* A few stars around a clear or nearly-clear moon.
+
+   The moon alone is a correct night symbol and a dull one: at the size these
+   get it is a pale comma, and next to a sun that has eight rays it reads as
+   the lesser glyph rather than as the other half of the day. Stars are what
+   the reference sets use to balance that, and they carry a little meaning
+   besides — they are only drawn when the sky is clear enough to have any,
+   so their absence under broken cloud is itself right.
+
+   Fixed positions rather than random: this is redrawn on every pointermove,
+   and a constellation that reshuffles sixty times a second is the single most
+   distracting thing a chart can do. Four-pointed sparkles rather than filled
+   five-point stars, which at 3 px are a blob. */
+const MG_STARS = [
+  [-0.40, -0.30, 0.070], [0.34, -0.38, 0.055], [0.42, 0.06, 0.042],
+  [-0.30, 0.16, 0.040], [0.05, -0.46, 0.038],
+];
+function mgStars(c, x, y, size, col, n) {
+  c.save();
+  c.fillStyle = col;
+  for (let k = 0; k < Math.min(n, MG_STARS.length); k++) {
+    const [sx, sy, sr] = MG_STARS[k];
+    const cx = x + size * sx, cy = y + size * sy, r = size * sr;
+    // A four-pointed sparkle: two spikes crossing, each drawn as a pair of
+    // quadratic curves pinched at the centre. Concave sides are what makes it
+    // read as a star rather than as a plus sign.
+    c.beginPath();
+    c.moveTo(cx, cy - r);
+    c.quadraticCurveTo(cx + r * 0.18, cy - r * 0.18, cx + r, cy);
+    c.quadraticCurveTo(cx + r * 0.18, cy + r * 0.18, cx, cy + r);
+    c.quadraticCurveTo(cx - r * 0.18, cy + r * 0.18, cx - r, cy);
+    c.quadraticCurveTo(cx - r * 0.18, cy - r * 0.18, cx, cy - r);
+    c.closePath();
+    c.fill();
+  }
+  c.restore();
+}
+
 /* Teardrops rather than tally marks. The slashes this replaces were legible
    but they were punctuation, not weather — and three of them under a cloud
    read as a strikethrough. A drop is a bulb with a point pulled off the top of
@@ -6057,8 +6351,11 @@ function mgSymbol(c, x, y, size, sky, wet, day, snow, pal) {
   const yTop = wet ? y - size * 0.15 : y;
 
   if (sky === 0) {
+    // Stars before the moon, so the moon is never drawn over by one.
+    if (!day && !wet) mgStars(c, x, yTop, size, mgRgba(mgHex(pal.moon) || [200, 214, 228], 0.72), 5);
     orb(c, x, yTop, r * 1.20, lit, pal.edge);
   } else if (sky === 1) {
+    if (!day && !wet) mgStars(c, x, yTop, size, mgRgba(mgHex(pal.moon) || [200, 214, 228], 0.58), 3);
     orb(c, x - size * 0.11, yTop - size * 0.08, r, lit, pal.edge);
     mgCloud(c, x + size * 0.15, yTop + size * 0.13, cw * 0.64, body, pal.edge);
   } else if (sky === 2) {
@@ -6112,6 +6409,81 @@ function mgBeaufort(ms) {
   let b = 0;
   while (b < MG_BFT.length && ms >= MG_BFT[b]) b++;
   return b;
+}
+
+/* Beaufort as a real number — force 4 exactly at the bottom of force 4, 4.5
+   halfway up it.
+
+   The integer force is the right thing to *say* and the wrong thing to colour
+   by: a cell that steps from green to yellow the moment 7.9 m/s becomes 8.1
+   draws a boundary the atmosphere does not have, and a wind sitting near a
+   threshold flickers between two colours along a row. The continuous version
+   also lets the chart's wind fill be a smooth vertical gradient whose colour at
+   any height is, by construction, the colour the grid gives that same speed —
+   which is the only reason the two views can share one key. */
+function mgBftF(ms) {
+  if (!(ms > 0)) return 0;
+  const b = mgBeaufort(ms);
+  const lo = b === 0 ? 0 : MG_BFT[b - 1];
+  // Force 12 is open-ended; give it the width of force 11 so the ramp has
+  // somewhere to go rather than clamping flat at the top of the scale.
+  const hi = b < MG_BFT.length ? MG_BFT[b] : MG_BFT[MG_BFT.length - 1] * 1.13;
+  return b + clamp((ms - lo) / (hi - lo), 0, 1);
+}
+
+/* The wind ramp, keyed on force rather than on speed.
+
+   Windguru's progression, which is the one every sailor reading this page
+   already has in their eye: still air barely tinted, breezes cyan into green,
+   the working winds yellow and orange, gale red, storm magenta. Keyed on
+   Beaufort so it means the same thing in km/h and in m/s — switching unit
+   restates the numbers and must not restate the colours.
+
+   Deliberately pale at the bottom. Most hours of most weeks are force 0–3, and
+   a scale that gives them saturated colour spends all its contrast on the
+   ordinary and leaves none for the one afternoon that matters. */
+const MG_BFT_COL = [
+  [230, 240, 247], [207, 233, 246], [170, 225, 240], [138, 220, 196],
+  [124, 214, 124], [180, 220, 88], [248, 206, 72], [246, 158, 58],
+  [238, 104, 60], [224, 64, 64], [212, 46, 108], [192, 52, 158],
+  [166, 68, 190], [140, 80, 206],
+];
+function mgBftRGB(ms) {
+  const f = clamp(mgBftF(ms), 0, MG_BFT_COL.length - 1.001);
+  const i = Math.floor(f);
+  return mgMix(MG_BFT_COL[i], MG_BFT_COL[i + 1], f - i);
+}
+
+/* Temperature, as a diverging ramp through the range this page actually sees:
+   Zürich in January at one end, Malta in August at the other. Anchored every
+   ten degrees and interpolated between, with the pale band deliberately placed
+   over 5–20 °C so that a comfortable day reads as unremarkable and the colour
+   is spent on the ends. */
+const MG_T_ANCH = [
+  [-20, [122, 86, 170]], [-10, [84, 122, 196]], [0, [150, 200, 232]],
+  [5, [206, 232, 240]], [12, [226, 240, 222]], [18, [246, 240, 196]],
+  [24, [250, 212, 130]], [30, [246, 160, 92]], [36, [232, 96, 72]],
+  [44, [196, 54, 72]],
+];
+function mgTempRGB(t) {
+  const A = MG_T_ANCH;
+  if (!(t > A[0][0])) return A[0][1];
+  for (let k = 1; k < A.length; k++) {
+    if (t <= A[k][0]) {
+      return mgMix(A[k - 1][1], A[k][1], (t - A[k - 1][0]) / (A[k][0] - A[k - 1][0]));
+    }
+  }
+  return A[A.length - 1][1];
+}
+
+/* Rain, on the same compressed scale the chart's bars use (mgRainF), so a cell
+   and a bar for the same hour carry the same weight. White at nothing, through
+   the page's own rain blue, to violet for a rate nobody argues about. */
+function mgRainRGB(rate) {
+  const f = mgRainF(rate);
+  return f <= 0.5
+    ? mgMix([222, 236, 248], [96, 158, 226], f / 0.5)
+    : mgMix([96, 158, 226], [92, 72, 184], (f - 0.5) / 0.5);
 }
 
 const MG_POINTS = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
@@ -6321,21 +6693,31 @@ function mgPrepare(d) {
     ribbon.push({ h, cloud: cl, elev: mgSunElev(at(h), d.lat, d.lon) });
   }
 
-  // Night runs, used for a light wash under the temperature row only.
+  /* Night runs and daylight runs, walked together at ten-minute resolution.
+
+     Both, rather than one and its complement: the chart shades daylight and
+     the grid tints night, and deriving either from the other means reasoning
+     about the open ends — a run that is still going at +360 h, and a chart
+     that may begin in the middle of one. Found once here instead, where the
+     loop that has to run anyway can close both. */
   const runs = [];
+  const dayRuns = [];
   let run = null;
   for (let h = h0; h <= h1 + 1e-9; h += 1 / 6) {
     const night = mgSunElev(at(h), d.lat, d.lon) < -0.833;
     if (!run) run = { night, from: h, to: h };
-    else if (run.night !== night) { if (run.night) runs.push(run); run = { night, from: h, to: h }; }
-    else run.to = h;
+    else if (run.night !== night) {
+      (run.night ? runs : dayRuns).push(run);
+      run = { night, from: h, to: h };
+    } else run.to = h;
   }
-  if (run && run.night) runs.push(run);
+  if (run) (run.night ? runs : dayRuns).push(run);
 
   const dayFlag = d.steps.map((s) => mgSunElev(at(s), d.lat, d.lon) > 0);
 
   MG.prepFor = d;
-  MG.prep = { days, dayOf, ribbon, runs, day: dayFlag, at, rate, SPAN, init, fmtHM };
+  MG.prep = { days, dayOf, ribbon, runs, dayRuns, day: dayFlag, at, rate, SPAN,
+              init, fmtHM };
   return MG.prep;
 }
 
@@ -6421,42 +6803,62 @@ function mgDescribe(d) {
 
 /* ------------------------------------------------------------------ layout -- */
 
-function mgLayout(w, h, dry) {
+/* ------------------------------------------------------------------ layout --
+
+   Three panels under two bands.
+
+   The arrangement is meteoblue's, and it is the right one for a point forecast
+   because it matches the order the questions get asked in: how warm, is it
+   raining, how windy. Each panel owns one quantity and its own vertical scale,
+   so none of them has to be squeezed onto a shared axis it does not belong on —
+   which is what the single-axis layout here before was doing to rain.
+
+   Above them, two bands that carry no scale at all: the day strip, which is
+   the only thing on the chart you can read without measuring anything, and the
+   symbol row under it. Below everything, one hour axis for all three panels,
+   because they are the same hours and three copies of it would say so three
+   times. */
+function mgLayout(w, h, opts) {
   const narrow = w < 620;
   const compact = w < 900;
-  // Left gutter carries axis numbers; the right one carries the wind row's
-  // secondary m/s scale and nothing else.
-  const padL = narrow ? 34 : 48;
-  const padR = narrow ? 12 : 46;
-  const padT = 8;
-  const padB = narrow ? 24 : 28;
-  const headH = narrow ? 94 : compact ? 106 : 118;
-  const ribH = narrow ? 13 : 16;
-  const gapHead = narrow ? 9 : 12;   // header rule -> sky ribbon
-  const gapCap = narrow ? 23 : 24;   // ribbon -> first row (room for a caption)
-  const gap = narrow ? 22 : 27;
+  const padL = narrow ? 32 : 44;
+  /* The right gutter is the Beaufort scale's, and it is never dropped — only
+     narrowed. It is the one axis on this chart a reader is actively converting
+     in their head ("is that a 5 or a 6"), and a wind panel that makes them do
+     that against a km/h axis is a wind panel that has not answered. */
+  const padR = narrow ? 29 : 56;
+  const padT = 6;
+  const padB = narrow ? 19 : 23;
+  const dayH = narrow ? 17 : 20;
+  const symH = narrow ? 25 : 33;
+  const cloudH = narrow ? 12 : 15;
+  const gap = narrow ? 20 : 25;
 
-  const headY = padT;
-  const ribY = headY + headH + gapHead;
-  const rowsTop = ribY + ribH + gapCap;
-  const plotBot = h - padB;
-  let avail = plotBot - rowsTop - gap * 2;
-  // A dry week does not deserve a hundred pixels of empty rain box. It gets a
-  // slim lane that says so, and temperature gets the difference.
-  const rainH = dry ? (narrow ? 26 : 30) : avail * 1.02 / 4.90;
-  const rest = avail - rainH;
-  const tempH = rest * 2.62 / 3.87;
-  const windH = rest - tempH;
+  const dayY = padT;
+  const symY = dayY + dayH;
+  const cloudY = symY + symH + 1;
+  const top = cloudY + cloudH + (narrow ? 13 : 15);
+  const bot = h - padB;
+  const avail = Math.max(120, bot - top - gap * 2);
 
-  const rows = {
-    temp: { y: rowsTop, h: tempH, label: 'Temperature  °C' },
-    rain: { y: rowsTop + tempH + gap, h: rainH, label: 'Rain  mm/h' },
-    wind: { y: rowsTop + tempH + gap + rainH + gap, h: windH, label: 'Wind  km/h' },
-  };
+  /* Temperature gets the most height because it is the panel people read a
+     value off rather than a shape, and a 2 °C difference has to be visible.
+     A dry week collapses the rain panel to a slim lane that says so, and the
+     height goes to wind — which on a dry week is usually why you are here. */
+  const tempH = avail * 0.38;
+  const precH = opts.dry ? Math.min(avail * 0.14, narrow ? 24 : 30) : avail * 0.26;
+  const windH = avail - tempH - precH;
+
   return {
     narrow, compact, padL, padR, padT, padB, gap,
     x0: padL, x1: w - padR, w, h,
-    headY, headH, ribY, ribH, rowsTop, plotBot, rows, dry,
+    dayY, dayH, symY, symH, cloudY, cloudH,
+    rows: {
+      temp: { y: top, h: tempH },
+      prec: { y: top + tempH + gap, h: precH },
+      wind: { y: top + tempH + gap + precH + gap, h: windH },
+    },
+    plotTop: top, plotBot: bot, dry: opts.dry,
   };
 }
 
@@ -6476,9 +6878,35 @@ function mgRoundRect(c, x, y, w, h, r) {
   c.arcTo(x, y, x + w, y, r); c.closePath();
 }
 
-/* ------------------------------------------------------------------ draw -- */
+/* Black or white, whichever the fill can carry.
 
+   Both views paint text onto data-coloured cells — a temperature cell, a
+   Beaufort cell, the number on a rain bar — and the fill under it spans the
+   whole ramp. One ink colour cannot survive that: dark text vanishes on
+   force 10 magenta, light text vanishes on a pale 15 °C. Rec. 709 luma,
+   thresholded a little above the midpoint because dark text on a mid tone
+   stays readable further down than light text does. */
+function mgInkOn(rgb) {
+  const y = 0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2];
+  return y > 150 ? '#121a21' : '#f4f8fb';
+}
+
+/* ------------------------------------------------------------------ draw --
+
+   One entry point for both views, because everything that can invalidate the
+   chart — a resize, a theme flip, a new place, a hover — has no business
+   knowing which of the two is on screen. */
 function drawMeteogram() {
+  const d = MG.data;
+  if (!d) return;
+  const table = (state.mgView || 'graphs') === 'table';
+  $('mg-wrap').hidden = table;
+  $('mg-table-wrap').hidden = !table;
+  if (table) renderMgTable();
+  else drawMgGraphs();
+}
+
+function drawMgGraphs() {
   const d = MG.data;
   if (!d) return;
   const wrap = $('mg-wrap');
@@ -6491,10 +6919,10 @@ function drawMeteogram() {
   const below = bodyH - top - wrap.offsetHeight;
   // Fit what is left of the viewport, same rule as the map: a forecast you have
   // to scroll to read is one you compare from memory. A floor either way, since
-  // stacked rows stop being rows below it.
+  // three stacked panels stop being panels below it.
   const cssH = isNarrow()
-    ? Math.max(560, Math.min(940, window.innerHeight - top - 16))
-    : Math.max(520, window.innerHeight - top - below - 12);
+    ? Math.max(580, Math.min(960, window.innerHeight - top - 16))
+    : Math.max(540, window.innerHeight - top - below - 12);
 
   const dpr = Math.min(2, window.devicePixelRatio || 1);
   mgCanvas.width = Math.round(cssW * dpr);
@@ -6511,10 +6939,9 @@ function drawMeteogram() {
 
   const n = d.steps.length;
   const SPAN = P.SPAN, rate = P.rate;
-  const wettest = Math.max(...rate);
-  const dry = wettest < 0.05;
+  const dry = Math.max(...rate) < 0.05;
 
-  const L = mgLayout(cssW, cssH, dry);
+  const L = mgLayout(cssW, cssH, { dry });
   MG.layout = L;
 
   c.clearRect(0, 0, cssW, cssH);
@@ -6522,733 +6949,911 @@ function drawMeteogram() {
   c.fillRect(0, 0, cssW, cssH);
   c.textBaseline = 'alphabetic';
 
-  const init = new Date(d.init);
-  const times = d.steps.map((s) => new Date(init.getTime() + s * 3600e3));
-  /* Positioned by forecast hour, not by array index. The ICON-2I head is
-     hourly and the ICON-EU tail three-hourly, so an index axis would hand the
-     last two days the same width per point as the first three get per hour —
-     compressing them to a third of their span and bending every slope at the
-     join for no meteorological reason. */
-  const hSpan = (d.steps[n - 1] - d.steps[0]) || 1;
-  const Xh = (h) => L.x0 + ((h - d.steps[0]) / hSpan) * (L.x1 - L.x0);
-  const X = (i) => Xh(d.steps[i]);
-  const pxPerH = (L.x1 - L.x0) / hSpan;
+  /* The x axis is hours, not array index. Past the model join the steps are
+     three and then six hours apart, and indexing would draw the last nine days
+     at the same width as the first three. */
+  const h0 = d.steps[0], h1 = d.steps[n - 1];
+  const hSpan = (h1 - h0) || 1;
+  const X = (h) => L.x0 + (h - h0) / hSpan * (L.x1 - L.x0);
+  const Xi = (i) => X(d.steps[i]);
+  const times = d.steps.map((s) => P.at(s));
 
-  const topAll = L.headY;                 // day tints start at the header
-  const plotTop = L.ribY;                 // ribbon downwards is "the chart"
-  // Washes stop short of the sky ribbon: the ribbon is a picture of the sky and
-  // tinting it with rain, past hours or model provenance turns it into a
-  // barcode of three unrelated things.
-  const washTop = L.ribY + L.ribH;
-  const plotBot = L.plotBot;
-  const rT = L.rows.temp, rR = L.rows.rain, rW = L.rows.wind;
+  MG.scales = { times, SPAN, rate, day: P.day, X: Xi, plotTop: L.plotTop };
 
-  /* --- 1. day tints and dividers, the whole point of this layout ---------- */
-  P.days.forEach((day, k) => {
-    const xa = Math.max(L.x0, Xh(day.from)), xb = Math.min(L.x1, Xh(day.to));
-    c.fillStyle = (k % 2) ? pal.tintB : pal.tintA;
-    c.fillRect(xa, topAll, xb - xa, plotBot - topAll);
-  });
+  const rows = L.rows;
+  const bandTop = rows.temp.y, bandBot = rows.wind.y + rows.wind.h;
 
-  /* --- 2. wet hours, washed the full height of the plot -------------------
-     "When does it rain" then answers from anywhere on the chart rather than
-     only from the rain lane, which is what forced the old version to be
-     hovered before it could answer the question at all. */
-  if (!dry) {
-    for (let i = 0; i < n; i++) {
-      if (rate[i] < 0.1) continue;
-      const xb = X(i), xa = Xh(d.steps[i] - (SPAN[i] || 1));
-      const a = rate[i] >= 2 ? 0.085 : rate[i] >= 0.5 ? 0.058 : 0.036;
-      c.fillStyle = mgRgba(pal.rainC, a);
-      c.fillRect(Math.max(L.x0, xa), washTop, Math.min(L.x1, xb) - Math.max(L.x0, xa), plotBot - washTop);
-    }
+  /* ---------------------------------------------------------- daylight -- */
+  /* The yellow is the chart's clock. Every panel is crossed by it, so "that
+     peak is mid-afternoon" is answered by where the peak sits inside a band
+     rather than by tracing down to the axis — which is the whole reason
+     meteoblue's meteogram reads as fast as it does.
+
+     Very pale, and paler still on the dark theme, where a saturated yellow
+     over three panels of data would be the loudest thing on the page. */
+  for (const r of P.dayRuns) {
+    const xa = X(Math.max(h0, r.from)), xb = X(Math.min(h1, r.to));
+    if (xb <= xa) continue;
+    /* Warm rather than merely lighter. On the dark theme a low-alpha wash is
+       mostly a lift in lightness and reads as grey, which says "some other
+       panel" instead of "daytime"; the saturation has to carry it, so the
+       tint is a deeper amber at a slightly higher alpha. */
+    c.fillStyle = pal.dark ? 'rgba(255,196,64,.085)' : 'rgba(255,205,55,.19)';
+    c.fillRect(xa, bandTop, xb - xa, bandBot - bandTop);
   }
 
-  /* --- 3. the tails, where each successive model takes over --------------- */
-  /* One wash per handover, laid over the last rather than replacing it, so the
-     shading deepens with every model further from the lead. That reads as
-     "further from the forecast you should trust most", which is exactly what
-     the axis is doing, and it costs no legend to say it. */
+  /* ------------------------------------------------------- the day band --
+
+     The handover chips are measured before the band is drawn, not after, so
+     the band can get out of their way. Both want the same strip and the join
+     is the rarer and less recoverable label: a day whose name is suppressed is
+     still obviously the day between the two named either side of it, whereas
+     "ICON-EU" half-covered by "Wed 18 Nov" tells you neither thing. */
   const joins = mgJoins(d);
-  const xJoins = joins.map((j) =>
-    Xh(d.steps[j.from] - (d.steps[j.from] - d.steps[j.from - 1]) / 2));
-  for (const xj of xJoins) {
-    c.fillStyle = ink(pal.dark ? 0.035 : 0.026);
-    c.fillRect(xj, washTop, L.x1 - xj, plotBot - washTop);
+  c.font = mgF('600 9.5px');
+  const chips = joins.map((j) => {
+    const x = X(d.steps[j.from]);
+    return { x, w: c.measureText(j.short).width + 9, short: j.short, from: j.from };
+  }).filter((ch) => ch.x + ch.w + 4 < L.x1);
+
+  mgDayBand(c, d, P, L, pal, X, chips);
+
+  /* Midnight rules, carried the full height so the day division the band
+     announces is still there at the bottom of the wind panel. */
+  for (const day of P.days) {
+    if (day.from <= h0 + 1e-9) continue;
+    const x = Math.round(X(day.from)) + 0.5;
+    c.strokeStyle = ink(0.16);
+    c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x, L.dayY); c.lineTo(x, bandBot); c.stroke();
   }
 
-  /* --- 4. the hours already gone ----------------------------------------- */
-  const nowH = (Date.now() - init.getTime()) / 3600e3;
-  const nowInRange = nowH > d.steps[0] + 0.05 && nowH < d.steps[n - 1];
-  if (nowInRange) {
-    c.fillStyle = ink(pal.dark ? 0.055 : 0.045);
-    c.fillRect(L.x0, washTop, Xh(nowH) - L.x0, plotBot - washTop);
+  /* -------------------------------------------------------- the symbols -- */
+  mgSymbolRow(c, d, P, L, pal, X);
+
+  /* ----------------------------------------------------- the cloud strip -- */
+  mgCloudStrip(c, d, P, L, pal, X, ink);
+
+  /* ----------------------------------------------------------- the panels -- */
+  mgTempPanel(c, d, P, L, pal, ink, X, Xi);
+  mgPrecPanel(c, d, P, L, pal, ink, X, Xi, dry);
+  mgWindPanel(c, d, P, L, pal, ink, X, Xi);
+
+  /* ------------------------------------------------------------ the hours -- */
+  mgHourAxis(c, d, P, L, pal, ink, X);
+
+  /* ------------------------------------------------------------- the joins -- */
+  /* A change of model is not a change in the weather and must not read as one,
+     so the handover gets a rule and a name rather than a change of line
+     colour. Drawn after the panels so the label sits over the data. */
+  for (const j of joins) {
+    const x = Math.round(X(d.steps[j.from])) + 0.5;
+    c.save();
+    c.setLineDash([4, 3]);
+    c.strokeStyle = ink(0.42);
+    c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x, L.symY); c.lineTo(x, bandBot); c.stroke();
+    c.restore();
   }
-
-  /* --- 5. the day header ------------------------------------------------- */
-  drawMgHeader(c, d, P, L, pal);
-
-  /* --- 6. the sky ribbon --------------------------------------------------
-     Cloud cover and daylight in one 16 px strip: this is where day and night
-     live now. The old chart washed the whole column instead, which made every
-     panel look striped and, on the dark theme, made night read as lit. */
-  {
-    const y = L.ribY, hh = L.ribH;
-    // Night is dark and cool, day is bright and cool-to-grey, in both themes:
-    // the ribbon is the one object here that is a picture rather than a plot,
-    // so it keeps its own colour and does not invert with the panel.
-    const dayClear = [138, 189, 230], dayGrey = [171, 181, 190];
-    const nightClear = [64, 84, 110], nightGrey = [104, 114, 128];
-    const R = P.ribbon;
-    for (let k = 0; k < R.length; k++) {
-      const s = R[k];
-      const xa = Xh(s.h), xb = k + 1 < R.length ? Xh(R[k + 1].h) : L.x1;
-      if (xb <= L.x0 || xa >= L.x1) continue;
-      const f = clamp(s.cloud / 100, 0, 1);
-      const t = clamp((s.elev + 6) / 12, 0, 1);
-      const col = mgMix(mgMix(nightClear, nightGrey, f), mgMix(dayClear, dayGrey, f), t);
-      c.fillStyle = mgRgba(col, 1);
-      c.fillRect(Math.max(L.x0, xa) - 0.4, y, Math.min(L.x1, xb) - Math.max(L.x0, xa) + 0.8, hh);
-    }
-    c.strokeStyle = ink(0.14); c.lineWidth = 1;
-    c.strokeRect(L.x0 + 0.5, y + 0.5, L.x1 - L.x0 - 1, hh - 1);
-    c.font = mgF('600 11px');
-    c.fillStyle = ink(0.62);
-    c.textAlign = 'right';
-    c.fillText('Sky', L.x0 - 8, y + hh / 2 + 4);
-    c.textAlign = 'left';
-  }
-
-  /* --- 7. gridlines and captions ----------------------------------------- */
-  const caption = (row) => {
-    c.font = mgF('700 11px');
-    c.fillStyle = ink(0.70);
-    if (c.letterSpacing !== undefined) c.letterSpacing = '0.05em';
-    c.fillText(row.label.toUpperCase(), L.x0, row.y - 8);
-    if (c.letterSpacing !== undefined) c.letterSpacing = '0px';
-  };
-  const gridline = (y) => {
-    const yy = Math.round(y) + 0.5;
-    c.strokeStyle = ink(0.10); c.lineWidth = 1;
-    c.beginPath(); c.moveTo(L.x0, yy); c.lineTo(L.x1, yy); c.stroke();
-  };
-  const tickLabel = (y, s) => {
-    c.font = mgF('500 12px');
+  /* The names, on chips, in the strip the day band has already been told to
+     leave clear for them. The chip is the panel colour rather than a stroked
+     box, so the label reads as being in front of the band rather than as a
+     widget bolted onto it. */
+  c.font = mgF('600 9.5px');
+  c.textAlign = 'left';
+  c.textBaseline = 'alphabetic';
+  for (const ch of chips) {
+    c.fillStyle = mgRgba(pal.panel, 0.92);
+    mgRoundRect(c, ch.x + 2, L.dayY + 2, ch.w, L.dayH - 5, 2.5);
+    c.fill();
     c.fillStyle = ink(0.58);
-    c.textAlign = 'right';
-    c.fillText(s, L.x0 - 8, Math.round(y) + 4);
-    c.textAlign = 'left';
-  };
-
-  /* --- 8. temperature ----------------------------------------------------- */
-  const [tLo, tHi] = mgBounds(d.temp.concat(d.dew), 0.8, 2);
-  const tY = (v) => rT.y + rT.h * (1 - (v - tLo) / (tHi - tLo));
-  caption(rT);
-  {
-    // A faint wash for the night hours, but only here — this is the row where
-    // the diurnal cycle is the story, and the ribbon carries the rest.
-    for (const r of P.runs) {
-      const xa = Math.max(L.x0, Xh(r.from)), xb = Math.min(L.x1, Xh(r.to));
-      if (xb <= xa) continue;
-      c.fillStyle = pal.dark ? 'rgba(0,0,0,.15)' : 'rgba(24,44,70,.034)';
-      c.fillRect(xa, rT.y, xb - xa, rT.h);
-    }
-    const step = Math.max(2, Math.round((tHi - tLo) / 5 / 2) * 2);
-    for (let v = tLo; v <= tHi + 1e-9; v += step) {
-      const y = tY(v);
-      if (Math.abs(v) < 1e-9 && tLo < 0) {
-        c.strokeStyle = ink(0.26); c.lineWidth = 1.2;
-        c.beginPath(); c.moveTo(L.x0, Math.round(y) + 0.5); c.lineTo(L.x1, Math.round(y) + 0.5); c.stroke();
-      } else gridline(y);
-      tickLabel(y, String(Math.round(v)));
-    }
+    c.fillText(ch.short, ch.x + 6, L.dayY + L.dayH - 6);
   }
-  // A soft fill under the temperature curve. Temperature is the subject of this
-  // chart, and until it had some area behind it every row weighed the same.
-  {
-    const g = c.createLinearGradient(0, rT.y, 0, rT.y + rT.h);
-    g.addColorStop(0, mgRgba(pal.tempC, pal.dark ? 0.22 : 0.16));
-    g.addColorStop(1, mgRgba(pal.tempC, 0));
+
+  /* --------------------------------------------------------------- now -- */
+  /* Only when it is actually on the chart. A run six hours old has "now" a
+     little way in; a run from yesterday that failed to refresh would otherwise
+     draw it off the left edge and silently clamp it to the axis. */
+  const nowH = (Date.now() - P.init.getTime()) / 3600e3;
+  if (nowH > h0 && nowH < h1) {
+    const x = Math.round(X(nowH)) + 0.5;
     c.save();
-    c.beginPath();
-    c.moveTo(X(0), rT.y + rT.h);
-    for (let i = 0; i < n; i++) c.lineTo(X(i), tY(d.temp[i]));
-    c.lineTo(X(n - 1), rT.y + rT.h);
-    c.closePath();
-    c.fillStyle = g; c.fill();
+    c.setLineDash([5, 4]);
+    c.strokeStyle = pal.accent;
+    c.lineWidth = 1.4;
+    c.beginPath(); c.moveTo(x, L.dayY + L.dayH); c.lineTo(x, bandBot); c.stroke();
     c.restore();
   }
-  const trace = (vals, yFn, color, width, dash) => {
-    c.save();
-    c.beginPath();
-    for (let i = 0; i < n; i++) {
-      const y = yFn(vals[i]);
-      if (i === 0) c.moveTo(X(i), y); else c.lineTo(X(i), y);
-    }
-    c.strokeStyle = color; c.lineWidth = width;
-    c.lineJoin = 'round'; c.lineCap = 'round';
-    if (dash) c.setLineDash(dash);
-    c.stroke();
-    c.restore();
-  };
-  trace(d.dew, tY, mgRgba(pal.coldC, 0.60), 1.8, [5, 4]);
-  trace(d.temp, tY, pal.temp, 3.0);
 
-  /* Each day's high and low, printed where they happen. The header already
-     says what they are; this says when, which is the half the header cannot. */
-  {
-    c.font = mgF('700 11.5px');
-    c.textAlign = 'center';
-    for (const day of P.days) {
-      if (day.count < 5 || day.iHi < 0 || day.iHi === day.iLo) continue;
-      for (const [i, dy, col] of [[day.iHi, -15, pal.tempC], [day.iLo, 19, pal.coldC]]) {
-        const lab = Math.round(d.temp[i]) + '°';
-        const wlab = c.measureText(lab).width;
-        const x = clamp(X(i), L.x0 + wlab / 2 + 3, L.x1 - wlab / 2 - 3);
-        const yv = tY(d.temp[i]), y = yv + dy;
-        // A rounded plate instead of a stroked halo: the halo used to punch a
-        // white nick straight through the dewpoint trace behind it.
-        mgRoundRect(c, x - wlab / 2 - 4, y - 11, wlab + 8, 15, 3);
-        c.fillStyle = mgRgba(pal.panel, 0.86); c.fill();
-        c.fillStyle = mgRgba(col, 1);
-        c.fillText(lab, x, y);
-        c.beginPath(); c.arc(X(i), yv, 2.6, 0, TAU); c.fill();
-      }
-    }
-    c.textAlign = 'left';
-  }
-
-  /* --- 9. rain ------------------------------------------------------------ */
-  if (dry) {
-    /* No box, no axis, no empty hundred pixels of white. A dry week gets a slim
-       lane that says so in words, and the height goes to temperature. */
-    const y = rR.y + rR.h / 2;
-    mgRoundRect(c, L.x0, rR.y, L.x1 - L.x0, rR.h, 4);
-    c.fillStyle = ink(0.035); c.fill();
-    c.font = mgF('700 11px');
-    if (c.letterSpacing !== undefined) c.letterSpacing = '0.05em';
-    c.fillStyle = ink(0.70);
-    c.fillText('RAIN', L.x0 + 10, y + 4);
-    if (c.letterSpacing !== undefined) c.letterSpacing = '0px';
-    const off = c.measureText('RAIN').width + 20;
-    c.font = mgF('500 12px');
-    c.fillStyle = ink(0.48);
-    c.fillText('none anywhere in this forecast', L.x0 + off, y + 4);
-  } else {
-    caption(rR);
-    const base = rR.y + rR.h;
-    const rY = (r) => base - mgRainF(r) * rR.h;
-    for (const v of [0.5, 2, 10]) {
-      const y = rY(v);
-      if (y < rR.y - 1) continue;
-      gridline(y);
-      tickLabel(y, v === 0.5 ? '0.5' : String(v));
-    }
-    c.strokeStyle = ink(0.16); c.lineWidth = 1;
-    c.beginPath(); c.moveTo(L.x0, Math.round(base) + 0.5); c.lineTo(L.x1, Math.round(base) + 0.5); c.stroke();
-
-    /* One continuous stepped area over the bucket edges rather than a bar per
-       step. A six-hour event then reads as one object, and the change from
-       hourly to three-hourly buckets alters the width of a step but never the
-       apparent magnitude of the rain in it. */
-    c.save();
-    c.beginPath();
-    c.rect(L.x0, rR.y - 6, L.x1 - L.x0, rR.h + 6);
-    c.clip();
-    c.beginPath();
-    let started = false;
-    for (let i = 0; i < n; i++) {
-      const xa = Xh(d.steps[i] - (SPAN[i] || 1)), xb = X(i);
-      const y = rY(Math.min(rate[i], 10));
-      if (!started) { c.moveTo(xa, base); started = true; }
-      c.lineTo(xa, y); c.lineTo(xb, y);
-    }
-    c.lineTo(X(n - 1), base);
-    c.closePath();
-    c.fillStyle = mgRgba(pal.rainC, 0.80);
-    c.fill();
-    /* The wet blocks get an outline so that drizzle is still an object rather
-       than a smear — but only the wet ones. Stroking the dry buckets too drew
-       a saturated blue rule from one end of the chart to the other along the
-       zero line, which read as the loudest thing on the panel. */
-    c.beginPath();
-    let pen = false;
-    for (let i = 0; i < n; i++) {
-      const xa = Xh(d.steps[i] - (SPAN[i] || 1)), xb = X(i);
-      const y = rY(Math.min(rate[i], 10));
-      if (rate[i] > 0) {
-        if (!pen) { c.moveTo(xa, base); pen = true; }
-        c.lineTo(xa, y); c.lineTo(xb, y);
-      } else if (pen) { c.lineTo(xa, base); pen = false; }
-    }
-    if (pen) c.lineTo(X(n - 1), base);
-    c.strokeStyle = mgRgba(pal.rainC, 1); c.lineWidth = 1.6;
-    c.lineJoin = 'miter';
-    c.stroke();
-    c.restore();
-
-    /* Over the top of the scale, the bar is notched rather than the axis being
-       rescaled: 20 mm/h in one place must not silently redraw 2 mm/h in
-       another as the same height. */
-    for (let i = 0; i < n; i++) {
-      if (rate[i] <= 10) continue;
-      const xa = Math.max(L.x0, Xh(d.steps[i] - (SPAN[i] || 1))), xb = Math.min(L.x1, X(i));
-      c.save();
-      c.strokeStyle = panelHex; c.lineWidth = 2;
-      c.beginPath();
-      for (let x = xa; x < xb; x += 4) {
-        c.moveTo(x, rR.y + 3.5); c.lineTo(Math.min(xb, x + 2), rR.y + 0.5);
-        c.lineTo(Math.min(xb, x + 4), rR.y + 3.5);
-      }
-      c.stroke();
-      c.restore();
-    }
-  }
-
-  /* --- 10. wind ----------------------------------------------------------- */
-  caption(rW);
-  const gustSorted = d.gust.slice().sort((a, b) => a - b);
-  const p90 = gustSorted[Math.floor(gustSorted.length * 0.9)];
-  const maxMean = Math.max(...d.wind);
-  /* The axis follows the body of the distribution, not its single worst point.
-     One 25 m/s gust used to set the ceiling for three days and pin the mean —
-     the thing you actually stand in — flat against the floor. */
-  let wKmh = Math.max(p90, maxMean * 1.6, 4.5) * 3.6;
-  const kStep = wKmh <= 44 ? 10 : wKmh <= 88 ? 20 : 30;
-  wKmh = Math.ceil(wKmh / kStep) * kStep;
-  const wHi = wKmh / 3.6;
-  const wY = (v) => rW.y + rW.h * (1 - clamp(v / wHi, 0, 1));
-  for (let k = 0; k <= wKmh + 1e-9; k += kStep) {
-    const y = wY(k / 3.6);
-    if (k === 0) {
-      c.strokeStyle = ink(0.16); c.lineWidth = 1;
-      c.beginPath(); c.moveTo(L.x0, Math.round(y) + 0.5); c.lineTo(L.x1, Math.round(y) + 0.5); c.stroke();
-    } else gridline(y);
-    tickLabel(y, String(k));
-  }
-  // m/s up the right margin, because that is the unit every other wind number
-  // on this site is in — but km/h is the one a person decides with, so km/h
-  // owns the labelled scale now and m/s is the gloss.
-  if (!L.narrow) {
-    c.font = mgF('500 11px');
-    c.fillStyle = ink(0.42);
-    for (let v = 0; v <= wHi + 1e-9; v += (wHi > 16 ? 5 : wHi > 8 ? 4 : 2)) {
-      const y = wY(v);
-      c.fillText(Math.round(v) + (v === 0 ? ' m/s' : ''), L.x1 + 7, Math.round(y) + 4);
-    }
-  }
-  {
-    // Mean-to-gust as a band. Two lines of the same colour separated only by a
-    // dash pattern was asking the reader to remember which was which.
-    c.save();
-    c.beginPath();
-    c.rect(L.x0, rW.y, L.x1 - L.x0, rW.h + 1);
-    c.clip();
-    c.beginPath();
-    for (let i = 0; i < n; i++) { const y = wY(d.gust[i]); if (i === 0) c.moveTo(X(i), y); else c.lineTo(X(i), y); }
-    for (let i = n - 1; i >= 0; i--) c.lineTo(X(i), wY(d.wind[i]));
-    c.closePath();
-    c.fillStyle = mgRgba(pal.windC, pal.dark ? 0.26 : 0.20);
-    c.fill();
-    trace(d.gust, wY, mgRgba(pal.windC, 0.62), 1.4);
-    trace(d.wind, wY, pal.wind, 2.6);
-    c.restore();
-    // The clipped-off peak, named rather than allowed to own the axis.
-    let gi = 0;
-    for (let i = 1; i < n; i++) if (d.gust[i] > d.gust[gi]) gi = i;
-    if (d.gust[gi] > wHi) {
-      const x = clamp(X(gi), L.x0 + 18, L.x1 - 18);
-      c.fillStyle = mgRgba(pal.windC, 1);
-      c.beginPath();
-      c.moveTo(x, rW.y - 1); c.lineTo(x - 4.5, rW.y + 5.5); c.lineTo(x + 4.5, rW.y + 5.5);
-      c.closePath(); c.fill();
-      c.font = mgF('700 11px');
-      c.textAlign = 'center';
-      const lab = Math.round(d.gust[gi] * 3.6) + '';
-      const lw = c.measureText(lab).width;
-      mgRoundRect(c, x - lw / 2 - 4, rW.y - 16, lw + 8, 14, 3);
-      c.fillStyle = mgRgba(pal.panel, 0.9); c.fill();
-      c.fillStyle = mgRgba(pal.windC, 1);
-      c.fillText(lab, x, rW.y - 5);
-      c.textAlign = 'left';
-    }
-    // One Beaufort reference inside the lane, so "windy" can be read as a
-    // position rather than decoded from a number.
-    for (const [ms, name] of [[8.0, 'F5'], [13.9, 'F7']]) {
-      const y = wY(ms);
-      // Clear of the direction arrows along the top of the lane, and clear of
-      // the floor: a reference line nobody can read is just another gridline.
-      if (y < rW.y + 24 || y > rW.y + rW.h - 12) continue;
-      c.save();
-      c.setLineDash([2, 4]);
-      c.strokeStyle = ink(0.22); c.lineWidth = 1;
-      c.beginPath(); c.moveTo(L.x0, Math.round(y) + 0.5); c.lineTo(L.x1, Math.round(y) + 0.5); c.stroke();
-      c.restore();
-      c.font = mgF('700 11px');
-      c.fillStyle = ink(0.45);
-      c.fillText(name, L.x0 + 4, y - 3);
-    }
-  }
-  // Direction arrows along the top of the lane; each points the way the wind is
-  // blowing TO. Spaced along the axis rather than along the array, so the
-  // three-hourly tail is not thinned out relative to the hourly head.
-  {
-    const minGap = L.narrow ? 26 : 34;
-    c.strokeStyle = ink(0.55); c.fillStyle = ink(0.55); c.lineWidth = 1.4;
-    c.lineCap = 'round';
-    let last = -Infinity;
-    for (let i = 0; i < n; i++) {
-      // Kept clear of both frame edges: half an arrow hanging outside the
-      // panel reads as a rendering fault rather than as a wind direction.
-      if (X(i) - last < minGap || X(i) > L.x1 - 8 || X(i) < L.x0 + 8) continue;
-      last = X(i);
-      const a = (d.dir[i] + 180) * Math.PI / 180;
-      const x = X(i), y = rW.y + 10;
-      const dx = Math.sin(a) * 5.5, dy = -Math.cos(a) * 5.5;
-      c.beginPath(); c.moveTo(x - dx, y - dy); c.lineTo(x + dx, y + dy); c.stroke();
-      c.beginPath();
-      c.moveTo(x + dx * 1.05, y + dy * 1.05);
-      c.lineTo(x + dx * 0.35 - dy * 0.42, y + dy * 0.35 + dx * 0.42);
-      c.lineTo(x + dx * 0.35 + dy * 0.42, y + dy * 0.35 - dx * 0.42);
-      c.closePath(); c.fill();
-    }
-  }
-
-  /* --- 11. midnight dividers, over the data ------------------------------- */
-  for (let k = 1; k < P.days.length; k++) {
-    const x = Math.round(Xh(P.days[k].from)) + 0.5;
-    if (x <= L.x0 + 1 || x >= L.x1 - 1) continue;
-    c.strokeStyle = ink(0.20); c.lineWidth = 1;
-    c.beginPath(); c.moveTo(x, topAll); c.lineTo(x, plotBot); c.stroke();
-  }
-  c.strokeStyle = ink(0.16); c.lineWidth = 1;
-  c.strokeRect(L.x0 + 0.5, plotTop + 0.5, L.x1 - L.x0 - 1, plotBot - plotTop - 1);
-
-  /* --- 12. the model joins ------------------------------------------------ */
-  /* The label says what actually changes at the rule: the model, and the step
-     to a coarser rain bucket when there is one. The bucket width is read off
-     the data rather than written in — it was hard-coded to "3-hourly" while
-     ICON-EU was the only tail, which the IFS section would have made a lie at
-     the very moment the buckets doubled again.
-
-     Labels are placed left-to-right and pushed clear of the previous one, so
-     two joins a few hours apart degrade to two touching pills rather than one
-     illegible overprint. */
-  {
-    let minX = L.x0 + 4;
-    joins.forEach((j, k) => {
-      const x = Math.round(xJoins[k]) + 0.5;
-      c.strokeStyle = ink(0.34); c.lineWidth = 2;
-      c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
-      const sp = SPAN[j.from] || 0;
-      const prevSp = SPAN[j.from - 1] || 0;
-      const lab = (j.short || 'model')
-        + (L.narrow || !sp || sp === prevSp ? '' : ` · ${sp}-hourly`);
-      c.font = mgF('600 11px');
-      const lw = c.measureText(lab).width;
-      const bx = Math.min(Math.max(x + 6, minX), L.x1 - lw - 14);
-      if (bx + lw + 12 > L.x1 - 2) return;   // no room left; the rule stands alone
-      mgRoundRect(c, bx, rT.y + 6, lw + 12, 18, 9);
-      c.fillStyle = panelHex; c.fill();
-      c.strokeStyle = ink(0.22); c.lineWidth = 1; c.stroke();
-      c.fillStyle = ink(0.66);
-      c.fillText(lab, bx + 6, rT.y + 19);
-      minX = bx + lw + 16;
-    });
-  }
-
-  /* --- 13. the hour ruler ------------------------------------------------- */
-  {
-    const marks = L.narrow || pxPerH * 6 < 30 ? [12] : [6, 12, 18];
-    c.font = mgF('500 11px');
-    c.textAlign = 'center';
-    for (const day of P.days) {
-      // The day's local midnight, which is where its cell begins; the first
-      // day's is before the run starts, so it is reconstructed backwards.
-      const mid0 = day.hours >= 23.4 || day.from > d.steps[0] ? day.from : day.to - 24;
-      for (const hh of marks) {
-        const h = mid0 + hh;
-        if (h < d.steps[0] + 0.5 || h > d.steps[n - 1] - 0.5) continue;
-        const x = Xh(h);
-        c.strokeStyle = ink(0.22); c.lineWidth = 1;
-        c.beginPath(); c.moveTo(Math.round(x) + 0.5, plotBot);
-        c.lineTo(Math.round(x) + 0.5, plotBot + 4); c.stroke();
-        c.fillStyle = ink(0.52);
-        c.fillText(String(hh).padStart(2, '0'), x, plotBot + 16);
-      }
-    }
-    c.textAlign = 'left';
-  }
-
-  /* --- 14. now ------------------------------------------------------------ */
-  if (nowInRange) {
-    const x = Math.round(Xh(nowH)) + 0.5;
-    c.strokeStyle = pal.accent; c.lineWidth = 2;
-    c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
-    c.font = mgF('700 11px');
-    const lw = c.measureText('NOW').width;
-    // On the ribbon lane: the only band on the chart with no numbers in it, so
-    // the one place a chip can sit without covering something that is read.
-    const cy = plotTop + L.ribH / 2;
-    mgRoundRect(c, x - lw / 2 - 6, cy - 8, lw + 12, 16, 8);
-    c.fillStyle = pal.accent; c.fill();
-    c.fillStyle = pal.dark ? '#0f1216' : '#ffffff';
-    c.textAlign = 'center';
-    c.fillText('NOW', x, cy + 4);
-    c.textAlign = 'left';
-  }
-
-  MG.scales = { tLo, tHi, tY, wHi, wY, rainY: (r) => (dry ? null : rR.y + rR.h - mgRainF(r) * rR.h),
-    X, Xh, n, times, rate, SPAN, hSpan, day: P.day, dry, plotTop, plotBot };
-
-  /* --- 15. crosshair ------------------------------------------------------ */
+  /* ----------------------------------------------------------- crosshair -- */
   if (MG.hover !== null && MG.hover >= 0 && MG.hover < n) {
-    const i = MG.hover;
-    const x = Math.round(X(i)) + 0.5;
-    c.save();
-    c.strokeStyle = pal.accent; c.lineWidth = 1;
-    c.setLineDash([3, 3]);
-    c.beginPath(); c.moveTo(x, plotTop); c.lineTo(x, plotBot); c.stroke();
-    c.setLineDash([]);
-    const dot = (y) => {
-      c.beginPath(); c.arc(X(i), y, 3.6, 0, TAU);
-      c.fillStyle = panelHex; c.fill();
-      c.lineWidth = 2; c.strokeStyle = pal.accent; c.stroke();
-    };
-    dot(tY(d.temp[i]));
-    dot(wY(Math.min(d.wind[i], wHi)));
-    if (!dry && rate[i] > 0) dot(rR.y + rR.h - mgRainF(Math.min(rate[i], 10)) * rR.h);
-    // The hour under the cursor, printed on the ruler.
-    const lab = P.fmtHM.format(times[i]);
-    c.font = mgF('700 11px');
-    const lw = c.measureText(lab).width;
-    const bx = clamp(X(i) - lw / 2 - 5, L.x0, L.x1 - lw - 10);
-    mgRoundRect(c, bx, plotBot + 3, lw + 10, 16, 3);
-    c.fillStyle = pal.accent; c.fill();
-    c.fillStyle = pal.dark ? '#0f1216' : '#ffffff';
-    c.fillText(lab, bx + 5, plotBot + 15);
-    c.restore();
+    const x = Math.round(Xi(MG.hover)) + 0.5;
+    c.strokeStyle = ink(0.40);
+    c.lineWidth = 1;
+    c.beginPath(); c.moveTo(x, L.symY); c.lineTo(x, bandBot); c.stroke();
   }
 }
 
-/* ------------------------------------------------------------- the header --
+/* ------------------------------------------------------------- the day band --
 
-   One cell per local calendar day. This is the layer the whole design is for:
-   weekday and date, a large symbol for the daylight half and a smaller one for
-   the night, the day's high and low as a paired number, and — only when they
-   are worth a line — the rain total and the peak gust.
+   One cell per local calendar day: weekday, date, and the day's high and low.
 
-   Partial days are the awkward case and are handled rather than hidden. The
-   first day usually starts a couple of hours after midnight, which is fine; a
-   trailing sliver of two or three hours is too narrow to summarise honestly,
-   so it is merged into the previous cell's content and keeps only its tint and
-   its midnight rule. */
-/* No join position is passed in. There used to be one and nothing here ever
-   read it, which only surfaced when the caller's variable was renamed for the
-   second join and this became a reference to something that no longer existed —
-   silently, since the argument was never touched. */
-function drawMgHeader(c, d, P, L, pal) {
+   The high and low are here rather than on the temperature panel because they
+   answer a different question. The panel answers "what is the shape of
+   Tuesday"; the band answers "is Tuesday worth looking at", which is the
+   question you ask first and the one you want answered without reading a
+   curve. */
+function mgDayBand(c, d, P, L, pal, X, chips) {
   const ink = pal.ink;
-  const hy = L.headY, hh = L.headH;
-  const n = d.steps.length;
-  const hSpan = (d.steps[n - 1] - d.steps[0]) || 1;
-  const Xh = (h) => L.x0 + ((h - d.steps[0]) / hSpan) * (L.x1 - L.x0);
-
-  // Merge slivers into a neighbour for the purposes of content only.
-  const cells = [];
-  P.days.forEach((day, k) => {
-    const xa = Math.max(L.x0, Xh(day.from)), xb = Math.min(L.x1, Xh(day.to));
+  const h0 = d.steps[0], h1 = d.steps[d.steps.length - 1];
+  const taken = chips || [];
+  let k = 0;
+  for (const day of P.days) {
+    const xa = X(Math.max(h0, day.from)), xb = X(Math.min(h1, day.to));
     const w = xb - xa;
-    if (w < 58 && cells.length) { cells[cells.length - 1].xb = xb; return; }
-    if (w < 58 && P.days[k + 1]) { cells.push({ day: P.days[k + 1], xa, xb, skipNext: true }); return; }
-    if (cells.length && cells[cells.length - 1].skipNext) {
-      cells[cells.length - 1].xb = xb; cells[cells.length - 1].skipNext = false; return;
+    if (w <= 1) { k++; continue; }
+    // The alternating wash, which is what carries the day division into the
+    // panels on a chart too wide for the midnight rules alone to group.
+    c.fillStyle = (k % 2) ? pal.tintB : pal.tintA;
+    c.fillRect(xa, L.dayY, w, L.dayH);
+    k++;
+
+    c.textAlign = 'center';
+    c.textBaseline = 'alphabetic';
+    const cx = xa + w / 2;
+    const label = day.name || `${day.wd} ${day.date}`;
+    // Below about 46 px there is no honest way to write a date, so the cell
+    // keeps the weekday and drops the rest rather than overprinting a
+    // neighbour. Below 22 px it says nothing at all and lets the wash and the
+    // midnight rule carry the division on their own.
+    let txt = label;
+    c.font = mgF(`600 ${L.narrow ? 10.5 : 11.5}px`);
+    if (c.measureText(txt).width > w - 6) { txt = day.wd; c.font = mgF('600 10px'); }
+    if (c.measureText(txt).width > w - 4) txt = '';
+    /* Dropped outright when a handover chip is sitting where it would go.
+
+       Shortening it first was tried and is worse: the chip is opaque and lands
+       wherever the model join lands, so a shortened name is just a shorter
+       thing for the chip to cover half of. The day either gets its name or it
+       does not — and a day between two named days needs no label to be
+       identified. */
+    if (txt) {
+      const tw = c.measureText(txt).width;
+      const a = cx - tw / 2 - 3, b = cx + tw / 2 + 3;
+      if (taken.some((ch) => ch.x + 2 < b && ch.x + 2 + ch.w > a)) txt = '';
     }
-    cells.push({ day, xa, xb });
-  });
+    if (txt) {
+      c.fillStyle = day.today ? pal.accent : ink(0.86);
+      c.fillText(txt, cx, L.dayY + (L.narrow ? 12 : 14));
+    }
+  }
+}
 
-  c.strokeStyle = ink(0.18); c.lineWidth = 1;
+/* --------------------------------------------------------------- symbols --
+
+   One glyph per few hours, at whatever stride keeps them from touching.
+
+   Stride is computed from the pixels actually available rather than fixed at
+   "every 3 hours": the same chart is 1100 px on a desktop and 360 px on a
+   phone, and the long range packs six-hourly steps at a third of the spacing
+   the hourly head gets. A fixed stride would overlap at one end of the chart
+   or leave the other end bare. */
+function mgSymbolRow(c, d, P, L, pal, X) {
+  const n = d.steps.length;
+  const size = Math.min(L.symH * 0.92, L.narrow ? 24 : 30);
+  const minGap = size * 1.08;
+  const cy = L.symY + L.symH / 2;
+  let lastX = -1e9;
+  for (let i = 0; i < n; i++) {
+    const x = X(d.steps[i]);
+    if (x - lastX < minGap) continue;
+    if (x < L.x0 - 2 || x > L.x1 + 2) continue;
+    const sky = mgSkyClass(d.cloud[i]);
+    const wet = mgWetClass(P.rate[i]);
+    mgSymbol(c, x, cy, size, sky, wet, P.day[i], d.temp[i] <= 1.0, pal);
+    lastX = x;
+  }
+}
+
+/* ----------------------------------------------------------- cloud strip --
+
+   Total cloud as a grey band, one strip above the panels.
+
+   A strip rather than meteoblue's shaded altitude cross-section, because this
+   payload carries a single total-cloud fraction per step and not a profile.
+   Drawn as what it is: a band whose darkness is the fraction of sky covered,
+   with no vertical extent implied. Faking a profile out of a scalar would be
+   the one dishonest thing on this chart. */
+function mgCloudStrip(c, d, P, L, pal, X, ink) {
+  const y = L.cloudY, h = L.cloudH;
+  /* One gradient across the strip rather than a rectangle per sample.
+
+     The ribbon is quarter-hourly, which over fifteen days is 1440 samples in
+     about 1200 px — sub-pixel rectangles, and the rounding between them beat
+     against the pixel grid into a vertical moiré that looked like data. A
+     gradient hands the resampling to the rasteriser, which has the subpixel
+     coverage to do it properly. Capped at 320 stops because past that they are
+     finer than the strip can show and only cost parse time. */
+  const R = P.ribbon;
+  const g = c.createLinearGradient(L.x0, 0, L.x1, 0);
+  const stride = Math.max(1, Math.ceil(R.length / 320));
+  const span = (R[R.length - 1].h - R[0].h) || 1;
+  const col = (f) => (pal.dark
+    ? `rgba(196,212,228,${(0.05 + f * 0.58).toFixed(3)})`
+    : `rgba(88,106,124,${(0.05 + f * 0.64).toFixed(3)})`);
+  for (let k = 0; k < R.length; k += stride) {
+    const t = clamp((R[k].h - R[0].h) / span, 0, 1);
+    // Floor the alpha a little above zero so a clear sky still reads as "this
+    // strip is the cloud strip" rather than as a gap in the chart.
+    g.addColorStop(t, col(clamp(R[k].cloud / 100, 0, 1)));
+  }
+  g.addColorStop(1, col(clamp(R[R.length - 1].cloud / 100, 0, 1)));
+  c.fillStyle = g;
+  c.fillRect(L.x0, y, L.x1 - L.x0, h);
+  c.strokeStyle = ink(0.14);
+  c.lineWidth = 1;
+  c.strokeRect(L.x0 + 0.5, y + 0.5, L.x1 - L.x0 - 1, h - 1);
+  c.font = mgF('500 9.5px');
+  c.textAlign = 'right';
+  c.textBaseline = 'middle';
+  c.fillStyle = ink(0.50);
+  if (!L.narrow) c.fillText('Cloud', L.x0 - 6, y + h / 2);
+}
+
+/* ------------------------------------------------------------ temperature --
+
+   A line with the area under it filled by value, not by a single colour.
+
+   The fill is a vertical gradient sampled off the same ramp the grid colours
+   its temperature cells with, so a given height on this panel and a given cell
+   in the table are the same colour for the same temperature. That is what
+   makes the two views one product rather than two charts of one dataset. */
+function mgTempPanel(c, d, P, L, pal, ink, X, Xi) {
+  const R = L.rows.temp;
+  const n = d.steps.length;
+  const [lo, hi] = mgBounds(d.temp.concat(d.dew), 1.2, 2);
+  const Y = (t) => R.y + R.h - (t - lo) / (hi - lo) * R.h;
+
+  // Gridlines at a step that gives four or five of them, whatever the span.
+  const rawStep = (hi - lo) / 4.5;
+  const step = [1, 2, 2.5, 5, 10, 20].find((s) => s >= rawStep) || 20;
+  c.save();
+  c.beginPath(); c.rect(L.x0, R.y, L.x1 - L.x0, R.h); c.clip();
+
+  for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) {
+    const y = Math.round(Y(t)) + 0.5;
+    // Freezing gets a solid rule and the rest get a faint one. On the Zürich
+    // chart it is the single most consulted line on the panel, and a reader
+    // should never have to count gridlines to find it.
+    const zero = Math.abs(t) < 1e-9;
+    c.strokeStyle = zero ? ink(0.34) : ink(0.10);
+    c.lineWidth = 1;
+    c.beginPath(); c.moveTo(L.x0, y); c.lineTo(L.x1, y); c.stroke();
+  }
+
+  // The filled area, clipped to under the curve.
+  c.save();
   c.beginPath();
-  c.moveTo(L.x0, Math.round(hy + hh) + 0.5); c.lineTo(L.x1, Math.round(hy + hh) + 0.5);
-  c.stroke();
+  c.moveTo(Xi(0), R.y + R.h);
+  for (let i = 0; i < n; i++) c.lineTo(Xi(i), Y(d.temp[i]));
+  c.lineTo(Xi(n - 1), R.y + R.h);
+  c.closePath();
+  c.clip();
+  const g = c.createLinearGradient(0, R.y + R.h, 0, R.y);
+  // A stop every two degrees is finer than the eye resolves and cheap enough
+  // that it is not worth being clever about where the ramp's own knees are.
+  const stops = Math.max(2, Math.min(40, Math.round((hi - lo) / 2)));
+  for (let s = 0; s <= stops; s++) {
+    const t = lo + (hi - lo) * s / stops;
+    /* Opaque at the curve, fading to almost nothing at the floor.
 
-  /* Sunrise and sunset go on every title line or on none of them. Deciding it
-     cell by cell means the widest days carry a clock and the others do not,
-     which reads as a rendering accident rather than a layout. */
-  const sunOf = (day) => `↑${day.rise}  ↓${day.set}`;
-  let showSun = !L.narrow;
-  if (showSun) {
-    for (const cell of cells) {
-      const day = cell.day, cw = cell.xb - cell.xa;
-      if (cw < 196 || !day.rise || !day.set) { showSun = false; break; }
-      c.font = mgF('700 14px');
-      let need = c.measureText(day.name || day.wd).width;
-      if (!day.name) { c.font = mgF('500 11.5px'); need += 7 + c.measureText(day.date).width; }
-      c.font = mgF('500 11px');
-      if (24 + need + 16 + c.measureText(sunOf(day)).width > cw) { showSun = false; break; }
+       A flat alpha was tried first and is wrong in both themes for the same
+       reason: the fill reaches from the curve all the way down, so a flat
+       value spends as much ink on the empty bottom of the panel as on the
+       degree either side of the line — and on the dark theme a pale mid-range
+       cream at 60% over near-black came out as uniform mud, every temperature
+       the same tan, which is the one thing a fill coloured *by value* must not
+       do.
+
+       Ramping the alpha with height puts the colour where the information is.
+       The floor is 0.30 rather than 0 because a cold run sits low in its own
+       panel — Zürich in January is a curve near the bottom — and a fade to
+       nothing would leave that chart with no fill at all. */
+    const a = 0.30 + 0.58 * (s / stops);
+    g.addColorStop(s / stops, mgRgba(
+      pal.dark ? mgMix(mgTempRGB(t), pal.panel, 0.12) : mgTempRGB(t), a));
+  }
+  c.fillStyle = g;
+  c.fillRect(L.x0, R.y, L.x1 - L.x0, R.h);
+  c.restore();
+
+  // Dew point: thin, dashed, quiet. It is context for the temperature line
+  // rather than a second reading — how close the air is to saturating — and
+  // is drawn so it can be ignored.
+  c.save();
+  c.setLineDash([3, 3]);
+  c.strokeStyle = ink(0.38);
+  c.lineWidth = 1;
+  c.beginPath();
+  for (let i = 0; i < n; i++) (i ? c.lineTo : c.moveTo).call(c, Xi(i), Y(d.dew[i]));
+  c.stroke();
+  c.restore();
+
+  // The temperature line itself.
+  c.strokeStyle = pal.temp;
+  c.lineWidth = L.narrow ? 1.8 : 2.1;
+  c.lineJoin = 'round';
+  c.beginPath();
+  for (let i = 0; i < n; i++) (i ? c.lineTo : c.moveTo).call(c, Xi(i), Y(d.temp[i]));
+  c.stroke();
+  c.restore();
+
+  /* Each day's high and low, printed on the curve.
+
+     Printed per day rather than at every local extreme: a six-hourly tail has
+     a turning point at nearly every step, and labelling them all would bury
+     the panel under its own annotation. Two numbers a day is what the eye is
+     looking for anyway — and it is the same pair the day band is showing, so
+     the two agree by construction. */
+  c.font = mgF(`600 ${L.narrow ? 9.5 : 10.5}px`);
+  c.textAlign = 'center';
+  for (const day of P.days) {
+    if (day.count < 3) continue;
+    for (const [idx, dy, va] of [[day.iHi, -7, 'alphabetic'], [day.iLo, 13, 'alphabetic']]) {
+      if (idx < 0 || idx >= n) continue;
+      const x = Xi(idx);
+      if (x < L.x0 + 9 || x > L.x1 - 9) continue;
+      const y = Y(d.temp[idx]) + dy;
+      if (y < R.y + 7 || y > R.y + R.h - 2) continue;
+      const txt = Math.round(d.temp[idx]) + '°';
+      // A halo rather than a box: the fill behind these is a full-strength
+      // ramp, and a box would punch a hole in the one thing the panel is for.
+      c.textBaseline = va;
+      c.lineWidth = 2.6;
+      c.strokeStyle = pal.dark ? 'rgba(14,18,22,.72)' : 'rgba(255,255,255,.80)';
+      c.strokeText(txt, x, y);
+      c.fillStyle = ink(0.92);
+      c.fillText(txt, x, y);
     }
   }
 
-  for (const cell of cells) {
-    const day = cell.day, cw = cell.xb - cell.xa;
-    if (cw < 34) continue;
+  // Axis numbers, outside the clip.
+  c.font = mgF(`500 ${L.narrow ? 9 : 10}px`);
+  c.textAlign = 'right';
+  c.textBaseline = 'middle';
+  for (let t = Math.ceil(lo / step) * step; t <= hi; t += step) {
+    c.fillStyle = ink(0.50);
+    c.fillText(String(Math.round(t)), L.x0 - 5, Y(t));
+  }
+  mgCaption(c, L, ink, R.y, 'Temperature  °C');
+}
+
+/* ----------------------------------------------------------- precipitation --
+
+   Bars on the compressed rate scale, one per step, each as wide as the window
+   it accumulated over.
+
+   Width matters here and nowhere else on the chart: a 6 mm six-hourly IFS
+   bucket and a 1 mm hourly ICON-2I bucket are the same rate, and drawing both
+   at one width would make the long range look like a wall of rain. The bar
+   therefore spans its own `span` hours, which is also why the join between
+   models needs no explaining — the bars simply get wider. */
+function mgPrecPanel(c, d, P, L, pal, ink, X, Xi, dry) {
+  const R = L.rows.prec;
+  const n = d.steps.length;
+  const SPAN = P.SPAN, rate = P.rate;
+
+  c.strokeStyle = ink(0.10);
+  c.lineWidth = 1;
+  const base = Math.round(R.y + R.h) + 0.5;
+  c.beginPath(); c.moveTo(L.x0, base); c.lineTo(L.x1, base); c.stroke();
+
+  if (dry) {
+    c.font = mgF(`500 ${L.narrow ? 9.5 : 10.5}px`);
+    c.textAlign = 'left';
+    c.textBaseline = 'middle';
+    c.fillStyle = ink(0.42);
+    c.fillText('No rain in this forecast', L.x0 + 6, R.y + R.h / 2);
+    mgCaption(c, L, ink, R.y, 'Rain');
+    return;
+  }
+
+  // Gridlines at the three rates the compressed scale is anchored on, so the
+  // axis can be labelled with rates that mean something rather than with
+  // fractions of whatever this week's maximum happened to be.
+  c.font = mgF(`500 ${L.narrow ? 9 : 10}px`);
+  c.textBaseline = 'middle';
+  for (const r of [0.5, 2, 10]) {
+    const y = Math.round(R.y + R.h - mgRainF(r) * R.h) + 0.5;
+    if (y < R.y) continue;
     c.save();
-    c.beginPath();
-    c.rect(cell.xa, hy, cw, hh);
-    c.clip();
+    c.setLineDash([2, 3]);
+    c.strokeStyle = ink(0.12);
+    c.beginPath(); c.moveTo(L.x0, y); c.lineTo(L.x1, y); c.stroke();
+    c.restore();
+    c.textAlign = 'right';
+    c.fillStyle = ink(0.44);
+    c.fillText(String(r), L.x0 - 5, y);
+  }
 
-    const title = day.name || day.wd;
+  for (let i = 0; i < n; i++) {
+    if (!(rate[i] > 0)) continue;
+    const sp = SPAN[i] || 1;
+    // The bucket covers the `sp` hours ending at this step, which is where the
+    // model accumulated it — not the hours after it.
+    const xa = X(Math.max(d.steps[0], d.steps[i] - sp));
+    const xb = X(d.steps[i]);
+    const w = Math.max(1.4, xb - xa - 0.8);
+    const hgt = Math.max(1.2, mgRainF(rate[i]) * R.h);
+    c.fillStyle = mgRgba(mgRainRGB(rate[i]), 0.92);
+    c.fillRect(xa + 0.4, R.y + R.h - hgt, w, hgt);
+  }
+  mgCaption(c, L, ink, R.y, 'Rain  mm/h');
+}
 
-    /* Which of the three cell layouts fits, decided by measuring rather than by
-       a width threshold. The threshold version held for a 00 UTC run, where
-       every cell is a whole day of equal width. A 12 UTC run puts a half-day
-       cell at each end, and those cells cleared the threshold while being far
-       too narrow for the layout it selected: the symbols are laid out from the
-       left and the numbers from the right, so the two ran straight through each
-       other and the last day printed its high on top of its own cloud. */
-    const hasNum = day.tMax !== null && day.count >= 3;
-    const hiTxt = hasNum ? Math.round(day.tMax) + '°' : '';
-    const loTxt = hasNum ? Math.round(day.tMin) + '°' : '';
-    const numW = (hiPx, loPx) => {
-      if (!hasNum) return 0;
-      c.font = mgF(`700 ${hiPx}px`);
-      const w = c.measureText(hiTxt).width;
-      c.font = mgF(`600 ${loPx}px`);
-      return w + 8 + c.measureText(loTxt).width;
-    };
-    // 12 px of padding each side, then symbols, a 12 px minimum gutter, numbers.
-    const fits = (big, small, hiPx, loPx) =>
-      cw - 24 >= big + 6 + small + 12 + numW(hiPx, loPx);
-    const mode = (cw >= 196 && fits(46, 30, 27, 18)) ? 2
-               : fits(38, 25, 22, 15) ? 1 : 0;
+/* -------------------------------------------------------------------- wind --
 
-    if (mode === 0) {
-      /* Narrow: one column, centred. Weekday, both symbols side by side, then
-         the paired numbers. Nothing else fits and nothing else is needed. */
-      const cx = cell.xa + cw / 2;
-      c.textAlign = 'center';
-      c.font = mgF('700 12px');
-      c.fillStyle = ink(0.92);
-      c.fillText(title, cx, hy + 15);
-      c.font = mgF('500 11px');
-      c.fillStyle = ink(0.50);
-      c.fillText(day.date, cx, hy + 28);
-      c.textAlign = 'left';
-      const s0 = day.symbols[0], s1 = day.symbols[1];
-      if (s0) mgSymbol(c, cx - (s1 ? 15 : 0), hy + 51, 30, s0.sky, s0.wet, true, s0.snow, pal);
-      if (s1) mgSymbol(c, cx + (s0 ? 17 : 0), hy + 53, 21, s1.sky, s1.wet, false, s1.snow, pal);
-      if (day.tMax !== null && day.count >= 3) {
-        c.textAlign = 'center';
-        const hiS = Math.round(day.tMax) + '°', loS = Math.round(day.tMin) + '°';
-        c.font = mgF('700 17px');
-        const hw = c.measureText(hiS).width;
-        c.font = mgF('600 13px');
-        const lw = c.measureText(loS).width;
-        const tot = hw + 6 + lw;
-        c.textAlign = 'left';
-        c.font = mgF('700 17px');
-        c.fillStyle = mgRgba(pal.tempC, 1);
-        c.fillText(hiS, cx - tot / 2, hy + 84);
-        c.font = mgF('600 13px');
-        c.fillStyle = mgRgba(pal.coldC, 1);
-        c.fillText(loS, cx - tot / 2 + hw + 6, hy + 84);
-      }
-      c.restore();
+   Windguru's wind panel: the gust envelope filled with the Beaufort ramp, the
+   mean wind as a line over it, and the force scale down the right-hand side.
+
+   The fill is the point. A wind chart with one colour makes you read a number
+   off an axis and then convert it; a chart whose fill *is* the Beaufort scale
+   lets you answer "is this a force 6 afternoon" by colour alone, and the axis
+   is there for when you want the number. Because the gradient is keyed on the
+   same function the grid colours its cells with, the colour at a given height
+   is the colour that speed gets everywhere else on the page. */
+function mgWindPanel(c, d, P, L, pal, ink, X, Xi) {
+  const R = L.rows.wind;
+  const n = d.steps.length;
+  const U = mgU();
+  // Arrows get their own lane at the top of the panel rather than riding the
+  // line: on a 360-hour chart the line can be near the top of the panel for a
+  // day at a time, and arrows on it would collide with their own trace.
+  const arrowH = L.narrow ? 13 : 16;
+  const py = R.y + arrowH, ph = R.h - arrowH;
+
+  const top = Math.max(...d.gust) * 1.08;
+  const Y = (ms) => py + ph - clamp(ms / (top || 1), 0, 1) * ph;
+
+  /* The gradient. Stops at every Beaufort boundary inside the panel plus the
+     two ends, which is exact — the ramp is piecewise linear in force and the
+     axis is linear in speed, so a stop per boundary reproduces it with no
+     sampling error and no banding. */
+  const g = c.createLinearGradient(0, py + ph, 0, py);
+  const stop = (ms) => clamp(ms / (top || 1), 0, 1);
+  g.addColorStop(0, mgRgba(mgBftRGB(0), 0.95));
+  for (const b of MG_BFT) {
+    if (b >= top) break;
+    g.addColorStop(stop(b), mgRgba(mgBftRGB(b), 0.95));
+  }
+  g.addColorStop(1, mgRgba(mgBftRGB(top), 0.95));
+
+  c.save();
+  c.beginPath(); c.rect(L.x0, py, L.x1 - L.x0, ph); c.clip();
+
+  // The gust envelope.
+  c.beginPath();
+  c.moveTo(Xi(0), py + ph);
+  for (let i = 0; i < n; i++) c.lineTo(Xi(i), Y(d.gust[i]));
+  c.lineTo(Xi(n - 1), py + ph);
+  c.closePath();
+  c.fillStyle = g;
+  c.fill();
+
+  // Mean wind, as a line on top of the envelope. Dark rather than coloured:
+  // every colour in this panel already means a force, and a coloured line
+  // would be read as one.
+  c.strokeStyle = pal.dark ? 'rgba(14,18,23,.82)' : 'rgba(18,26,33,.88)';
+  c.lineWidth = L.narrow ? 1.5 : 1.8;
+  c.lineJoin = 'round';
+  c.beginPath();
+  for (let i = 0; i < n; i++) (i ? c.lineTo : c.moveTo).call(c, Xi(i), Y(d.wind[i]));
+  c.stroke();
+  c.restore();
+
+  // Gridlines and the speed axis, in the reader's unit.
+  const topU = top * U.k;
+  const rawStep = topU / 3.4;
+  const nice = U.k === 1 ? [1, 2, 5, 10, 20] : [5, 10, 20, 25, 50, 100];
+  const stepU = nice.find((s) => s >= rawStep) || nice[nice.length - 1];
+  c.font = mgF(`500 ${L.narrow ? 9 : 10}px`);
+  c.textAlign = 'right';
+  c.textBaseline = 'middle';
+  for (let v = stepU; v < topU; v += stepU) {
+    const y = Math.round(Y(v / U.k)) + 0.5;
+    c.strokeStyle = ink(0.10);
+    c.lineWidth = 1;
+    c.beginPath(); c.moveTo(L.x0, y); c.lineTo(L.x1, y); c.stroke();
+    c.fillStyle = ink(0.50);
+    c.fillText(String(v), L.x0 - 5, y);
+  }
+
+  /* The Beaufort axis: the ramp itself as a bar, numbered.
+
+     A colour bar rather than a bare list of numbers, because the numbers are
+     only useful if you can see which band of the fill each one names. Drawn in
+     the right gutter, at the same vertical scale as the panel, so a horizontal
+     glance from any point on the chart lands on its force. */
+  const bw = L.narrow ? 7 : 9;
+  const bx = L.x1 + (L.narrow ? 5 : 7);
+  c.fillStyle = g;
+  c.fillRect(bx, py, bw, ph);
+  c.strokeStyle = ink(0.18);
+  c.lineWidth = 1;
+  c.strokeRect(bx + 0.5, py + 0.5, bw - 1, ph - 1);
+  c.font = mgF(`600 ${L.narrow ? 8.5 : 9.5}px`);
+  c.textAlign = 'left';
+  c.textBaseline = 'middle';
+  let lastY = 1e9;
+  // Numbered in the middle of each force's band, which is where the colour
+  // that force owns actually is. Labelling the boundaries instead would put
+  // every number on the join between two colours.
+  for (let b = 1; b < MG_BFT.length; b++) {
+    const mid = (MG_BFT[b - 1] + MG_BFT[b]) / 2;
+    if (mid > top) break;
+    const y = Y(mid);
+    // Skip a number that would sit on the one above it — on a calm week the
+    // whole scale is three forces tall and they would overprint.
+    if (lastY - y < 10) continue;
+    lastY = y;
+    c.fillStyle = ink(0.72);
+    c.fillText(String(b), bx + bw + 2.5, y);
+  }
+  // Named above the bar, so the column of bare numbers is not the only thing
+  // saying what scale this is. Horizontal: the rotated version it replaced
+  // was centred on the canvas edge and half of it fell off the right-hand
+  // side, which is a thing you only ever see in a screenshot.
+  if (!L.narrow) {
+    c.textAlign = 'left';
+    c.textBaseline = 'alphabetic';
+    c.font = mgF('500 9px');
+    c.fillStyle = ink(0.46);
+    c.fillText('Bft', bx - 1, py - 4);
+  }
+
+  /* Direction arrows, in their own lane.
+
+     Pointing the way the wind is going, which is the convention every chart
+     this page is read beside uses — `dir` is the direction it comes from, so
+     the glyph is turned through 180°. Thinned to whatever stride keeps them
+     apart, same rule as the symbols. */
+  const minGap = L.narrow ? 15 : 19;
+  let lastX = -1e9;
+  for (let i = 0; i < n; i++) {
+    const x = Xi(i);
+    if (x - lastX < minGap || x < L.x0 + 4 || x > L.x1 - 4) continue;
+    lastX = x;
+    mgArrow(c, x, R.y + arrowH / 2, L.narrow ? 4.6 : 5.6,
+            (d.dir[i] + 180) * Math.PI / 180, ink(0.72));
+  }
+
+  mgCaption(c, L, ink, R.y, `Wind  ${U.label}`);
+}
+
+/* A wind arrow: a shaft with a solid head, pointing along `ang` where 0 is up.
+   Solid rather than a stroked V, because at the 10 px these get on a phone a
+   stroked head closes up into a blob. */
+function mgArrow(c, x, y, r, ang, col) {
+  c.save();
+  c.translate(x, y);
+  c.rotate(ang);
+  c.strokeStyle = col;
+  c.fillStyle = col;
+  c.lineWidth = 1.25;
+  c.lineCap = 'round';
+  c.beginPath(); c.moveTo(0, r); c.lineTo(0, -r * 0.35); c.stroke();
+  c.beginPath();
+  c.moveTo(0, -r * 1.15);
+  c.lineTo(r * 0.62, -r * 0.05);
+  c.lineTo(0, -r * 0.42);
+  c.lineTo(-r * 0.62, -r * 0.05);
+  c.closePath();
+  c.fill();
+  c.restore();
+}
+
+/* A panel's name, sitting just above its top-left corner. */
+function mgCaption(c, L, ink, y, text) {
+  c.font = mgF(`500 ${L.narrow ? 9.5 : 10.5}px`);
+  c.textAlign = 'left';
+  c.textBaseline = 'alphabetic';
+  c.fillStyle = ink(0.52);
+  c.fillText(text, L.x0, y - 4);
+}
+
+/* ---------------------------------------------------------------- the hours --
+
+   One axis for all three panels. The tick interval is chosen from the pixels
+   per hour actually available, so the hourly head of the chart gets three-hour
+   ticks and the six-hourly tail gets daily ones — rather than a single
+   interval that is either unreadably dense at one end or useless at the other.*/
+function mgHourAxis(c, d, P, L, pal, ink, X) {
+  const n = d.steps.length;
+  const h0 = d.steps[0], h1 = d.steps[n - 1];
+  const pxPerH = (L.x1 - L.x0) / ((h1 - h0) || 1);
+  const want = (L.narrow ? 42 : 54) / pxPerH;
+  const everyH = [1, 2, 3, 6, 12, 24, 48].find((s) => s >= want) || 48;
+
+  const fmt = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', hour12: false, timeZone: d.tz });
+
+  c.font = mgF(`500 ${L.narrow ? 9 : 9.5}px`);
+  c.textAlign = 'center';
+  c.textBaseline = 'alphabetic';
+  const y = L.plotBot + (L.narrow ? 12 : 14);
+
+  /* Anchored on a local midnight and walked out from it, not on the init.
+
+     Malta is UTC+1, so hour 0 of a 00 UTC run is 01:00 local; ticking every
+     six hours from there labels 01, 07, 13, 19 — an axis whose numbers are all
+     one off the ones people look for, on every run, forever. The anchor is the
+     *second* day boundary, because the first entry in `days` is where the
+     forecast starts rather than a midnight, and then stepped back to before
+     the chart begins so the ticks before the anchor are on the same grid. */
+  let anchor = P.days.length > 1 ? P.days[1].from : h0;
+  while (anchor - everyH >= h0 - 1e-9) anchor -= everyH;
+  for (let h = anchor; h <= h1 + 1e-9; h += everyH) {
+    if (h < h0 - 1e-9) continue;
+    const x = X(h);
+    if (x < L.x0 - 1 || x > L.x1 + 1) continue;
+    /* Midnight is the day's own boundary and is already named by the band
+       above, so it gets a tick and no number.
+
+       At a daily or coarser interval that rule removes every label there is —
+       which is correct, not a bug to work around. Fifteen days of "00 00 00"
+       told a reader nothing the day band was not already saying better, so
+       the axis becomes pure ticks and the band carries the dates alone. */
+    const lab = fmt.format(P.at(h));
+    if (everyH >= 24 || lab === '00') {
+      c.strokeStyle = ink(0.14);
+      c.lineWidth = 1;
+      const mx = Math.round(x) + 0.5;
+      c.beginPath(); c.moveTo(mx, L.plotBot); c.lineTo(mx, L.plotBot + 3); c.stroke();
       continue;
     }
-
-    const px = cell.xa + 12;
-    const pr = cell.xb - 12;
-
-    /* Title line: the day, and on a wide cell the sunrise and sunset that were
-       already being computed for the shading and then thrown away. */
-    c.font = mgF('700 14px');
-    c.fillStyle = ink(0.93);
-    c.fillText(title, px, hy + 19);
-    const tw = c.measureText(title).width;
-    // "Today" and "Tomorrow" do not also need their date spelled out; the day
-    // after that does, and gets the room the other two gave back.
-    if (!day.name) {
-      c.font = mgF('500 11.5px');
-      c.fillStyle = ink(0.52);
-      c.fillText(day.date, px + tw + 7, hy + 19);
-    }
-    if (showSun) {
-      c.textAlign = 'right';
-      c.font = mgF('500 11px');
-      c.fillStyle = ink(0.46);
-      c.fillText(sunOf(day), pr, hy + 19);
-      c.textAlign = 'left';
-    }
-
-    /* Symbols. Big one is the daylight half; the small one is the night, which
-       is genuinely the less informative cell and is drawn as such. */
-    const bigS = mode === 2 ? 46 : 38;
-    const smallS = mode === 2 ? 30 : 25;
-    const symY = hy + (mode === 2 ? 62 : 58);
-    const s0 = day.symbols[0], s1 = day.symbols[1];
-    let sx = px + bigS / 2;
-    if (s0) { mgSymbol(c, sx, symY, bigS, s0.sky, s0.wet, true, s0.snow, pal); sx += bigS / 2 + 6; }
-    if (s1) {
-      mgSymbol(c, sx + smallS / 2, symY + 3, smallS, s1.sky, s1.wet, false, s1.snow, pal);
-      sx += smallS + 6;
-    }
-
-    /* The numbers, right-aligned so the eye can run down a column of highs. */
-    if (day.tMax !== null && day.count >= 3) {
-      const hiS = Math.round(day.tMax) + '°', loS = Math.round(day.tMin) + '°';
-      const hiPx = mode === 2 ? 27 : 22, loPx = mode === 2 ? 18 : 15;
-      c.font = mgF(`600 ${loPx}px`);
-      const lw = c.measureText(loS).width;
-      c.font = mgF(`700 ${hiPx}px`);
-      const hw = c.measureText(hiS).width;
-      const yN = hy + (mode === 2 ? 70 : 65);
-      c.fillStyle = mgRgba(pal.tempC, 1);
-      c.fillText(hiS, pr - lw - 8 - hw, yN);
-      c.font = mgF(`600 ${loPx}px`);
-      c.fillStyle = mgRgba(pal.coldC, 1);
-      c.fillText(loS, pr - lw, yN);
-    } else if (day.count) {
-      c.textAlign = 'right';
-      c.font = mgF('500 11px');
-      c.fillStyle = ink(0.40);
-      c.fillText('part day', pr, hy + (mode === 2 ? 62 : 58));
-      c.textAlign = 'left';
-    }
-
-    /* The bottom line of the cell. Wind is always there, so every cell has the
-       same shape; rain only when there is any, because a "0.0 mm" printed on
-       five consecutive days is five lines of chart saying nothing. Provenance
-       and short days are notes, in ink rather than in a hue. */
-    const yC = hy + hh - 12;
-    const chips = [];
-    if (day.mm >= 0.05) {
-      chips.push([mgRgba(pal.rainC, 1), `${day.mm < 10 ? day.mm.toFixed(1) : Math.round(day.mm)} mm`]);
-    }
-    if (day.wPeak) {
-      chips.push([mgRgba(pal.windC, 1),
-        day.gust * 3.6 >= 45
-          ? `${day.dir} ${Math.round(day.wPeak * 3.6)}, gust ${Math.round(day.gust * 3.6)} km/h`
-          : `${day.dir} ${Math.round(day.wPeak * 3.6)} km/h`]);
-    }
-    if (day.partial) chips.push([ink(0.44), 'part day']);
-    if (day.span > 1) chips.push([ink(0.44), `${day.span}-hourly`]);
-
-    c.font = mgF('600 11px');
-    let x = px;
-    chips.forEach(([col, text], ci) => {
-      const w = c.measureText(text).width;
-      if (x + w > pr) return;
-      if (ci && x > px) {
-        c.fillStyle = ink(0.24);
-        c.beginPath(); c.arc(x - 7, yC - 4, 1.3, 0, TAU); c.fill();
-      }
-      c.fillStyle = col;
-      c.fillText(text, x, yC);
-      x += w + 13;
-    });
-    c.restore();
+    c.fillStyle = ink(0.46);
+    c.fillText(lab, x, y);
+    c.strokeStyle = ink(0.14);
+    c.lineWidth = 1;
+    const tx = Math.round(x) + 0.5;
+    c.beginPath(); c.moveTo(tx, L.plotBot); c.lineTo(tx, L.plotBot + 3); c.stroke();
   }
+}
+
+/* ============================================================== the grid ==
+
+   Windguru's table, built from the same payload and the same scales.
+
+   Rows are parameters and columns are hours, which inverts the chart: the
+   chart is read along a row to see a shape, the grid is read down a column to
+   see an hour. Both are needed and neither substitutes for the other — "when
+   does the wind drop" is a chart question, "what exactly is it doing at 15:00
+   Thursday" is a grid one.
+
+   Rendered as HTML rather than onto the canvas. The cells are numbers a reader
+   will want to select and copy, the label column wants to freeze under a
+   horizontal scroll, and 133 columns want to scroll with momentum on a phone —
+   all three come free from the browser and would each be a project on a
+   canvas. */
+
+/* Every row of the grid, in the order a reader works down them: wind first,
+   because it is the row most people open this view for; then the thermal
+   picture; then sky and rain; pressure last, as context.
+
+   Each row is a value, a formatted string and a background. Keeping the three
+   separate is what lets the same definition drive the cell, its colour and its
+   contrast ink without any of them re-deriving the others. */
+function mgRows(d, P) {
+  const U = mgU();
+  return [
+    {
+      lab: 'Wind', unit: U.label,
+      val: (i) => d.wind[i],
+      txt: (i) => mgWindTxt(d.wind[i]),
+      bg: (i) => mgBftRGB(d.wind[i]),
+    },
+    {
+      lab: 'Gusts', unit: U.label,
+      val: (i) => d.gust[i],
+      txt: (i) => mgWindTxt(d.gust[i]),
+      bg: (i) => mgBftRGB(d.gust[i]),
+    },
+    {
+      lab: 'Direction', unit: '',
+      arrow: true,
+      val: (i) => d.dir[i],
+      txt: (i) => MG_POINTS[Math.round(d.dir[i] / 22.5) % 16],
+    },
+    {
+      lab: 'Temperature', unit: '°C',
+      val: (i) => d.temp[i],
+      txt: (i) => Math.round(d.temp[i]) + '',
+      bg: (i) => mgTempRGB(d.temp[i]),
+    },
+    {
+      /* Shown always rather than only when it differs from the air
+         temperature, because a row that appears and disappears between places
+         would move every row under it. Same ramp as the temperature above it,
+         so the two can be compared by colour down a column. */
+      lab: 'Feels like', unit: '°C',
+      val: (i) => mgFeels(d.temp[i], d.dew[i], d.wind[i]),
+      txt: (i) => Math.round(mgFeels(d.temp[i], d.dew[i], d.wind[i])) + '',
+      bg: (i) => mgTempRGB(mgFeels(d.temp[i], d.dew[i], d.wind[i])),
+    },
+    {
+      lab: 'Humidity', unit: '%',
+      val: (i) => mgRH(d.temp[i], d.dew[i]),
+      txt: (i) => Math.round(mgRH(d.temp[i], d.dew[i])) + '',
+    },
+    {
+      lab: 'Cloud cover', unit: '%',
+      val: (i) => d.cloud[i],
+      txt: (i) => Math.round(d.cloud[i]) + '',
+      // Grey, on the same reading as the chart's cloud strip: darkness is the
+      // fraction of sky covered.
+      bg: (i) => mgMix([244, 248, 251], [72, 88, 104], clamp(d.cloud[i] / 100, 0, 1)),
+    },
+    {
+      /* mm over the step's own window, not a rate. The window is three hours
+         in the ICON-EU section and six in IFS, which is why the header says
+         so — a 2 mm cell is a different event at one hour than at six. */
+      lab: 'Rain', unit: 'mm',
+      val: (i) => d.precip[i],
+      txt: (i) => (d.precip[i] > 0.05 ? d.precip[i].toFixed(1) : ''),
+      bg: (i) => (d.precip[i] > 0.05 ? mgRainRGB(P.rate[i]) : null),
+    },
+    {
+      lab: 'Pressure', unit: 'hPa',
+      val: (i) => d.pres[i],
+      // Dropped to the last three digits, which is how a pressure is read off
+      // a chart anyway: the leading 9 or 10 never changes inside one forecast.
+      txt: (i) => Math.round(d.pres[i]) + '',
+    },
+  ];
+}
+
+function renderMgTable() {
+  const d = MG.data;
+  const host = $('mg-table-scroll');
+  if (!d || !host) return;
+  const P = mgPrepare(d);
+  const n = d.steps.length;
+  const rows = mgRows(d, P);
+  const joins = mgJoins(d);
+  const joinAt = new Set(joins.map((j) => j.from));
+
+  const fmtHr = new Intl.DateTimeFormat('en-GB', {
+    hour: '2-digit', hour12: false, timeZone: d.tz });
+
+  // Where "now" falls: the first step at or after it. One edge, not a band —
+  // at six-hourly spacing a band would be six hours wide and claim a precision
+  // the chart does not have.
+  const nowMs = Date.now();
+  let nowAt = -1;
+  for (let i = 0; i < n; i++) {
+    if (P.at(d.steps[i]).getTime() >= nowMs) { nowAt = i; break; }
+  }
+
+  // Column groups, one per local day, in step order.
+  const groups = [];
+  for (let i = 0; i < n; i++) {
+    const k = P.dayOf[i];
+    if (groups.length && groups[groups.length - 1].key === k) groups[groups.length - 1].n++;
+    else groups.push({ key: k, n: 1, at: i });
+  }
+  const dayByKey = new Map(P.days.map((x) => [x.key, x]));
+
+  const esc = (s) => String(s).replace(/[&<>"]/g, (ch) =>
+    ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+  // Per-column classes, worked out once and reused by every row rather than
+  // recomputed nine times.
+  const cls = [];
+  for (let i = 0; i < n; i++) {
+    const a = [];
+    const gi = groups.findIndex((g) => i >= g.at && i < g.at + g.n);
+    if (gi % 2) a.push('alt');
+    if (groups[gi] && groups[gi].at === i && i > 0) a.push('dayedge');
+    if (joinAt.has(i)) a.push('joinedge');
+    if (i === nowAt) a.push('nowedge');
+    cls.push(a);
+  }
+
+  let html = '<table class="mg-table"><thead><tr><th class="mg-lab"></th>';
+  for (const g of groups) {
+    const day = dayByKey.get(g.key);
+    const lab = day ? (day.name || `${day.wd} ${day.date}`) : g.key;
+    html += `<th class="mg-day${day && day.today ? ' today' : ''}" colspan="${g.n}">`
+      + `<span>${esc(lab)}</span></th>`;
+  }
+  html += '</tr><tr><th class="mg-lab"></th>';
+  for (let i = 0; i < n; i++) {
+    html += `<th class="mg-hr ${cls[i].join(' ')}">${esc(fmtHr.format(P.at(d.steps[i])))}</th>`;
+  }
+  html += '</tr></thead><tbody>';
+
+  for (const r of rows) {
+    html += `<tr><th class="mg-lab">${esc(r.lab)}`
+      + (r.unit ? ` <span class="u">${esc(r.unit)}</span>` : '') + '</th>';
+    for (let i = 0; i < n; i++) {
+      const bg = r.bg ? r.bg(i) : null;
+      const style = bg ? ` style="background:${mgRgba(bg, 1)};color:${mgInkOn(bg)}"` : '';
+      let body;
+      if (r.arrow) {
+        /* The glyph is turned, not swapped for one of sixteen arrow
+           characters: a rotation is exact at every degree the model reports,
+           and the sixteen-way set would quantise the direction twice — once
+           into a compass point and again into whichever glyph the font has.
+           The compass point still goes in the title, where it is a label
+           rather than a measurement. */
+        const rot = (d.dir[i] + 180) % 360;
+        body = `<span class="dir" style="display:inline-block;transform:rotate(${rot.toFixed(0)}deg)">&#8593;</span>`;
+      } else {
+        const t = r.txt(i);
+        body = t === '' ? '<span class="nil">·</span>' : esc(t);
+      }
+      html += `<td class="${cls[i].join(' ')}"${style} data-i="${i}">${body}</td>`;
+    }
+    html += '</tr>';
+  }
+  html += '</tbody></table>';
+  host.innerHTML = html;
+
+  /* The Beaufort key: the grid's legend for its two wind rows, and the same
+     scale the chart puts down its right-hand gutter. Rendered into its own
+     element outside the scroller so it stays put while the grid moves. */
+  let key = '<span class="cap">Beaufort</span>';
+  for (let b = 0; b <= 11; b++) {
+    const ms = b === 0 ? 0 : (MG_BFT[b - 1] + MG_BFT[b]) / 2;
+    key += `<span class="sw" style="background:${mgRgba(mgBftRGB(ms), 1)}"></span>`
+      + `<span class="lab">${b}</span>`;
+  }
+  $('mg-key').innerHTML = key;
+
+  /* Hover is shared with the chart, so the hour you were looking at survives a
+     view switch. Delegated to the table rather than bound per cell: 1200 cells
+     is 1200 listeners otherwise, and they would all have to be torn down on
+     every re-render. */
+  const tbl = host.querySelector('.mg-table');
+  tbl.addEventListener('pointermove', (e) => {
+    const td = e.target.closest('td[data-i]');
+    if (!td) return;
+    const i = +td.dataset.i;
+    if (i === MG.hover) return;
+    MG.hover = i;
+    mgHotColumn(tbl, i);
+  });
+  tbl.addEventListener('pointerleave', () => {
+    MG.hover = null;
+    mgHotColumn(tbl, -1);
+  });
+  mgHotColumn(tbl, MG.hover === null ? -1 : MG.hover);
+
+  /* Opened scrolled to now rather than to the start of the run.
+
+     A run is up to six hours old by the time it is read, and on the extended
+     range the first visible columns can be most of a day in the past. Scrolled
+     so that now sits a little in from the left edge, which leaves the hours
+     just gone visible — they are the ones you check the forecast against.
+
+     Once only, keyed on what is being shown. A re-render happens on every
+     resize and on every unit change, and re-homing the scroll each time would
+     throw away the reader's position mid-read — which is infuriating in
+     exactly the case the grid is for, scrolling out to Thursday. */
+  const token = `${state.mgPlace}/${state.mgRange}`;
+  if (nowAt > 0 && MG.tableHomed !== token) {
+    MG.tableHomed = token;
+    const cell = tbl.querySelector(`td[data-i="${nowAt}"]`);
+    if (cell) host.scrollLeft = Math.max(0, cell.offsetLeft - 160);
+  }
+}
+
+/* Light one column. Cheap enough to do on every pointermove: it touches the
+   cells of one column and the one it left, not the table. */
+function mgHotColumn(tbl, i) {
+  for (const el of tbl.querySelectorAll('td.hot')) el.classList.remove('hot');
+  if (i < 0) return;
+  for (const el of tbl.querySelectorAll(`td[data-i="${i}"]`)) el.classList.add('hot');
 }
 
 /* ------------------------------------------------------------------ hover -- */
@@ -7277,8 +7882,8 @@ function mgTip(i) {
     row('Temperature', `${temp.toFixed(1)} °C`) +
     (Math.abs(feels - temp) >= 1 ? row('Feels like', `${feels.toFixed(0)} °C`) : '') +
     row('Humidity', `${rh}%  ·  dew ${dew.toFixed(1)} °C`) +
-    row('Wind', `${Math.round(wind * 3.6)} km/h ${MG_POINTS[Math.round(d.dir[i] / 22.5) % 16]}`) +
-    row('', `<span class="mg-tip-sub">${MG_BFT_WORD[bft]} · force ${bft} · gust ${Math.round(d.gust[i] * 3.6)} km/h</span>`) +
+    row('Wind', `${mgWindTxt(wind)} ${mgU().label} ${MG_POINTS[Math.round(d.dir[i] / 22.5) % 16]}`) +
+    row('', `<span class="mg-tip-sub">${MG_BFT_WORD[bft]} · force ${bft} · gust ${mgWindTxt(d.gust[i])} ${mgU().label}</span>`) +
     row('Cloud', `${Math.round(d.cloud[i])}%`) +
     row('Rain', d.precip[i] > 0
       ? `${rate.toFixed(1)} mm/h${sp > 1 ? ` (${d.precip[i].toFixed(1)} mm / ${sp} h)` : ''}`
@@ -8480,6 +9085,8 @@ function showView(name) {
     const d = MG.data;
     buildMgPlaceButtons();
     buildMgRangeButtons();
+    buildMgViewButtons();
+    buildMgUnitButtons();
     $('mg-place').textContent = d ? d.place : 'Point forecast';
     if (d) {
       const init = new Date(d.init);
@@ -8617,7 +9224,13 @@ function syncHash() {
        copied out of the address bar. The place was hard-coded to malta here,
        which meant a link sent from the Zürich chart opened Valletta. */
     const place = MG_PLACES[state.mgPlace || 'valletta'];
+    /* The view goes in the link too, and before the range, because it is the
+       bigger difference between two things someone might send you: "look at
+       Thursday afternoon" wants the grid, "look at the week" wants the chart.
+       Only when it is not the default, so the ordinary link stays the short
+       one it has always been. */
     hash = `#meteogram/${place ? place.domain : 'malta'}`
+      + (state.mgView === 'table' ? '/table' : '')
       + (state.mgRange === 'long' && mgHasExtended(MG.full) ? '/extended' : '');
   } else {
     const hours = Math.round(validAt(state.tf).hours);
@@ -8704,12 +9317,19 @@ function applyHash() {
      Its third segment is a range, where every other product's is a model slug,
      and folding both into one alternation would let #t2m/malta/extended parse
      as something meaningful. */
-  const mg = /^#meteogram(?:\/([\w-]+))?(?:\/(extended))?$/.exec(BOOT_HASH);
+  const mg = /^#meteogram(?:\/([\w-]+))?(?:\/(table|graphs))?(?:\/(extended))?$/
+    .exec(BOOT_HASH);
   if (mg) {
-    const [, domainSlug, ext] = mg;
+    const [, domainSlug, view, ext] = mg;
     const place = Object.entries(MG_PLACES)
       .find(([, p]) => p.domain === domainSlug);
     if (place) state.mgPlace = place[0];
+    /* A link that names a view wins over the remembered preference, and a link
+       that does not leaves it alone. Someone sending you a grid means you to
+       see a grid; someone sending you a bare #meteogram/malta means nothing
+       about the view at all, and overriding your choice from it would be
+       reading an intent that is not in the link. */
+    if (view) state.mgView = view;
     // Honoured only if this payload has a long section; a stale link must not
     // leave the range buttons pressed on a view that does not exist.
     state.mgRange = ext ? 'long' : 'short';
