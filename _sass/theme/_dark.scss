@@ -41,39 +41,17 @@ $navicon-height             : 4px;
 $sidebar-link-max-width     : 250px;
 $sidebar-screen-min-width   : 1024px;
 
-/* Dark theme for the site */
-html[data-theme="dark"] {
-    /* Not the page colour: .btn and the mobile nav paint their background from
-       this, so it has to stay visible against the surfaces around it. */
-    --global-base-color                 : #{$border-strong};
-    --global-bg-color                   : #{$background};
-    --global-masthead-bg-color          : #{$background-deep};
-    --global-footer-bg-color            : #{$background-deep};
-    --global-border-color               : #{$border};
-    --global-dark-border-color          : #{$border-strong};
-    /* Raised panels. This was #fafafa, which lit up every code block and table
-       cell in dark mode. */
-    --global-code-background-color      : #{$surface};
-    --global-code-text-color            : #{$text};
-    --global-fig-caption-color          : #{$text-muted};
-    /* links carry no underline, so the colour must stand on its own (AA on the dark bg) */
-    --global-link-color                 : #{mix(#fff, $link, 35%)};
-    --global-link-color-hover           : #{mix(#fff, $link, 60%)};
-    --global-link-color-visited         : #{$link-light};
-    --global-masthead-link-color        : #{$text};
-    --global-masthead-link-color-hover  : #{mix(#fff, $link, 35%)};
-    --global-text-color                 : #{$text};
-    --global-text-color-light           : #{$text-muted};
-    --global-thead-color                : #{$border};
-}
+/* The dark theme's rules are gone — the site is light only, and nothing sets
+   data-theme any more, so they matched nothing.
 
-/* The GitHub mark carries its brand colour (#171516), which is all but
-   invisible against the page. GitHub's own guidance is to invert the mark on
-   dark backgrounds, so paint it white in the sidebar and the footer. */
-html[data-theme="dark"] .social-icons {
-    .fa-github,
-    .fa-github-alt,
-    .fa-github-square {
-        color: #fff;
-    }
-}
+   The file stays because it was never only a theme. Everything above this
+   line is the SCSS variable palette the rest of the stylesheet is written
+   against: $border, $background, $text, $link and six more are declared here
+   and nowhere else, and fifteen partials read them. Deleting the file to
+   remove the theme would take the palette with it and the build would stop on
+   an undefined variable.
+
+   Renaming it is the obvious follow-up and is deliberately not done here:
+   "theme/dark" is one line in main.scss and a git mv, but the name appears in
+   a stylesheet the site is mid-edit on, and a rename is a worse thing to
+   collide with than a stale filename. */

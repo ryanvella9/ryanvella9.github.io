@@ -2,43 +2,15 @@
    Various functions that we want to use within the template
    ========================================================================== */
 
-// Determine the expected state of the theme toggle, which can be "dark" or "light".
-// Dark is the site default (site_theme in _config.yml), so anything unrecognised —
-// including no stored preference at all — means dark. The OS preference is
-// deliberately not consulted: the site has a look, and it is the dark one.
-let determineThemeSetting = () => {
-  let themeSetting = localStorage.getItem("theme");
-  return themeSetting === "light" ? "light" : "dark";
-};
+/* The theme helpers that used to open this file are gone. The site is light
+   only: nothing reads a stored preference, nothing consults the OS, and
+   nothing writes data-theme. See _sass/theme/_dark.scss for what remains of
+   the dark theme and why the file is still there.
 
-// Determine the computed theme, which can be "dark" or "light". With the OS
-// preference out of the picture this is just the stored setting.
-let determineComputedTheme = () => determineThemeSetting();
-
-// Set the theme on page load or when explicitly called
-let setTheme = (theme) => {
-  const use_theme =
-    theme ||
-    localStorage.getItem("theme") ||
-    $("html").attr("data-theme") ||
-    "dark";
-
-  if (use_theme === "dark") {
-    $("html").attr("data-theme", "dark");
-    $("#theme-icon").removeClass("fa-sun").addClass("fa-moon");
-  } else if (use_theme === "light") {
-    $("html").removeAttr("data-theme");
-    $("#theme-icon").removeClass("fa-moon").addClass("fa-sun");
-  }
-};
-
-// Toggle the theme manually
-var toggleTheme = () => {
-  const current_theme = $("html").attr("data-theme");
-  const new_theme = current_theme === "dark" ? "light" : "dark";
-  localStorage.setItem("theme", new_theme);
-  setTheme(new_theme);
-};
+   Note that assets/js/main.min.js is a committed build artefact and is what
+   the page actually loads — this file is its source, and the two are edited
+   together by hand because there is no node on the machine that publishes
+   this site. */
 
 /* ==========================================================================
    Plotly integration script so that Markdown codeblocks will be rendered
@@ -82,14 +54,6 @@ $(document).ready(function () {
   // SCSS SETTINGS - These should be the same as the settings in the relevant files 
   const scssLarge = 925;          // pixels, from /_sass/_themes.scss
   const scssMastheadHeight = 70;  // pixels, from the current theme (e.g., /_sass/theme/_default.scss)
-
-  // Re-apply the decision the head script already made before first paint.
-  // No OS-preference listener: flipping the machine to light mid-session used to
-  // drag an unset visitor out of the site default.
-  setTheme();
-
-  // Enable the theme toggle
-  $('#theme-toggle').on('click', toggleTheme);
 
   // Enable the sticky footer
   var bumpIt = function () {

@@ -7,7 +7,9 @@
 
 # Site Settings
 locale                   : "en-US"
-site_theme               : "dark" # renders data-theme="dark" on <html>; the toggle still overrides and is remembered
+# site_theme is gone with the dark theme. It only ever fed one conditional in
+# _layouts/default.html, which put data-theme="dark" on <html>; that conditional
+# and the stylesheet it selected are both removed, so the key read by nothing.
 title                    : "Ryan Vella"
 title_separator          : "-"
 name                     : &name "Ryan Vella"
