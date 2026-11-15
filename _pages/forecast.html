@@ -1057,7 +1057,9 @@ title: "Weather"
         <b>Data.</b> DWD ICON-EU 0.0625°, native over Malta and subsampled to
         0.25° over the Central Mediterranean; ItaliaMeteo-Arpae ICON-2I
         0.025 × 0.02° (CC BY 4.0), hourly to +72 h, Malta only — its domain
-        stops at 33.7 °N; ECMWF IFS 0.25° open data (CC BY 4.0) on
+        stops at 33.7 °N; the meteogram's cloud cross-section alone from
+        Open-Meteo (CC BY 4.0), redistributing DWD ICON, for the reason set
+        out under <i>Cloud cross-section</i> below; ECMWF IFS 0.25° open data (CC BY 4.0) on
         every frame — the four Europe charts, 6-hourly to +144 h and
         12-hourly to +360 h beyond it, and the
         surface fields over the other two, held to ICON-EU's +120 h so that
@@ -1113,15 +1115,31 @@ title: "Weather"
         travels in the link (<code>#meteogram/malta/table</code>) but the unit
         does not: the view is something you are showing someone, the unit is
         something you prefer.<br />
-        <b>What is not here.</b> Precipitation <i>probability</i>, the cloud
-        split into high, mid and low, and the freezing level are all
-        parameters the reference sites show in this kind of grid and none of
-        them are in this payload — the first needs an ensemble and this is a
-        deterministic chain, the other two are fields the pipeline does not
-        currently download. The cloud row and the chart's cloud strip are
-        total cover only, and are drawn as a single band rather than as a
-        vertical cross-section so that nothing implies a profile that is not
-        there.<br />
+        <b>Cloud cross-section.</b> The shading behind the rain bars is cloud
+        fraction on nineteen pressure levels from 1000 to 30 hPa, and it is
+        the one thing on this page that does not come from the institution
+        that ran the model. DWD does publish it — ICON-EU <code>clc</code> on
+        74 model levels — but only as whole-Europe files, one per level per
+        step, which is 8,742 files and about 2.4 GB for a single run, with no
+        byte-range index to read one grid column out of. ECMWF does not
+        publish cloud on pressure levels at all. Open-Meteo redistributes the
+        same DWD ICON data and will answer for one point, so the same
+        information costs 9 KB. That makes the panel a <i>different model</i>
+        from the lines above it — ICON seamless rather than ICON-2I — and it
+        is named in the subtitle for the same reason every handover along the
+        time axis is named. It runs to +192 h where the chart runs to +360, so
+        on the extended view it stops two-thirds of the way across and says
+        so; a panel that simply went blank would read as "no cloud", which is
+        the opposite of what it means. The vertical axis is linear in
+        pressure, which is the model's own coordinate — hence the unevenly
+        spaced kilometre labels — and those labels are this run's geopotential
+        heights rather than a standard atmosphere. The cloud strip under the
+        symbols is still total cover, and still spans the whole chart.<br />
+        <b>What is not here.</b> Precipitation <i>probability</i> and the
+        freezing level. The first needs an ensemble and this is a
+        deterministic chain; the second is a field the pipeline does not
+        currently download, though both ICON-2I
+        (<code>HZEROCL</code>) and Open-Meteo publish it.<br />
         <b>24 h rainfall.</b> The IFS total-precipitation field differenced
         across a fixed 24-hour window, so each chart is the total for the day
         <i>ending</i> at the time shown — rain and melted snow, convective and
@@ -6822,11 +6840,12 @@ function mgLayout(w, h, opts) {
   const narrow = w < 620;
   const compact = w < 900;
   const padL = narrow ? 32 : 44;
-  /* The right gutter is the Beaufort scale's, and it is never dropped — only
-     narrowed. It is the one axis on this chart a reader is actively converting
-     in their head ("is that a 5 or a 6"), and a wind panel that makes them do
-     that against a km/h axis is a wind panel that has not answered. */
-  const padR = narrow ? 29 : 56;
+  /* The right gutter carries two things now — the Beaufort scale beside the
+     wind panel and the altitude scale beside the cross-section — so it widens
+     when the second one exists. Neither is ever dropped: Beaufort is the axis
+     a reader is actively converting in their head, and an altitude panel with
+     no altitude on it is a grey smear. */
+  const padR = opts.profile ? (narrow ? 34 : 72) : (narrow ? 29 : 56);
   const padT = 6;
   const padB = narrow ? 19 : 23;
   const dayH = narrow ? 17 : 20;
@@ -6844,9 +6863,16 @@ function mgLayout(w, h, opts) {
   /* Temperature gets the most height because it is the panel people read a
      value off rather than a shape, and a 2 °C difference has to be visible.
      A dry week collapses the rain panel to a slim lane that says so, and the
-     height goes to wind — which on a dry week is usually why you are here. */
-  const tempH = avail * 0.38;
-  const precH = opts.dry ? Math.min(avail * 0.14, narrow ? 24 : 30) : avail * 0.26;
+     height goes to wind — which on a dry week is usually why you are here.
+
+     Unless there is a cross-section in it. Then the panel is carrying a
+     second quantity over fourteen vertical kilometres and the collapse would
+     squeeze nineteen levels into thirty pixels; it takes the largest share of
+     the three instead, which is also the proportion meteoblue gives it. */
+  const tempH = avail * (opts.profile ? 0.33 : 0.38);
+  const precH = opts.profile ? avail * 0.36
+    : opts.dry ? Math.min(avail * 0.14, narrow ? 24 : 30)
+    : avail * 0.26;
   const windH = avail - tempH - precH;
 
   return {
@@ -6941,7 +6967,8 @@ function drawMgGraphs() {
   const SPAN = P.SPAN, rate = P.rate;
   const dry = Math.max(...rate) < 0.05;
 
-  const L = mgLayout(cssW, cssH, { dry });
+  const hasProfile = !!(d.profile && d.profile.cloud && d.profile.cloud.length);
+  const L = mgLayout(cssW, cssH, { dry, profile: hasProfile });
   MG.layout = L;
 
   c.clearRect(0, 0, cssW, cssH);
@@ -7338,10 +7365,234 @@ function mgTempPanel(c, d, P, L, pal, ink, X, Xi) {
    at one width would make the long range look like a wall of rain. The bar
    therefore spans its own `span` hours, which is also why the join between
    models needs no explaining — the bars simply get wider. */
+/* ------------------------------------------------- the cloud cross-section --
+
+   Cloud fraction against height and time, shaded, behind the rain bars.
+
+   This is the one panel on the chart whose data does not come from the models
+   the lines come from. DWD publishes cloud on 74 model levels but only as
+   whole-Europe GRIBs with no byte-range index — 2.4 GB a run to read one grid
+   column — and ECMWF does not publish cloud on pressure levels at all. The
+   payload therefore carries a point query from Open-Meteo, which redistributes
+   the same DWD ICON data and will serve one column for 9 KB. It is a different
+   model from the temperature line above it and it is named as such under the
+   panel, on the same principle as every other handover on this chart.
+
+   The vertical axis is linear in PRESSURE, not in height. That is why the
+   altitude ticks come out unevenly spaced — 0, 1.5, 3.5, 6, 9, 14 km — and it
+   is deliberate: pressure is the model's own vertical coordinate, so a linear
+   pressure axis gives every level the same share of the panel instead of
+   squeezing the eight levels above 300 hPa into the top eighth of it. The
+   labels are the run's own geopotential heights rather than a standard
+   atmosphere, so the kilometre a band is at is the kilometre it is at today.
+
+   The shading is drawn once into an offscreen canvas and blitted, because
+   this function runs on every pointermove and the field is 19 x 193 samples
+   bilinearly resampled to the panel. Cached on the payload and invalidated by
+   size or theme; without it the chart dropped to about 8 fps on a hover. */
+
+const MG_PROF_TOP = 150;    // hPa at the top of the panel — about 14 km
+const MG_PROF_BOT = 1000;   // and at the bottom
+
+/* meteoblue's own break points. A stepped ramp rather than a smooth one
+   because a cloud deck has edges: the eye reads "where does the overcast
+   stop" off a contour far faster than off a gradient, and 10 / 25 / 50 / 75 /
+   90 is where the forecast's own language changes too. */
+const MG_PROF_STOPS = [10, 25, 50, 75, 90, 100];
+
+function mgProfAlpha(v) {
+  if (!(v > 8)) return 0;
+  let k = 0;
+  while (k < MG_PROF_STOPS.length - 1 && v >= MG_PROF_STOPS[k]) k++;
+  return 0.13 + 0.87 * (k / (MG_PROF_STOPS.length - 1));
+}
+
+const MG_PROF_CACHE = new WeakMap();
+
+function mgProfileImage(d, L, pal) {
+  const prof = d.profile;
+  if (!prof || !prof.cloud || !prof.cloud.length) return null;
+  const R = L.rows.prec;
+  const w = Math.max(1, Math.round(L.x1 - L.x0));
+  const h = Math.max(1, Math.round(R.h));
+  const h0 = d.steps[0], h1 = d.steps[d.steps.length - 1];
+  const tag = `${w}x${h}|${pal.dark}|${h0}-${h1}`;
+
+  const hit = MG_PROF_CACHE.get(prof);
+  if (hit && hit.tag === tag) return hit.cv;
+
+  const cv = document.createElement('canvas');
+  cv.width = w; cv.height = h;
+  const cx = cv.getContext('2d');
+  const img = cx.createImageData(w, h);
+  const px = img.data;
+
+  const lv = prof.levels, hrs = prof.hours, grid = prof.cloud;
+  const nL = lv.length, nH = hrs.length;
+  const hSpan = (h1 - h0) || 1;
+  // Grey in both themes. Cloud is the one quantity on this chart with a
+  // literal colour, and tinting it to suit a dark background would make it
+  // the only thing here that lies about what it looks like.
+  const tone = pal.dark ? 222 : 92;
+
+  for (let xi = 0; xi < w; xi++) {
+    // Pixel -> forecast hour -> position in the profile's own hour list,
+    // which is hourly throughout and so does not match the chart's steps.
+    const hour = h0 + (xi + 0.5) / w * hSpan;
+    if (hour < hrs[0] || hour > hrs[nH - 1]) continue;
+    let a = 0;
+    while (a < nH - 2 && hrs[a + 1] <= hour) a++;
+    const ft = (hour - hrs[a]) / ((hrs[a + 1] - hrs[a]) || 1);
+
+    for (let yi = 0; yi < h; yi++) {
+      // Pixel -> pressure (linear) -> the two levels bracketing it.
+      const p = MG_PROF_TOP + (yi + 0.5) / h * (MG_PROF_BOT - MG_PROF_TOP);
+      let b = 0;
+      while (b < nL - 2 && lv[b + 1] > p) b++;
+      if (p > lv[0] || p < lv[nL - 1]) continue;
+      const fp = (lv[b] - p) / ((lv[b] - lv[b + 1]) || 1);
+
+      const c00 = grid[b][a], c10 = grid[b][a + 1];
+      const c01 = grid[b + 1][a], c11 = grid[b + 1][a + 1];
+      if (c00 < 0 || c10 < 0 || c01 < 0 || c11 < 0) continue;
+      const top = c01 + (c11 - c01) * ft;
+      const bot = c00 + (c10 - c00) * ft;
+      const v = bot + (top - bot) * fp;
+
+      const al = mgProfAlpha(v);
+      if (al <= 0) continue;
+      const o = (yi * w + xi) * 4;
+      px[o] = tone; px[o + 1] = tone; px[o + 2] = tone;
+      px[o + 3] = Math.round(al * 255);
+    }
+  }
+  cx.putImageData(img, 0, 0);
+  MG_PROF_CACHE.set(prof, { tag, cv });
+  return cv;
+}
+
+/* The altitude axis down the right-hand side, and the note naming the model.
+
+   Six ticks, at the same fractions of the panel the rain axis uses, so the two
+   scales line up and the panel reads as one box with a scale on each side
+   rather than as two charts sharing a rectangle. */
+function mgProfileAxis(c, d, L, pal, ink) {
+  const prof = d.profile;
+  if (!prof) return;
+  const R = L.rows.prec;
+  const lv = prof.levels, z = prof.z;
+
+  c.font = mgF(`500 ${L.narrow ? 9 : 10}px`);
+  c.textAlign = 'left';
+  c.textBaseline = 'middle';
+  for (let k = 0; k <= 5; k++) {
+    const f = k / 5;
+    const p = MG_PROF_BOT - f * (MG_PROF_BOT - MG_PROF_TOP);
+    // Height interpolated out of the run's own geopotential, so the tick says
+    // where that pressure is today rather than where it is on average.
+    let b = 0;
+    while (b < lv.length - 2 && lv[b + 1] > p) b++;
+    const t = (lv[b] - p) / ((lv[b] - lv[b + 1]) || 1);
+    const m = z[b] + (z[b + 1] - z[b]) * t;
+    if (!(m >= 0)) continue;
+    const km = m / 1000;
+    const y = R.y + R.h - f * R.h;
+    c.fillStyle = ink(0.46);
+    c.fillText(km < 10 ? km.toFixed(1) : String(Math.round(km)), L.x1 + 5, y);
+  }
+  if (!L.narrow) {
+    c.save();
+    c.translate(L.x1 + (L.narrow ? 22 : 34), R.y + R.h / 2);
+    c.rotate(Math.PI / 2);
+    c.textAlign = 'center';
+    c.font = mgF('500 9px');
+    c.fillStyle = ink(0.42);
+    c.fillText('Altitude (km)', 0, 0);
+    c.restore();
+  }
+}
+
+/* The greyscale key, right-aligned on the panel's caption line.
+
+   On the caption line rather than under the panel, which is where meteoblue
+   puts it, because that strip of the chart is already reserved for saying
+   what a panel is and there is no second empty line to spend. Six swatches,
+   the ramp's own break points, no units — the caption two inches to the left
+   already says "cloud cover". */
+function mgProfileKey(c, d, L, pal, ink) {
+  if (!d.profile || L.narrow) return;
+  const R = L.rows.prec;
+  const sw = 13, sh = 7, gap = 1;
+  const nS = MG_PROF_STOPS.length;
+  const tone = pal.dark ? 222 : 92;
+  c.font = mgF('500 8.5px');
+  c.textAlign = 'center';
+  c.textBaseline = 'alphabetic';
+  const wTotal = nS * (sw + gap);
+  let x = L.x1 - wTotal;
+  const y = R.y - 10;
+  c.fillStyle = ink(0.42);
+  c.textAlign = 'right';
+  c.fillText('cloud %', x - 6, y + 7);
+  c.textAlign = 'center';
+  for (let k = 0; k < nS; k++) {
+    const al = 0.13 + 0.87 * (k / (nS - 1));
+    c.fillStyle = `rgba(${tone},${tone},${tone},${al})`;
+    c.fillRect(x, y, sw, sh);
+    c.strokeStyle = ink(0.16);
+    c.lineWidth = 1;
+    c.strokeRect(x + 0.5, y + 0.5, sw - 1, sh - 1);
+    c.fillStyle = ink(0.42);
+    c.fillText(String(MG_PROF_STOPS[k]), x + sw / 2, y + sh + 8);
+    x += sw + gap;
+  }
+}
+
+/* Where the cross-section runs out.
+
+   ICON's pressure-level cloud reaches +192 h where the chart reaches +360, so
+   on the Extended view the panel genuinely stops two-thirds of the way across.
+   Marked with a rule and a word rather than just ending, because a panel that
+   simply goes blank reads as "no cloud" — the opposite of what it means. */
+function mgProfileEnd(c, d, L, pal, ink, X) {
+  const prof = d.profile;
+  if (!prof) return;
+  const last = prof.hours[prof.hours.length - 1];
+  const h1 = d.steps[d.steps.length - 1];
+  if (last >= h1 - 1e-6) return;
+  const R = L.rows.prec;
+  const x = Math.round(X(last)) + 0.5;
+  c.save();
+  c.setLineDash([3, 3]);
+  c.strokeStyle = ink(0.34);
+  c.lineWidth = 1;
+  c.beginPath(); c.moveTo(x, R.y); c.lineTo(x, R.y + R.h); c.stroke();
+  c.restore();
+  c.font = mgF(`500 ${L.narrow ? 8.5 : 9.5}px`);
+  c.textAlign = 'left';
+  c.textBaseline = 'top';
+  const txt = 'cloud profile ends';
+  if (x + c.measureText(txt).width + 6 < L.x1) {
+    c.fillStyle = ink(0.40);
+    c.fillText(txt, x + 4, R.y + 3);
+  }
+}
+
 function mgPrecPanel(c, d, P, L, pal, ink, X, Xi, dry) {
   const R = L.rows.prec;
   const n = d.steps.length;
   const SPAN = P.SPAN, rate = P.rate;
+
+  /* The cross-section first, so everything else in this panel sits on top of
+     it. It is the background the rain falls out of — literally, since the
+     bars below are the same cloud reaching the ground — and drawing it last
+     would put a grey wash over the bars it is supposed to explain. */
+  const prof = mgProfileImage(d, L, pal);
+  if (prof) {
+    c.drawImage(prof, L.x0, R.y, L.x1 - L.x0, R.h);
+    mgProfileAxis(c, d, L, pal, ink);
+    mgProfileKey(c, d, L, pal, ink);
+  }
 
   c.strokeStyle = ink(0.10);
   c.lineWidth = 1;
@@ -7353,8 +7604,13 @@ function mgPrecPanel(c, d, P, L, pal, ink, X, Xi, dry) {
     c.textAlign = 'left';
     c.textBaseline = 'middle';
     c.fillStyle = ink(0.42);
-    c.fillText('No rain in this forecast', L.x0 + 6, R.y + R.h / 2);
-    mgCaption(c, L, ink, R.y, 'Rain');
+    // On a dry week with a cross-section the panel is full of cloud and the
+    // old flat "no rain" line read as a caption for the shading. Say which
+    // of the two the sentence is about.
+    c.fillText(prof ? 'Cloud only — no rain in this forecast'
+                    : 'No rain in this forecast', L.x0 + 6, R.y + R.h / 2);
+    if (prof) mgProfileEnd(c, d, L, pal, ink, X);
+    mgCaption(c, L, ink, R.y, prof ? 'Rain  mm/h  ·  cloud cover' : 'Rain');
     return;
   }
 
@@ -7388,7 +7644,8 @@ function mgPrecPanel(c, d, P, L, pal, ink, X, Xi, dry) {
     c.fillStyle = mgRgba(mgRainRGB(rate[i]), 0.92);
     c.fillRect(xa + 0.4, R.y + R.h - hgt, w, hgt);
   }
-  mgCaption(c, L, ink, R.y, 'Rain  mm/h');
+  if (prof) mgProfileEnd(c, d, L, pal, ink, X);
+  mgCaption(c, L, ink, R.y, prof ? 'Rain  mm/h  ·  cloud cover' : 'Rain  mm/h');
 }
 
 /* -------------------------------------------------------------------- wind --
@@ -9091,10 +9348,19 @@ function showView(name) {
     if (d) {
       const init = new Date(d.init);
       const js = mgJoins(d);
+      /* The cross-section's model is named in the subtitle beside the chain
+         that produced the lines, not folded into it. It is not a fourth
+         section of the same splice — it is a different model answering a
+         different question over the same hours, and a reader comparing the
+         grey against the temperature trace is entitled to know they came from
+         two places. Only on the Graphs view, since the grid does not show it.*/
+      const prof = (state.mgView || 'graphs') === 'graphs' && d.profile;
       $('mg-sub').textContent =
         `${d.model} · init ${fmtUTC.format(init)} UTC · ${mgCadence(d)}` +
-        (js.length ? ` · then ${js.map((j) => j.short).join(', ')}` : '');
-      $('mg-now').textContent = `${d.credit} · © Ryan Vella`;
+        (js.length ? ` · then ${js.map((j) => j.short).join(', ')}` : '') +
+        (prof ? ` · cloud profile ${d.profile.model}` : '');
+      $('mg-now').textContent =
+        `${d.credit}${prof ? ` · ${d.profile.credit}` : ''} · © Ryan Vella`;
       // Written by the renderer, which is the only thing that knows what
       // this particular run actually says.
       $('mg-desc').textContent = mgDescribe(d);
