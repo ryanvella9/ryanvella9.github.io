@@ -68,6 +68,13 @@ $container-max-width        : 1600px !default;
    in the column, while the cover, figures and cards take the full width. */
 $measure                    : 56rem !default;
 
+/* The same cap for the archive layout, which carries the reference and media
+   lists rather than running prose. Sized to the list measure in
+   layout/_content.scss so a list very nearly fills its block instead of
+   leaving a band of empty page beside it; at the 18px desktop base this is
+   ~792px against the lists' ~787px. */
+$archive-measure            : 44rem !default;
+
 /* ==========================================================================
    Grid
    ========================================================================== */

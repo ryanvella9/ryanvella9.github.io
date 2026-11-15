@@ -13,19 +13,23 @@
     @include span(10 of 12 last);
     @include prefix(0.5 of 12);
 
-    /* Same treatment .page already gets in _page.scss: span() stretches this
-       across 10 of 12, which at $container-max-width is far wider than any
-       text wants to be, so the column is held to $measure and centred. The
-       float has to go with it -- auto margins do not centre a floated box.
+    /* span() stretches this across 10 of 12, which at $container-max-width is
+       far wider than text wants to be: /publications/ and /outreach/ ran past
+       1200px while the copy inside stopped at its own measure, so the right
+       half of the page sat empty. .page already solved this in _page.scss and
+       .archive was left behind.
 
-       .page was fixed on its own and .archive was left behind, which is why
-       /publications/ and /outreach/ ran ~1200px wide while the landing page
-       sat at $measure. Keeping the two in step is the whole point of the
-       note left on .page. */
-    float: none;
-    max-width: $measure;
-    margin-left: auto;
-    margin-right: auto;
+       Cap the children rather than this column, exactly as .page does. The
+       column has to keep its float: above $sidebar-screen-min-width the
+       sidebar is position:fixed and therefore out of flow, so a centred
+       non-floated column slides underneath it with no line-box wrapping to
+       push the text clear. Holding the float keeps the column to the right of
+       the sidebar at every width, and the children centre inside it. */
+    > * {
+      max-width: $archive-measure;
+      margin-left: auto;
+      margin-right: auto;
+    }
   }
 
   a {
