@@ -107,14 +107,14 @@ html[data-theme="dark"] .pub-list {
 <div class="pub-main"><div class="pub-title">Air Quality Penalty in Southeast Asia Driven by AMOC Slowdown</div><div class="pub-auth"><strong>Vella, R.</strong>, Steil, B., Meccia, V., Tost, H., Lelieveld, J., Pozzer, A.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
+<a class="pub" href="https://acp.copernicus.org/articles/26/14939/2026/">
+<div class="pub-meta"><span class="pub-y">2026</span>Atmos. Chem. Phys.</div>
+<div class="pub-main"><div class="pub-title">Aerosol&ndash;cloud interactions influence the climate response to AMOC weakening</div><div class="pub-auth"><strong>Vella, R.</strong>, Lohmann, U.</div></div>
+<span class="pub-arrow" aria-hidden="true">&rarr;</span>
+</a>
 <a class="pub" href="https://doi.org/10.22541/essoar.15009270/v1">
 <div class="pub-meta"><span class="pub-y">2026</span>JGR Atmos. &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Mixed-phase cloud response to dust INP perturbations strongly depends on ice nucleation scheme choice<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Ferrachat, S., Lohmann, U., Villanueva, D.</div></div>
-<span class="pub-arrow" aria-hidden="true">&rarr;</span>
-</a>
-<a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-2961/">
-<div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
-<div class="pub-main"><div class="pub-title">Aerosol&ndash;cloud interactions influence the climate response to AMOC weakening<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth"><strong>Vella, R.</strong>, Lohmann, U.</div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <div class="pub">
@@ -129,6 +129,11 @@ html[data-theme="dark"] .pub-list {
 <a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-4020/">
 <div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
 <div class="pub-main"><div class="pub-title">Oxidation mechanisms for volatile methylated sulfur compounds and the major contribution of methanesulfonic acid to Southern Ocean aerosol particles<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Ruhl, S., Kohl, M., Baalbaki, R., Xenofontos, C., <strong>Vella, R.</strong>, Gromov, S., He, X.-C., Shen, J., Alfaouri, D., Atabakhsh, S., Dada, L., DeVivo, J., Duplissy, J., El Haddad, I., Harder, H., Jokinen, T., Junninen, H., Kanawade, V. P., Sebastian, M. K., Klebach, H., Kulmala, M., Kunkler, F., Lelieveld, J., Lehtipalo, K., Lietzke, C. J., Liu, L., Mauldin, R., Mentler, B., M&ouml;hler, O., Pet&auml;j&auml;, T., Russell, D. M., Simon, M., Thakur, R. C., Yu, W., Zhang, J., Zheng, Z., Kirkby, J., Tost, H., Christoudias, T., Sander, R., Pozzer, A.</div></div>
+<span class="pub-arrow" aria-hidden="true">&rarr;</span>
+</a>
+<a class="pub" href="https://egusphere.copernicus.org/preprints/2026/egusphere-2026-6438/">
+<div class="pub-meta"><span class="pub-y">2026</span>EGUsphere &middot; preprint</div>
+<div class="pub-main"><div class="pub-title">On the direct radiative impact of upper tropospheric aerosol particles<span class="pub-badge is-rev">Under review</span></div><div class="pub-auth">Tost, H., Kohl, M., Menken, J. M., N&uuml;tzel, M., Stecher, L., Taraborrelli, D., <strong>Vella, R.</strong></div></div>
 <span class="pub-arrow" aria-hidden="true">&rarr;</span>
 </a>
 <a class="pub yb" href="https://acp.copernicus.org/articles/25/9885/2025/">
