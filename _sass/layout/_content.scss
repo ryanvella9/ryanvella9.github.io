@@ -24,10 +24,16 @@
 $content-serif: $serif;
 $content-sans: $global-font-family;
 
-/* The comfortable measure. The site's base steps to 18px at the $medium
-   breakpoint, so 34em lands near 68 characters; the first pass at 46em was
-   running past 110. */
-$content-measure: 34em;
+/* The comfortable measure for running prose. The site's base steps to 18px at
+   the $medium breakpoint, so 36em lands near 72 characters. */
+$content-measure: 36em;
+
+/* Reference and media lists are scanned, not read line after line, and they
+   sit in a column already held to $measure by .archive. Letting them run
+   wider than prose fills that column instead of leaving a band of empty page
+   down the right, and still stops well short of the ~130 characters the bare
+   container would give. */
+$list-measure: 46em;
 
 
 /* Section headings
@@ -128,7 +134,7 @@ $content-measure: 34em;
    read against, so a bare "3." is still unambiguous. */
 .reflist {
   counter-reset: ref;
-  max-width: $content-measure;
+  max-width: $list-measure;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -250,7 +256,7 @@ $content-measure: 34em;
    four-colour category badges. */
 
 .medialist {
-  max-width: $content-measure;
+  max-width: $list-measure;
   margin: 0 0 1.8em;
   padding: 0;
   list-style: none;
@@ -291,7 +297,7 @@ $content-measure: 34em;
 }
 
 .media-desc {
-  max-width: $content-measure;
+  max-width: $list-measure;
   margin: 0;
   line-height: 1.6;
   color: var(--global-text-color);
