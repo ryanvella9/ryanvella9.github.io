@@ -29,11 +29,17 @@ $content-sans: $global-font-family;
 $content-measure: 36em;
 
 /* Reference and media lists are scanned, not read line after line, and they
-   sit in a column already held to $measure by .archive. Letting them run
-   wider than prose fills that column instead of leaving a band of empty page
-   down the right, and still stops well short of the ~130 characters the bare
-   container would give. */
-$list-measure: 46em;
+   sit in a column already held to $archive-measure. Letting them run wider
+   than prose fills that column instead of leaving a band of empty page down
+   the right, and still stops well short of the ~130 characters the bare
+   container would give.
+
+   Two values for one width, because em resolves against each element's own
+   font-size: .reflist sets 0.95em, .medialist does not. Both land at roughly
+   $archive-measure (~792px at the 18px desktop base), so a list lines up with
+   the headings beside it rather than overhanging them. */
+$list-measure: 46em;      // in .reflist's 0.95em context -> ~787px
+$list-measure-root: 44em; // at the full body size        -> ~792px
 
 
 /* Section headings
@@ -256,7 +262,7 @@ $list-measure: 46em;
    four-colour category badges. */
 
 .medialist {
-  max-width: $list-measure;
+  max-width: $list-measure-root;
   margin: 0 0 1.8em;
   padding: 0;
   list-style: none;
@@ -297,7 +303,7 @@ $list-measure: 46em;
 }
 
 .media-desc {
-  max-width: $list-measure;
+  max-width: $list-measure-root;
   margin: 0;
   line-height: 1.6;
   color: var(--global-text-color);
