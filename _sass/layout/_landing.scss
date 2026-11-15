@@ -1,10 +1,11 @@
+/* Body copy on the landing page.
+   This was a bordered, tinted, drop-shadowed card wrapped around running
+   prose. Three paragraphs of biography do not need a container to be read as
+   belonging together — the heading above them and the space around them
+   already say it — so what is left is the spacing. */
 .content-box {
-  margin-bottom: 1.25em;
-  padding: 1.35em 1.5em;
-  border: 1px solid var(--global-border-color);
-  border-radius: 8px;
-  background: var(--global-code-background-color);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.035);
+  margin-bottom: 2em;
+  max-width: 42em;
 }
 
 .content-box > :first-child {
@@ -15,18 +16,6 @@
   margin-bottom: 0;
 }
 
-.content-box h2 {
-  margin-top: 0;
-}
-
-/* The border and background now come through from the dark theme variables;
-   only the shadow needs deepening to register against the darker page. */
-html[data-theme="dark"] .content-box {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-}
-
-@media screen and (max-width: 600px) {
-  .content-box {
-    padding: 1.05em 1em;
-  }
+.content-box p {
+  line-height: 1.65;
 }

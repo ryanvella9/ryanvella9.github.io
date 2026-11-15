@@ -1,0 +1,462 @@
+/* ==========================================================================
+   Content pages
+
+   Shared components for the prose pages: about, research, publications and
+   outreach. These four used to carry a <style> block each, every one of them
+   defining its own scoped custom properties, its own type sizes and its own
+   dark-mode overrides for the same handful of parts. Keeping them here means
+   one type scale, one accent and one set of spacings across the site.
+
+   The accent is the theme link colour, used only on links. Emphasis in body
+   copy comes from weight and italics, as it would in print.
+   ========================================================================== */
+
+
+/* Two faces, each with one job
+   ------------------------------------------------------------------------
+   Georgia carries headings and reference matter; the sans carries running
+   prose, metadata and labels. The serif is not an import — the theme
+   already sets figure captions in it ($caption-font-family in
+   _themes.scss), so this is vocabulary the site owned and was not using.
+   One face at one weight doing every job was part of what read as
+   generated. */
+
+$content-serif: $serif;
+$content-sans: $global-font-family;
+
+/* The comfortable measure. The site's base steps to 18px at the $medium
+   breakpoint, so 34em lands near 68 characters; the first pass at 46em was
+   running past 110. */
+$content-measure: 34em;
+
+
+/* Section headings
+   ------------------------------------------------------------------------
+   The rule and padding restate what the theme already gives `h2`, because
+   only the `single` layout wraps content in `.page__content` — the `archive`
+   layout the publication and outreach pages use does not, so the heading
+   would otherwise lose its rule there.
+
+   Book weight rather than bold: Georgia at 600+ shouts, and the size step
+   plus the rule already carry the level. The rule uses the stronger border
+   token because --global-border-color is #f2f3f3, invisible on white. */
+
+.section-head {
+  margin: 2.2em 0 1em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid var(--global-dark-border-color);
+  font-family: $content-serif;
+  font-size: 1.5em;
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--global-text-color);
+}
+
+.section-head:first-child {
+  margin-top: 0.6em;
+}
+
+
+/* Opening paragraph
+   ------------------------------------------------------------------------
+   Slightly larger than body copy, and measured so a line stays readable. */
+
+.lead {
+  max-width: $content-measure;
+  margin: 0 0 1.4em;
+  font-size: 1.1em;
+  line-height: 1.6;
+  color: var(--global-text-color);
+}
+
+.prose {
+  max-width: $content-measure;
+
+  p {
+    line-height: 1.65;
+  }
+}
+
+
+/* Topic list
+   ------------------------------------------------------------------------
+   Research interests: a term and a sentence about it. This replaces a grid
+   of six icon cards; the icons stood for abstract ideas that no icon can
+   actually carry, and the cards added chrome around two lines of text. */
+
+.topics {
+  max-width: $content-measure;
+  margin: 0 0 1.6em;
+  padding-left: 1.2em;
+
+  li {
+    margin: 0 0 0.75em;
+    line-height: 1.6;
+  }
+
+  strong {
+    font-weight: 600;
+    color: var(--global-text-color);
+  }
+}
+
+/* A plain comma-run of secondary interests, in place of pill chips. */
+.topics-also {
+  max-width: $content-measure;
+  margin: 0 0 1.4em;
+  color: var(--global-text-color-light);
+  line-height: 1.6;
+}
+
+
+/* Reference list
+   ------------------------------------------------------------------------
+   Publications, set as a numbered bibliography. Each entry is three lines:
+   authors, then the title on its own line, then the venue. Review status is
+   plain words at the end of the venue line rather than a coloured pill.
+
+   The numbering is not decoration — a publication list genuinely is
+   enumerable, and the numbers are what let a reader or a covering letter
+   refer to "no. 4". */
+
+.reflist-wrap {
+  margin: 0 0 1.6em;
+}
+
+/* The counter is reset per year group rather than once for the page, so each
+   year restarts at 1. The year label above the list is what the number is
+   read against, so a bare "3." is still unambiguous. */
+.reflist {
+  counter-reset: ref;
+  max-width: $content-measure;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-family: $content-serif;
+  font-size: 0.95em;
+  line-height: 1.6;
+
+  li {
+    position: relative;
+    counter-increment: ref;
+    /* Space between entries has to beat the leading inside one, or three
+       stacked lines read as six loose ones. */
+    margin: 0 0 1.5em;
+    padding-left: 2.8em;
+  }
+
+  li::before {
+    content: counter(ref) ".";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 2.2em;
+    text-align: right;
+    color: var(--global-text-color-light);
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    text-decoration: none;
+  }
+
+  a:hover,
+  a:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+/* The three lines of an entry, each its own block: title, then authors, then
+   the source. The title leads, so it carries the serif at full size while the
+   two lines under it drop to the sans at 0.88em — the entry has one thing to
+   read first and two things to check afterwards. */
+.ref-title {
+  display: block;
+  margin: 0 0 0.25em;
+  font-size: 1.05em;
+  line-height: 1.45;
+  /* Plain text colour, so a title with nothing to link to does not look
+     like a dead link. The anchor inside takes the accent. */
+  color: var(--global-text-color);
+
+  a {
+    color: var(--global-link-color);
+  }
+}
+
+/* Review status, running straight on from the title in the same serif at the
+   same size — only the colour drops. It reads as part of the sentence the
+   title makes rather than as a tag stuck beside it. */
+.ref-status {
+  color: var(--global-text-color-light);
+}
+
+.ref-authors {
+  display: block;
+  font-family: $content-sans;
+  font-size: 0.88em;
+  line-height: 1.5;
+  color: var(--global-text-color-light);
+
+  /* The author's own name, the one piece of emphasis in the entry. */
+  strong {
+    font-weight: 700;
+    color: var(--global-text-color);
+  }
+}
+
+.ref-source {
+  display: block;
+  margin: 0.15em 0 0;
+  font-family: $content-sans;
+  font-size: 0.88em;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  color: var(--global-text-color-light);
+}
+
+.ref-venue {
+  font-style: italic;
+}
+
+/* "in review", "preprint", "PhD thesis" — plain words, not a badge. */
+.ref-note {
+  color: var(--global-text-color-light);
+}
+
+/* A quiet label, pitched well below the serif section head so the two read
+   as different levels rather than competing. */
+.refyear {
+  margin: 1.9em 0 0.9em;
+  font-family: $content-sans;
+  font-size: 0.72em;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--global-text-color-light);
+  font-variant-numeric: tabular-nums;
+}
+
+.refyear:first-of-type,
+.section-head + .refyear {
+  margin-top: 0;
+}
+
+
+/* Media list
+   ------------------------------------------------------------------------
+   Press and public engagement. Title, then a plain venue-and-date line,
+   then a sentence. Replaces the two-column monospace date rail and the
+   four-colour category badges. */
+
+.medialist {
+  max-width: $content-measure;
+  margin: 0 0 1.8em;
+  padding: 0;
+  list-style: none;
+
+  > li {
+    margin: 0;
+    padding: 1.1em 0;
+    border-top: 1px solid var(--global-dark-border-color);
+  }
+
+  > li:first-child {
+    border-top: 0;
+    padding-top: 0.2em;
+  }
+}
+
+.media-title {
+  margin: 0 0 0.25em;
+  font-size: 1.05em;
+  font-weight: 600;
+  line-height: 1.4;
+
+  a {
+    text-decoration: none;
+  }
+
+  a:hover,
+  a:focus-visible {
+    text-decoration: underline;
+  }
+}
+
+/* Outlet, date, and the kind of item — one quiet line, read as a sentence. */
+.media-meta {
+  margin: 0 0 0.4em;
+  font-size: 0.9em;
+  color: var(--global-text-color-light);
+}
+
+.media-desc {
+  max-width: $content-measure;
+  margin: 0;
+  line-height: 1.6;
+  color: var(--global-text-color);
+}
+
+
+/* Figures and video
+   ------------------------------------------------------------------------
+   Kept functional: the click-to-load embed avoids handing YouTube a request
+   on page load. Only the styling is quietened — square corners, and no
+   scaling play button. */
+
+.fig {
+  max-width: 40em;
+  margin: 0 0 1.8em;
+}
+
+.fig img,
+.fig video {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* A looping panel that falls back to its own poster. The still carries the
+   figure whenever the clip does not play: before the first frame decodes, if
+   the file 404s, and under reduced motion. */
+.fig-frame {
+  position: relative;
+  /* Interpolated so Sass emits a literal slash instead of dividing. */
+  aspect-ratio: #{16} / #{9};
+  overflow: hidden;
+  background: #14181b center / cover no-repeat;
+}
+
+.fig-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fig-frame video {
+    display: none;
+  }
+}
+
+.fig-cap {
+  max-width: $content-measure;
+  margin: 0.6em 0 0;
+  font-size: 0.9em;
+  line-height: 1.55;
+  color: var(--global-text-color-light);
+
+  b {
+    font-weight: 600;
+    color: var(--global-text-color);
+  }
+}
+
+.media-video {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: 0.8em 0 0;
+  aspect-ratio: #{16} / #{9};
+  overflow: hidden;
+  background: #000;
+
+  iframe {
+    display: block;
+    width: 100%;
+    height: 100%;
+    border: 0;
+  }
+}
+
+.media-play {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+.media-play::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 56px;
+  height: 40px;
+  transform: translate(-50%, -50%);
+  background: rgba(20, 20, 20, 0.75)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23fff'%3E%3Cpath d='M8 5v14l11-7z'/%3E%3C/svg%3E")
+    center / 22px no-repeat;
+}
+
+.media-play:hover::after {
+  background-color: rgba(20, 20, 20, 0.9);
+}
+
+.media-play:focus-visible {
+  outline: 2px solid var(--global-link-color);
+  outline-offset: -2px;
+}
+
+
+/* Notes and footers
+   ------------------------------------------------------------------------ */
+
+/* A follow-up or aside attached to the item above it. */
+.note {
+  max-width: $content-measure;
+  margin: 0.7em 0 0;
+  font-size: 0.92em;
+  line-height: 1.6;
+  color: var(--global-text-color-light);
+
+  b {
+    font-weight: 600;
+    color: var(--global-text-color);
+  }
+}
+
+.page-updated {
+  margin: 2.4em 0 0;
+  font-size: 0.88em;
+  color: var(--global-text-color-light);
+}
+
+
+/* Narrow screens
+   ------------------------------------------------------------------------
+   The lists are single-column already, so only the opening sizes need to
+   come down. */
+
+@media screen and (max-width: 560px) {
+  .lead {
+    font-size: 1.05em;
+  }
+
+  .section-head {
+    font-size: 1.2em;
+  }
+
+  /* Tuck the numbers in, but keep them out of the text block. */
+  .reflist li {
+    padding-left: 2em;
+  }
+
+  .reflist li::before {
+    width: 1.5em;
+  }
+
+  .refyear {
+    letter-spacing: 0.12em;
+  }
+}

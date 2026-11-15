@@ -22,7 +22,6 @@ author_profile: true
   display: block;
   padding: 0;
   border: 0;
-  border-radius: 10px;
   overflow: hidden;
   background: #14181b;
   cursor: zoom-in;
@@ -34,10 +33,10 @@ author_profile: true
   aspect-ratio: 1 / 1;
   object-fit: cover;
   display: block;
-  transition: transform .35s ease, opacity .2s ease;
+  transition: opacity .2s ease;
 }
 .ph-item:hover img,
-.ph-item:focus-visible img { transform: scale(1.035); opacity: .93; }
+.ph-item:focus-visible img { opacity: .88; }
 .ph-item:focus-visible { outline: 2px solid var(--global-link-color); outline-offset: 3px; }
 
 .ph-lb {
@@ -58,7 +57,6 @@ author_profile: true
   max-height: 94vh;
   width: auto;
   height: auto;
-  border-radius: 4px;
   cursor: default;
 }
 .ph-close {
@@ -124,7 +122,6 @@ author_profile: true
 body.ph-locked { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   .ph-item img { transition: none; }
-  .ph-item:hover img, .ph-item:focus-visible img { transform: none; }
 }
 </style>
 
