@@ -13,16 +13,40 @@ title: "Malta Live Sensors"
 <title>Malta Live Sensors · Ryan Vella</title>
 <style>
 /* ============================================================ theme ====
-   Dark is the default, not the OS preference: :root carries the dark values
-   and light is the opt-in override, so the dashboard opens dark for everyone
-   and matches the rest of the site rather than whatever the machine is set to.
-   The toggle still swings both ways and is still remembered — it just starts
-   from dark. */
+   Light only, matching the rest of the site. There is no toggle and no
+   stored preference: both went when the site's dark theme did, so :root
+   carries the one palette and color-scheme states it.
+
+   The semantic ramps below are not decoration and are deliberately left
+   alone -- good/moderate/poor and the clear/patchy/overcast bands encode
+   the reading, so they have to stay distinguishable. What changed is the
+   neutrals around them. */
 :root{
-  --bg:#f4f5f7; --surface:#ffffff; --hairline:#e3e5ea;
+  /* One flat surface. The page used to be white cards floating on grey,
+     which gave eleven panels the same visual weight and made nothing more
+     important than anything else. */
+  --bg:#ffffff; --surface:#ffffff; --hairline:#dfe2e8;
   --ink:#1c1f26; --ink-2:#5a6170; --ink-3:#8a91a0;
-  --shadow:0 1px 2px rgba(16,20,30,.05), 0 6px 20px rgba(16,20,30,.06);
   --grid:#eceef2; --axis:#c6cad4;
+
+  /* Three faces, each with one job: Georgia names things, the system sans
+     carries secondary text, mono carries every number. The serif is what
+     ties this page to the rest of the site -- the publication list and the
+     section headings are set in it too -- and what stops a standalone
+     dashboard reading as a generic app built from the OS UI font. */
+  --f-display:Georgia,Times,serif;
+  --f-ui:-apple-system,".SFNSText-Regular","San Francisco",Roboto,"Segoe UI","Helvetica Neue",Arial,sans-serif;
+  --f-num:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+
+  /* Six sizes, no half-pixels. There were sixteen, including 10.5, 11.5 and
+     13.5 -- sizes nobody picks on purpose. */
+  --t-xs:11px; --t-sm:13px; --t-md:16px;
+  --t-lg:20px; --t-xl:28px; --t-2xl:44px;
+
+  /* One radius. There were seven. 999px for pills and 50% for dots are
+     shapes rather than roundings, so they are not part of the count. */
+  --r:3px;
+
   --c-temp:#e8743b; --c-cold:#3b82c4; --c-rh:#3b82c4; --c-wind:#2f9e6e;
   --c-rain:#005b96; --c-pm25:#3b6fd4; --c-pm10:#d1443f; --c-cloud:#4c4fbe;
   /* Gold=clear, pale blue-grey=patchy/cirrus, slate=overcast. Yellow marked the
@@ -30,7 +54,7 @@ title: "Malta Live Sensors"
      at a glance. */
   --band-clear:#f5b301; --band-mid:#b7cbda; --band-over:#8a9198;
   --good:#2f9e6e; --moderate:#d9a520; --poor:#d1443f;
-  --pill:#eef0f4; --nsb-dark:#3a4a7a; --nsb-bright:#c9922e;
+  --pill:#f1f3f6; --nsb-dark:#3a4a7a; --nsb-bright:#c9922e;
   --sun:#e8a33b; --moon:#7f8aa8;
   /* WHO UV bands. Low and moderate borrow the air-quality colours so the same
      green/amber means the same thing on both hero cards; high and above need
@@ -44,11 +68,13 @@ title: "Malta Live Sensors"
 html,body{margin:0;padding:0}
 body{
   background:var(--bg); color:var(--ink);
-  font:16px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  font:var(--t-md)/1.55 var(--f-ui);
   -webkit-font-smoothing:antialiased;
 }
+/* Every reading on the page, so figures line up down a column and a value
+   does not change width as it ticks. */
 .mono,.num{
-  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+  font-family:var(--f-num);
   font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;
 }
 .wrap{max-width:1000px;margin:0 auto;padding:28px 20px 64px}
@@ -56,41 +82,39 @@ body{
 /* =========================================================== header ==== */
 header.top{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:22px}
 header.top .titles{flex:1 1 320px;min-width:0}
-h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
-.sub{color:var(--ink-2);font-size:14px;margin:0}
+h1{font-family:var(--f-display);font-size:var(--t-xl);font-weight:400;line-height:1.2;margin:0 0 4px}
+.sub{color:var(--ink-2);font-size:var(--t-sm);margin:0}
 .head-right{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .freshness{
   display:inline-flex;align-items:center;gap:7px;background:var(--pill);
   border:1px solid var(--hairline);border-radius:999px;padding:6px 12px;
-  font-size:11.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2);
+  font-size:var(--t-xs);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-2);
 }
 .freshness .dot{width:7px;height:7px;border-radius:50%;background:var(--good);flex:none}
 .freshness[data-stale="1"] .dot{background:var(--moderate)}
 .freshness[data-stale="2"] .dot{background:var(--poor)}
-.tbtn{
-  display:inline-flex;align-items:center;justify-content:center;gap:6px;
-  width:38px;height:38px;border-radius:10px;cursor:pointer;
-  background:var(--surface);border:1px solid var(--hairline);color:var(--ink-2);
-  box-shadow:var(--shadow);
-}
-.tbtn:hover{color:var(--ink)}
-.tbtn svg{width:18px;height:18px}
 
-/* ============================================================ cards ==== */
-.card{
-  background:var(--surface);border:1px solid var(--hairline);border-radius:16px;
-  box-shadow:var(--shadow);padding:18px 20px;
+/* ============================================================ cards ====
+   .card keeps its name because the markup and the script both use it, but
+   it is no longer a card: no fill, no border, no shadow. Space and the odd
+   hairline do the separating now. */
+.card{padding:0}
+.hero{
+  display:grid;grid-template-columns:1.35fr 1fr;gap:34px;
+  margin-bottom:30px;padding-bottom:26px;border-bottom:1px solid var(--hairline);
 }
-.hero{display:grid;grid-template-columns:1.35fr 1fr;gap:18px;margin-bottom:30px}
+/* A rule between the two hero readings rather than two floating panels. */
+.hero #card-aq{padding-left:34px;border-left:1px solid var(--hairline)}
 .card h2.ctitle{
-  font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
+  font-family:var(--f-ui);
+  font-size:var(--t-xs);letter-spacing:.09em;text-transform:uppercase;color:var(--ink-3);
   margin:0 0 14px;font-weight:600;
 }
 .now{display:flex;align-items:center;gap:18px;flex-wrap:wrap}
 .now .icon{flex:none;width:76px;height:76px}
-.now .bigtemp{font-size:46px;line-height:1;letter-spacing:-.02em}
-.now .bigtemp .u{font-size:22px;color:var(--ink-2)}
-.now .desc{color:var(--ink-2);font-size:14px;margin-top:5px}
+.now .bigtemp{font-size:var(--t-2xl);line-height:1;letter-spacing:-.02em}
+.now .bigtemp .u{font-size:var(--t-lg);color:var(--ink-2)}
+.now .desc{color:var(--ink-2);font-size:var(--t-sm);margin-top:5px}
 /* A grid, not a flex row: with rain and UV joining sun and moon, four stats of
    unequal width wrapped into a ragged 3 + 1. Two fixed columns give an even
    2x2 at every width the hero card actually takes, and leave the rise/set pair
@@ -106,13 +130,13 @@ h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
 .now-stats{display:flex;gap:24px;flex-wrap:wrap;margin-left:auto}
 @media (max-width:560px){ .now-stats{margin-left:0;width:100%} }
 .stat{display:flex;align-items:center;gap:10px}
-.stat .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
-.stat .val{font-size:19px}
-.stat .val .u{font-size:12px;color:var(--ink-2)}
-.stat .sm{font-size:11.5px;color:var(--ink-3)}
+.stat .lab{font-size:var(--t-xs);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3)}
+.stat .val{font-size:var(--t-lg)}
+.stat .val .u{font-size:var(--t-xs);color:var(--ink-2)}
+.stat .sm{font-size:var(--t-xs);color:var(--ink-3)}
 /* Rise and set sit side by side, so the pair needs to stay a touch smaller
    than a single-number stat or it wraps on a phone. */
-.stat .sun-times{font-size:15px;white-space:nowrap}
+.stat .sun-times{font-size:var(--t-md);white-space:nowrap}
 .stat .sun-up{color:var(--sun);margin-right:1px}
 .stat .sun-dn{color:var(--moon);margin:0 1px 0 8px}
 .compass{width:44px;height:44px;flex:none}
@@ -126,12 +150,12 @@ h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
 .icon .drop{transform-box:fill-box;transform-origin:center;animation:drop-fall 1.25s linear infinite}
 @media (prefers-reduced-motion:reduce){ .icon .drop{animation:none;opacity:.95} }
 .pm-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
-.pm .lab{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
-.pm .val{font-size:31px;line-height:1.05;letter-spacing:-.01em}
-.pm .u{font-size:12px;color:var(--ink-2);margin-left:3px}
+.pm .lab{font-size:var(--t-xs);letter-spacing:.07em;text-transform:uppercase;color:var(--ink-3);margin-bottom:3px}
+.pm .val{font-size:var(--t-xl);line-height:1.05;letter-spacing:-.01em}
+.pm .u{font-size:var(--t-xs);color:var(--ink-2);margin-left:3px}
 .aqpill{
   display:inline-flex;align-items:center;gap:7px;border-radius:999px;
-  padding:6px 13px;font-size:12px;font-weight:600;letter-spacing:.02em;
+  padding:6px 13px;font-size:var(--t-sm);font-weight:600;letter-spacing:.02em;
   border:1px solid transparent;
 }
 .aqpill .dot{width:8px;height:8px;border-radius:50%;flex:none}
@@ -141,53 +165,59 @@ h1{font-size:26px;line-height:1.2;margin:0 0 4px;letter-spacing:-.01em}
 .aq-mod .dot{background:var(--moderate)}
 .aq-poor{color:var(--poor);background:color-mix(in srgb,var(--poor) 12%,transparent);border-color:color-mix(in srgb,var(--poor) 30%,transparent)}
 .aq-poor .dot{background:var(--poor)}
-.aq-note{color:var(--ink-3);font-size:11.5px;margin-top:11px}
+.aq-note{color:var(--ink-3);font-size:var(--t-xs);margin-top:11px}
 
 /* ========================================================== sections === */
-section{margin-top:34px}
-.shead{display:flex;align-items:baseline;gap:12px;margin:0 0 14px;flex-wrap:wrap}
-.shead h2{font-size:17px;margin:0;letter-spacing:-.01em}
-.shead .meta{font-size:11.5px;color:var(--ink-3)}
-.board{margin-bottom:16px}
-.board h3{font-size:13.5px;margin:0 0 2px;font-weight:600}
-.board .cap{font-size:11.5px;color:var(--ink-3);margin:0 0 8px}
-.board .accum{font-size:15px;color:var(--ink-2);margin:14px 0 0;line-height:1.5}
-.board .accum b{color:var(--ink);font-weight:600;font-size:16px}
+section{margin-top:40px}
+.shead{display:flex;align-items:baseline;gap:12px;margin:0 0 20px;flex-wrap:wrap;
+       padding-bottom:8px;border-bottom:1px solid var(--hairline)}
+.shead h2{font-family:var(--f-display);font-size:var(--t-lg);font-weight:400;margin:0}
+.shead .meta{font-size:var(--t-xs);color:var(--ink-3)}
+/* Charts are the content, so they get room rather than a frame each. */
+.board{margin-bottom:30px}
+.board h3{font-family:var(--f-display);font-size:var(--t-md);margin:0 0 2px;font-weight:400}
+.board .cap{font-size:var(--t-sm);color:var(--ink-3);margin:0 0 10px;max-width:62em}
+.board .accum{font-size:var(--t-md);color:var(--ink-2);margin:14px 0 0;line-height:1.5}
+.board .accum b{color:var(--ink);font-weight:600}
 .plot{position:relative;width:100%}
 .plot svg{display:block;width:100%;height:auto;touch-action:pan-y}
 .nodata{
   display:flex;align-items:center;justify-content:center;min-height:120px;
-  color:var(--ink-3);font-size:13px;border:1px dashed var(--hairline);border-radius:10px;
+  color:var(--ink-3);font-size:var(--t-sm);border:1px dashed var(--hairline);border-radius:var(--r);
 }
-.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:11.5px;color:var(--ink-2)}
-.legend i{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:9px;font-size:var(--t-xs);color:var(--ink-2)}
+.legend i{display:inline-block;width:11px;height:11px;border-radius:var(--r);margin-right:6px;vertical-align:-1px}
 .donuts{display:flex;gap:6px;flex-wrap:wrap;justify-content:space-between}
 .donut{flex:1 1 0;min-width:78px;text-align:center}
 .donut svg{width:100%;max-width:84px;height:auto}
-.donut .d-lab{font-size:11px;color:var(--ink-3);margin-top:2px}
-.donut .d-pct{font-size:13px;margin-top:1px}
+.donut .d-lab{font-size:var(--t-xs);color:var(--ink-3);margin-top:2px}
+.donut .d-pct{font-size:var(--t-sm);margin-top:1px}
 
-/* ========================================================== tooltip ==== */
+/* ========================================================== tooltip ====
+   The one element that genuinely floats, so the one that keeps a shadow. */
 .tip{
   position:absolute;pointer-events:none;opacity:0;transition:opacity .09s;
-  background:var(--surface);border:1px solid var(--hairline);border-radius:9px;
-  box-shadow:var(--shadow);padding:7px 10px;font-size:12px;white-space:nowrap;z-index:20;
+  background:var(--surface);border:1px solid var(--hairline);border-radius:var(--r);
+  box-shadow:0 2px 10px rgba(16,20,30,.10);
+  padding:7px 10px;font-size:var(--t-sm);white-space:nowrap;z-index:20;
 }
-.tip .t-when{color:var(--ink-3);font-size:10.5px;margin-bottom:3px}
+.tip .t-when{color:var(--ink-3);font-size:var(--t-xs);margin-bottom:3px}
 .tip .t-row{display:flex;align-items:center;gap:7px;line-height:1.45}
-.tip .t-row i{width:8px;height:8px;border-radius:2px;flex:none}
+.tip .t-row i{width:8px;height:8px;border-radius:var(--r);flex:none}
 
 /* =========================================================== footer ==== */
-.note{color:var(--ink-2);font-size:13.5px;line-height:1.65}
-footer{margin-top:34px;padding-top:16px;border-top:1px solid var(--hairline);
-       color:var(--ink-3);font-size:12px}
+.note{color:var(--ink-2);font-size:var(--t-sm);line-height:1.65;max-width:62em}
+footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--hairline);
+       color:var(--ink-3);font-size:var(--t-xs)}
 footer a{color:var(--ink-2)}
 
 @media (max-width:760px){
-  .hero{grid-template-columns:1fr}
+  .hero{grid-template-columns:1fr;gap:24px}
+  /* With one column the rule between the readings has to move to the top. */
+  .hero #card-aq{padding-left:0;border-left:0;padding-top:24px;border-top:1px solid var(--hairline)}
   .wrap{padding:20px 14px 48px}
-  h1{font-size:22px}
-  .now .bigtemp{font-size:40px}
+  h1{font-size:var(--t-lg)}
+  .now .bigtemp{font-size:var(--t-xl)}
   .donut{min-width:64px}
 }
 </style>
