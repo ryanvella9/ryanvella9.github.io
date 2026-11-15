@@ -23,7 +23,10 @@ author_profile: true
   padding: 0;
   border: 0;
   overflow: hidden;
-  background: #14181b;
+  /* What shows while a thumbnail decodes, and behind one that does not fill
+     its square. A light neutral now the site has no dark theme — a near-black
+     tile under a half-loaded grid read as holes in the page. */
+  background: #eceef0;
   cursor: zoom-in;
   line-height: 0;
 }

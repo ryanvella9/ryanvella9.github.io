@@ -11,15 +11,6 @@ title: "Malta Live Sensors"
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Malta Live Sensors · Ryan Vella</title>
-<script>
-/* Runs before first paint so a reader who has chosen light does not get a dark
-   flash on every load. Dark needs nothing done to it — it is the :root default,
-   and initTheme() re-applies the same decision once the page script runs. */
-try {
-  if (localStorage.getItem("envdash-theme") === "light")
-    document.documentElement.setAttribute("data-theme", "light");
-} catch (e) {}
-</script>
 <style>
 /* ============================================================ theme ====
    Dark is the default, not the OS preference: :root carries the dark values
@@ -28,39 +19,25 @@ try {
    The toggle still swings both ways and is still remembered — it just starts
    from dark. */
 :root{
-  --bg:#0f1216; --surface:#171b21; --hairline:#262c35;
-  --ink:#e8eaee; --ink-2:#a2aab8; --ink-3:#6f7889;
-  --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.28);
-  --grid:#222831; --axis:#3a424e;
-  --c-temp:#f08a4b; --c-cold:#5b9fe0; --c-rh:#5b9fe0; --c-wind:#48b98a;
-  --c-rain:#3d8fd0; --c-pm25:#6b95e8; --c-pm10:#e56b66; --c-cloud:#7d7fe0;
-  /* Gold=clear, pale blue-grey=patchy/cirrus, slate=overcast. Yellow marked the
-     middle category before, which read as "sunny" and inverted the whole scale
-     at a glance. */
-  --band-clear:#d9a017; --band-mid:#7d94a6; --band-over:#5d646f;
-  --good:#48b98a; --moderate:#e0b53c; --poor:#e56b66;
-  --pill:#222831; --nsb-dark:#5b6ea8; --nsb-bright:#d9a94a;
-  --sun:#f0b64b; --moon:#9aa6c4;
-  /* WHO UV bands. Low and moderate borrow the air-quality colours so the same
-     green/amber means the same thing on both hero cards; high and above need
-     two more steps than air quality has. */
-  --uv-high:#e08a3c; --uv-extreme:#a86cd8;
-}
-:root[data-theme="light"]{
   --bg:#f4f5f7; --surface:#ffffff; --hairline:#e3e5ea;
   --ink:#1c1f26; --ink-2:#5a6170; --ink-3:#8a91a0;
   --shadow:0 1px 2px rgba(16,20,30,.05), 0 6px 20px rgba(16,20,30,.06);
   --grid:#eceef2; --axis:#c6cad4;
   --c-temp:#e8743b; --c-cold:#3b82c4; --c-rh:#3b82c4; --c-wind:#2f9e6e;
   --c-rain:#005b96; --c-pm25:#3b6fd4; --c-pm10:#d1443f; --c-cloud:#4c4fbe;
+  /* Gold=clear, pale blue-grey=patchy/cirrus, slate=overcast. Yellow marked the
+     middle category before, which read as "sunny" and inverted the whole scale
+     at a glance. */
   --band-clear:#f5b301; --band-mid:#b7cbda; --band-over:#8a9198;
   --good:#2f9e6e; --moderate:#d9a520; --poor:#d1443f;
   --pill:#eef0f4; --nsb-dark:#3a4a7a; --nsb-bright:#c9922e;
   --sun:#e8a33b; --moon:#7f8aa8;
+  /* WHO UV bands. Low and moderate borrow the air-quality colours so the same
+     green/amber means the same thing on both hero cards; high and above need
+     two more steps than air quality has. */
   --uv-high:#cf7420; --uv-extreme:#8b47c4;
+  color-scheme:light;
 }
-:root{ color-scheme:dark; }
-:root[data-theme="light"]{ color-scheme:light; }
 
 /* ============================================================= base ==== */
 *{box-sizing:border-box}
@@ -225,7 +202,6 @@ footer a{color:var(--ink-2)}
     </div>
     <div class="head-right">
       <span class="freshness" id="fresh"><span class="dot"></span><span id="fresh-txt">loading…</span></span>
-      <button class="tbtn" id="theme" title="Toggle light / dark" aria-label="Toggle light / dark"></button>
     </div>
   </header>
 
@@ -292,8 +268,9 @@ footer a{color:var(--ink-2)}
 /* ========================================================================
    Environmental monitoring dashboard.
    All charts are inline SVG built by hand - no charting library.
-   Colours are read from CSS custom properties at draw time, so switching
-   theme just triggers a redraw.
+   Colours are read from CSS custom properties at draw time rather than being
+   held in JS, which is what lets a resize redraw come out right without
+   anything caching a palette.
    ===================================================================== */
 
 const TZ   = "Europe/Malta";
@@ -874,10 +851,6 @@ function uvSvg(u){
       fill="none" stroke="${band.colour}" stroke-width="3.4" stroke-linecap="round"/>` : ""}
   </svg>`;
 }
-
-const themeIcon = dark => dark
-  ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>`
-  : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5z"/></svg>`;
 
 /* =====================================================================
    Hero panels  (refresh every 10 minutes)
@@ -1463,39 +1436,15 @@ function setNote(){
      current conditions and air quality refresh every 10 minutes.`;
 }
 
-/* -------------------------------------------------------------- theme */
-function applyTheme(mode){
-  const root = document.documentElement;
-  /* Dark is the :root default, so only light needs an attribute to select it. */
-  if (mode === "light") root.setAttribute("data-theme", "light");
-  else root.removeAttribute("data-theme");
-  const dark = mode !== "light";
-  $("#theme").innerHTML = themeIcon(dark);
-  /* colours come from CSS variables at draw time, so a redraw re-themes */
-  drawAll();
-  renderNow(); renderAQ();
-}
-function initTheme(){
-  let saved = null;
-  try { saved = localStorage.getItem("envdash-theme"); } catch (e) {}
-  /* Anything but an explicit "light" — including nothing saved at all — opens
-     dark. The OS preference is deliberately not consulted, so the page matches
-     the rest of the site instead of the machine. The head sets the same
-     attribute before first paint; this only has to agree with it. */
-  applyTheme(saved === "light" ? "light" : "dark");
-  $("#theme").addEventListener("click", () => {
-    const next = document.documentElement.getAttribute("data-theme") === "light"
-      ? "dark" : "light";
-    try { localStorage.setItem("envdash-theme", next); } catch (e) {}
-    applyTheme(next);
-  });
-}
+/* There is no theme here any more: the dashboard is light, the tokens above
+   are the only set, and nothing reads or writes a preference. Charts still
+   take their colours from the CSS variables at draw time, which is what lets
+   a resize redraw come out right without anything caching a palette. */
 
 let rt = null;
 addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(drawAll, 180); });
 
 (async function main(){
-  initTheme();
   try {
     HIST = await getJSON(HIST_URL, false);
   } catch (e){

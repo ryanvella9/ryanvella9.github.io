@@ -30,6 +30,22 @@
       margin-left: auto;
       margin-right: auto;
     }
+
+    /* Two things must not take the text cap, the same way .page__cover is
+       left out of the equivalent rule in _page.scss.
+
+       .ph-grid is a gallery, not a column of prose: its tracks are a fixed
+       210px, so capping the row to $archive-measure drops it from five
+       thumbnails to three and leaves the rest of the page blank.
+
+       .ph-lb is the lightbox backdrop, position:fixed with inset:0 to cover
+       the viewport. A max-width applies to fixed boxes as readily as any
+       other, so the cap would hold the overlay to $archive-measure and
+       leave the page visible beside it. */
+    > .ph-grid,
+    > .ph-lb {
+      max-width: none;
+    }
   }
 
   a {
