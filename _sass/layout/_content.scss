@@ -34,11 +34,11 @@ $content-measure: 36em;
    the right, and still stops well short of the ~130 characters the bare
    container would give.
 
-   Resolved at the full body size — every list that uses it sets its own
-   font-size per line rather than on the wrapper — so it lands at roughly
-   $archive-measure (~792px at the 18px desktop base) and a list lines up
-   with the headings beside it rather than overhanging them. */
-$list-measure-root: 44em; // at the full body size -> ~792px
+   In rem, not em: em resolves against each element's own font-size, so the
+   same 44em gave 792px on a 1em list but 1188px on the 1.5em .section-head —
+   which is wider than the column, i.e. no cap at all. Root-relative keeps
+   every block that uses it on the same right edge as .archive > *. */
+$list-measure-root: $archive-measure; // 44rem -> 792px at the 18px base
 
 
 /* Section headings
@@ -53,6 +53,10 @@ $list-measure-root: 44em; // at the full body size -> ~792px
    token because --global-border-color is #f2f3f3, invisible on white. */
 
 .section-head {
+  /* Uncapped, the rule ran the full column — 980px over a 648px paragraph on
+     the landing page. The list measure is what it heads on /publications/
+     and /outreach/, so it is the right ceiling. */
+  max-width: $list-measure-root;
   margin: 2.2em 0 1em;
   padding-bottom: 0.35em;
   border-bottom: 1px solid var(--global-dark-border-color);
@@ -439,7 +443,21 @@ $list-measure-root: 44em; // at the full body size -> ~792px
   }
 }
 
+/* Was a .btn--primary pill, but no --primary modifier is defined anywhere, so
+   it fell back to the default grey and read as a disabled control. A link is
+   also the more honest control for a download on a page of prose. */
+.cv-download {
+  margin: 2.2em 0 0;
+
+  a {
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.18em;
+  }
+}
+
 .page-updated {
+  max-width: $list-measure-root;
   margin: 2.4em 0 0;
   font-size: 0.88em;
   color: var(--global-text-color-light);

@@ -55,9 +55,15 @@
   }
 }
 
+/* Georgia, matching .section-head: the serif is already the site's heading
+   voice on the publication and outreach pages. Sized clear of the section
+   heads below it, which sat within a pixel of the old sans h1. */
 .page__title {
   margin-top: 0;
-  line-height: 1;
+  font-family: $serif;
+  font-size: 2.1em;
+  font-weight: 400;
+  line-height: 1.15;
 
   & + .page__meta {
     margin-top: -0.5em;
@@ -186,10 +192,13 @@
    Cover video
    ========================================================================== */
 
+/* A banner, not a hero: held to the text measure and about half its old
+   height, so the opening paragraph is on screen without scrolling. */
 .page__cover {
   position: relative;
-  margin: 0 0 2em;
-  aspect-ratio: 21 / 9;
+  max-width: $archive-measure;
+  margin: 0 0 2.2em;
+  aspect-ratio: 3 / 1;
   overflow: hidden;
   border-radius: $border-radius;
   background-color: var(--global-border-color);
@@ -197,9 +206,9 @@
   background-size: cover;
   background-repeat: no-repeat;
 
-  /* the source is 16:9, so a 21:9 window crops ~12% off the top and bottom */
+  /* the source is 16:9, so a wider window crops off the top and bottom */
   @include breakpoint(max-width $small) {
-    aspect-ratio: 16 / 10;
+    aspect-ratio: 2 / 1;
   }
 }
 
