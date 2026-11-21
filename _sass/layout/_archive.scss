@@ -24,10 +24,19 @@
        sidebar is position:fixed and therefore out of flow, so a centred
        non-floated column slides underneath it with no line-box wrapping to
        push the text clear. Holding the float keeps the column to the right of
-       the sidebar at every width, and the children centre inside it. */
+       the sidebar at every width.
+
+       The children run flush to the column's left edge rather than centring
+       in the slack the cap leaves. Centring only ever held for a child that
+       did not set its own horizontal margins, and most of the content blocks
+       in _content.scss do set them — so .page__title centred while the list
+       or the section heads beneath it sat ~94px to the left, and on /research/
+       a centred .prose fell out of line with the .lead above it. One left edge
+       for every child is what the eye reads as a column; a cap plus auto
+       margins was quietly producing two. */
     > * {
       max-width: $archive-measure;
-      margin-left: auto;
+      margin-left: 0;
       margin-right: auto;
     }
 
