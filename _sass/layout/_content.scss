@@ -123,10 +123,11 @@ $list-measure-root: 44em; // at the full body size -> ~792px
 /* Reference list
    ------------------------------------------------------------------------
    Publications, grouped under a ruled year and set two columns wide: the
-   month in a narrow gutter, the citation beside it. The month is what the
-   gutter is for — a dated rail lets a reader see the run rate of the list
-   at a glance, which a running count cannot, and the year rule above does
-   the grouping work the old uppercase label was too quiet to do.
+   entry number in a narrow gutter, the citation beside it. The number is
+   not decoration — a publication list genuinely is enumerable, and the
+   number is what lets a reader or a covering letter refer to "no. 4". The
+   year rule above does the grouping work the old uppercase label was too
+   quiet to do.
 
    Each citation is three lines: the title first, then authors, then the
    venue. Review status is plain words closing the venue line rather than a
@@ -158,35 +159,45 @@ $list-measure-root: 44em; // at the full body size -> ~792px
   margin-top: 0;
 }
 
+/* The counter restarts per year group rather than running once down the page,
+   so each year begins at 1. The year rule above is what the number is read
+   against, which keeps a bare "3." unambiguous — and it holds every group to
+   a single digit, so the gutter never has to widen for a stray two-digit
+   entry. */
 .publist {
+  counter-reset: pub;
   max-width: $list-measure-root;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-/* Gutter wide enough for a three-letter month at its tracking, and no wider —
-   the citation is what the column is for. The vertical padding has to beat
-   the leading inside an entry, or three stacked lines read as six loose
-   ones. */
+/* Gutter sized for one digit and its stop, and no wider — the citation is
+   what the column is for. The vertical padding has to beat the leading
+   inside an entry, or three stacked lines read as six loose ones. */
+/* `baseline` rather than a nudge in em: the number and the title are set in
+   different families at different sizes, so the offset that lines them up
+   depends on two sets of font metrics. Letting grid match the first
+   baselines gets it right without hard-coding either. */
 .publication {
   display: grid;
-  grid-template-columns: 4.2em 1fr;
-  gap: 0 1.3em;
+  grid-template-columns: 2.1em 1fr;
+  align-items: baseline;
+  gap: 0 1.1em;
   padding: 0.7em 0;
+  counter-increment: pub;
 }
 
-/* The accent is load-bearing here: it is the only colour in the row, which is
-   what makes the rail scannable. Nudged down so the month sits on the
-   title's first line rather than above it — the two have different
-   font-sizes, so no shared line-height lines them up. */
-.pub-when {
-  padding-top: 0.3em;
+/* A generated number rather than a real element: it keeps the count honest
+   against edits, keeps it out of a citation copied from the page, and the
+   list's own `ul` semantics already tell a screen reader this is enumerated.
+   The accent is load-bearing — it is the only colour in the row, which is
+   what makes the rail scannable. */
+.publication::before {
+  content: counter(pub) ".";
   font-family: $content-sans;
-  font-size: 0.8em;
+  font-size: 0.9em;
   font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   line-height: 1.5;
   color: var(--global-link-color);
   font-variant-numeric: tabular-nums;
@@ -449,16 +460,11 @@ $list-measure-root: 44em; // at the full body size -> ~792px
     font-size: 1.2em;
   }
 
-  /* A 4em gutter plus a citation does not fit a phone, so the month stacks
-     above the title and the rail goes away. It was a scanning aid, not
-     structure — the entry still reads top to bottom without it. */
+  /* A digit still fits beside the citation on a phone where a month label
+     would not, so the rail survives — tucked in, but out of the text block. */
   .publication {
-    grid-template-columns: 1fr;
-    gap: 0.1em 0;
-  }
-
-  .pub-when {
-    padding-top: 0;
+    grid-template-columns: 1.6em 1fr;
+    gap: 0 0.8em;
   }
 
   .refyear {
