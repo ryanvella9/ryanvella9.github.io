@@ -17,12 +17,8 @@
 }
 
 .page {
-  /* No suffix here. A suffix(2 of 12) used to sit below, which is a 16.95%
-     padding-right -- 211px of dead space at 1920px that held the text column
-     to 770px however wide the screen got, and pushed it left of centre. It
-     also left this narrower than .archive, which spans the same 10 of 12 with
-     the same prefix and no suffix; the landing page came out 210px narrower
-     than /outreach/. Keep the two in step. */
+  /* No suffix: it held the text column to 770px at any width and left this
+     narrower than .archive. Keep the two in step. */
   @include breakpoint($large) {
     @include span(10 of 12 last);
     @include prefix(0.5 of 12);
@@ -37,12 +33,8 @@
       @include full();
     }
 
-    /* full() above stretches these across the whole container, which is wider
-       than prose wants to be: at $container-max-width that is ~130 characters
-       a line. Hold the reading column to $measure and centre it. The float has
-       to go with it -- auto margins do not centre a floated box. .page__cover
-       is deliberately left out, being the one element that gains from the
-       extra width. */
+    /* Hold the reading column to $measure. float:none goes with it, since auto
+       margins do not centre a floated box. .page__cover is left out. */
     > header,
     > .page__content,
     > .page__meta,
@@ -55,9 +47,7 @@
   }
 }
 
-/* Georgia, matching .section-head: the serif is already the site's heading
-   voice on the publication and outreach pages. Sized clear of the section
-   heads below it, which sat within a pixel of the old sans h1. */
+/* Georgia, matching .section-head, and sized clear of it. */
 .page__title {
   margin-top: 0;
   font-family: $serif;
@@ -231,8 +221,7 @@
   border-radius: $border-radius 0 $border-radius 0;
 }
 
-/* Motion here is decoration, so fall back to the poster still when the
-   visitor has asked for less of it. */
+/* Decoration: fall back to the poster still. */
 @media (prefers-reduced-motion: reduce) {
   .page__cover-video {
     display: none;

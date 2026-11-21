@@ -1,12 +1,5 @@
-/* Body copy on the landing page.
-   This was a bordered, tinted, drop-shadowed card wrapped around running
-   prose. Three paragraphs of biography do not need a container to be read as
-   belonging together — the heading above them and the space around them
-   already say it — so what is left is the spacing. */
-/* 36em, matching $content-measure in _content.scss — that partial is imported
-   after this one, so the value cannot be read from the variable here. At 42em
-   these three paragraphs ran ~84 characters and sat wider than every block
-   below them. */
+/* Body copy on the landing page. */
+/* 36em = $content-measure, which lives in a partial imported after this one. */
 .content-box {
   margin-bottom: 2em;
   max-width: 36em;

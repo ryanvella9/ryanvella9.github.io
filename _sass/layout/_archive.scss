@@ -13,44 +13,18 @@
     @include span(10 of 12 last);
     @include prefix(0.5 of 12);
 
-    /* span() stretches this across 10 of 12, which at $container-max-width is
-       far wider than text wants to be: /publications/ and /outreach/ ran past
-       1200px while the copy inside stopped at its own measure, so the right
-       half of the page sat empty. .page already solved this in _page.scss and
-       .archive was left behind.
-
-       Cap the children rather than this column, exactly as .page does. The
-       column has to keep its float: above $sidebar-screen-min-width the
-       sidebar is position:fixed and therefore out of flow, so a centred
-       non-floated column slides underneath it with no line-box wrapping to
-       push the text clear. Holding the float keeps the column to the right of
-       the sidebar at every width.
-
-       The children run flush to the column's left edge rather than centring
-       in the slack the cap leaves. Centring only ever held for a child that
-       did not set its own horizontal margins, and most of the content blocks
-       in _content.scss do set them — so .page__title centred while the list
-       or the section heads beneath it sat ~94px to the left, and on /research/
-       a centred .prose fell out of line with the .lead above it. One left edge
-       for every child is what the eye reads as a column; a cap plus auto
-       margins was quietly producing two. */
+    /* Cap the children, not the column: the float has to stay, or the column
+       slides under the position:fixed sidebar. Flush left rather than centred,
+       because blocks in _content.scss set their own margins and escaped the
+       centring, leaving titles and content on two different edges. */
     > * {
       max-width: $archive-measure;
       margin-left: 0;
       margin-right: auto;
     }
 
-    /* Two things must not take the text cap, the same way .page__cover is
-       left out of the equivalent rule in _page.scss.
-
-       .ph-grid is a gallery, not a column of prose: its tracks are a fixed
-       210px, so capping the row to $archive-measure drops it from five
-       thumbnails to three and leaves the rest of the page blank.
-
-       .ph-lb is the lightbox backdrop, position:fixed with inset:0 to cover
-       the viewport. A max-width applies to fixed boxes as readily as any
-       other, so the cap would hold the overlay to $archive-measure and
-       leave the page visible beside it. */
+    /* Exempt from the cap: .ph-grid is a gallery on fixed 210px tracks and
+       loses thumbnails, .ph-lb is a fixed inset:0 backdrop and would shrink. */
     > .ph-grid,
     > .ph-lb {
       max-width: none;

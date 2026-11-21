@@ -1,16 +1,9 @@
 {% include base_path %}
 
 {% comment %}
-  Looping video banner at the top of the content column.
-
-  It deliberately sits inside .page__inner-wrap rather than spanning the
-  viewport: above $sidebar-screen-min-width the author sidebar is
-  position:fixed, so a full-bleed hero is drawn underneath it instead of
-  pushing it down.
-
-  The poster is set as the figure background as well as the video poster, so
-  it carries the banner whenever the video does not play — before the first
-  frame decodes, if the file 404s, and under prefers-reduced-motion.
+  Looping video banner. Sits inside .page__inner-wrap, not the viewport: the
+  author sidebar is position:fixed, so a full-bleed banner draws under it.
+  The poster doubles as the figure background for when the video does not play.
 {% endcomment %}
 
 {% if page.cover.poster contains "://" %}

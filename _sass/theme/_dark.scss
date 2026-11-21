@@ -8,10 +8,7 @@ $dark-gray                  : mix(#000, $gray, 40%);
 $darker-gray                : mix(#000, $gray, 60%);
 $light-gray                 : mix(#fff, $gray, 50%);
 
-/* Deep slate. A flat mid grey (this was #474747) sits too close to the warm
-   photography and the teal links to read as neutral — it comes across muddy,
-   almost brown. The surfaces below are pitched much darker and pulled a touch
-   towards blue so they sit under the accent rather than fighting it. */
+/* Deep slate, pulled slightly blue so it sits under the teal accent. */
 $background                 : #14181c; // page
 $surface                    : #1b2026; // raised: content boxes, code, tables
 $background-deep            : #11151a; // masthead and footer
@@ -41,17 +38,5 @@ $navicon-height             : 4px;
 $sidebar-link-max-width     : 250px;
 $sidebar-screen-min-width   : 1024px;
 
-/* The dark theme's rules are gone — the site is light only, and nothing sets
-   data-theme any more, so they matched nothing.
-
-   The file stays because it was never only a theme. Everything above this
-   line is the SCSS variable palette the rest of the stylesheet is written
-   against: $border, $background, $text, $link and six more are declared here
-   and nowhere else, and fifteen partials read them. Deleting the file to
-   remove the theme would take the palette with it and the build would stop on
-   an undefined variable.
-
-   Renaming it is the obvious follow-up and is deliberately not done here:
-   "theme/dark" is one line in main.scss and a git mv, but the name appears in
-   a stylesheet the site is mid-edit on, and a rename is a worse thing to
-   collide with than a stale filename. */
+/* No dark-theme rules: the site is light only. The file stays for the SCSS
+   palette above it, which fifteen partials read. Stale filename, on purpose. */
