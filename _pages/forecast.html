@@ -3257,10 +3257,27 @@ function isothermPaths(step, wantMarks) {
    collide wherever two contours run close, which over a tight gradient is
    exactly where they run close.
 
+   Which candidate wins used to be decided by nothing but grid-scan order, so
+   the first crossing found — top row, leftmost column — took the slot and the
+   155 px exclusion then blocked everything near it. That is why the labels
+   bunched into the top-left and sat rotated against the frame edge: not a
+   placement rule at all, just the order a nested loop happens to run in. They
+   are now scored and taken best-first, on the two things that make a label
+   readable on a printed analysis — room around it, and a straight piece of
+   line to sit on. A number on a hairpin reads as belonging to neither side of
+   the bend, and one against the edge is half outside the chart.
+
+   Scored per level first, so every isobar drawn gets its one label before any
+   gets a second. Without that the global ranking hands the whole budget to
+   whichever contours happen to run through the middle, and the outer isobars —
+   the ones a reader counts inward from — come out bare.
+
    The line is "broken" by a halo rather than by actually splitting the path:
    the same trick the place names use, and indistinguishable at this size. */
 const ISOBAR_LABEL_MIN_PX = 155;   // along a level, and between levels
 const ISOBAR_LABEL_CELL = 70;      // spatial-hash bucket, px
+const ISOBAR_LABEL_EDGE = 120;     // px from the frame past which room stops counting
+const ISOBAR_STRAIGHT_PX = 26;     // neighbourhood a candidate's straightness is judged over
 
 function drawContourLabels(marks, css) {
   if (!marks) return;
@@ -3283,6 +3300,70 @@ function drawContourLabels(marks, css) {
     return false;
   };
 
+  /* Straightness, from the candidates themselves rather than from a path: the
+     marks of one level within a short radius are the same contour, so how
+     consistent their directions are is how straight it is running. Measured on
+     doubled angles because a contour has no direction — east and west are the
+     same line, and averaging the raw angles would call a straight horizontal
+     run a hairpin half the time. 1 is dead straight, 0 is a tangle.
+
+     The two sines and cosines per mark are taken once, up front, rather than
+     inside the neighbour loop. Each candidate reads every mark in its nine
+     surrounding buckets, so computing them where they are read meant roughly
+     two million trig calls a repaint and put this function at 41 ms on its
+     own — more than the contouring it labels. Precomputed, the inner loop is
+     two adds. */
+  const R2 = ISOBAR_STRAIGHT_PX * ISOBAR_STRAIGHT_PX;
+  const scored = [];
+  for (const [lev, list] of marks) {
+    // In-frame candidates only, and the axial unit vector alongside them.
+    const cand = [];
+    for (const m of list) {
+      if (m.x < 26 || m.x > W - 26 || m.y < 16 || m.y > H - 16) continue;
+      const a2 = 2 * m.ang;
+      cand.push({ x: m.x, y: m.y, ang: m.ang, c2: Math.cos(a2), s2: Math.sin(a2) });
+    }
+    const hash = new Map();
+    for (const m of cand) {
+      const k = `${Math.floor(m.x / ISOBAR_STRAIGHT_PX)},${Math.floor(m.y / ISOBAR_STRAIGHT_PX)}`;
+      let b = hash.get(k);
+      if (!b) hash.set(k, b = []);
+      b.push(m);
+    }
+    for (const m of cand) {
+      const cx = Math.floor(m.x / ISOBAR_STRAIGHT_PX), cy = Math.floor(m.y / ISOBAR_STRAIGHT_PX);
+      let sx = 0, sy = 0, k = 0;
+      for (let i = cx - 1; i <= cx + 1; i++) {
+        for (let j = cy - 1; j <= cy + 1; j++) {
+          const b = hash.get(`${i},${j}`);
+          if (!b) continue;
+          for (const o of b) {
+            const dx = o.x - m.x, dy = o.y - m.y;
+            if (dx * dx + dy * dy > R2) continue;
+            sx += o.c2; sy += o.s2; k++;
+          }
+        }
+      }
+      const straight = k < 2 ? 0.5 : Math.hypot(sx, sy) / k;
+      const room = Math.min(ISOBAR_LABEL_EDGE,
+                            Math.min(m.x, W - m.x, m.y, H - m.y)) / ISOBAR_LABEL_EDGE;
+      // Room is the veto and straightness the tie-break: a label just inside
+      // the frame is wrong however straight the line it sits on.
+      scored.push({ lev, m, s: room * (0.45 + 0.55 * straight) });
+    }
+  }
+
+  /* Every level's best candidate first, then everything else by score. A
+     candidate that was already drawn in the first pass simply clashes with
+     itself in the second and is skipped. */
+  const best = new Map();
+  for (const c of scored) {
+    const b = best.get(c.lev);
+    if (!b || c.s > b.s) best.set(c.lev, c);
+  }
+  const byScore = (a, b) => b.s - a.s;
+  const order = [...best.values()].sort(byScore).concat(scored.sort(byScore));
+
   ctxG.save();
   ctxG.font = '600 10px ui-sans-serif, system-ui, sans-serif';
   ctxG.textAlign = 'center';
@@ -3292,26 +3373,22 @@ function drawContourLabels(marks, css) {
   ctxG.strokeStyle = halo;
   ctxG.fillStyle = ink;
 
-  for (const [lev, list] of marks) {
-    const text = String(lev);
-    for (const m of list) {
-      if (m.x < 26 || m.x > W - 26 || m.y < 16 || m.y > H - 16) continue;
-      if (clashes(m.x, m.y)) continue;
-      // Keep the number the right way up: a contour running east-to-west would
-      // otherwise print it upside down half the time.
-      let a = m.ang;
-      if (a > Math.PI / 2) a -= Math.PI;
-      else if (a < -Math.PI / 2) a += Math.PI;
-      ctxG.save();
-      ctxG.translate(m.x, m.y);
-      ctxG.rotate(a);
-      ctxG.strokeText(text, 0, 0);
-      ctxG.fillText(text, 0, 0);
-      ctxG.restore();
-      const k = key(m.x, m.y);
-      if (!taken.has(k)) taken.set(k, []);
-      taken.get(k).push([m.x, m.y]);
-    }
+  for (const { lev, m } of order) {
+    if (clashes(m.x, m.y)) continue;
+    // Keep the number the right way up: a contour running east-to-west would
+    // otherwise print it upside down half the time.
+    let a = m.ang;
+    if (a > Math.PI / 2) a -= Math.PI;
+    else if (a < -Math.PI / 2) a += Math.PI;
+    ctxG.save();
+    ctxG.translate(m.x, m.y);
+    ctxG.rotate(a);
+    ctxG.strokeText(String(lev), 0, 0);
+    ctxG.fillText(String(lev), 0, 0);
+    ctxG.restore();
+    const k = key(m.x, m.y);
+    if (!taken.has(k)) taken.set(k, []);
+    taken.get(k).push([m.x, m.y]);
   }
   ctxG.restore();
 }
@@ -3320,78 +3397,187 @@ function drawContourLabels(marks, css) {
 
    A closed isobar says a centre is inside it but not which way it turns, and at
    4 hPa spacing a shallow feature closes no isobar at all — so these are found
-   in the field rather than from the contours. A centre is a grid point that is a
-   strict extremum over its neighbourhood *and* stands out from that
-   neighbourhood by more than a wrinkle's worth of pressure.
+   in the field rather than from the contours.
 
-   Radius is in grid cells rather than degrees on purpose: it is a statement
-   about how many samples a feature has to span to be one, and the payload's
-   spacing is what decides that. */
-/* Two radii, because one cannot do this job.
+   What makes something a centre is that a closed isobar encloses it, and the
+   measure of how much it matters is how deep that closed contour is. That
+   quantity is topographic prominence: for a low, how far you must climb out of
+   its basin before you can reach a deeper low. It is exactly what a forecaster
+   drawing an L is judging by eye, and it is what the threshold below has always
+   claimed to be.
 
-   Testing for an extremum and testing how much it matters want opposite scales.
-   Measure prominence close in and a broad anticyclone fails: its centre is flat,
-   so it clears no threshold over a few degrees and the largest feature on the
-   chart goes unlabelled — which is exactly what a single 4° radius did here.
-   Measure the extremum far out and every shallow wrinkle inside a ridge
-   qualifies.
+   It was not what the code measured. Two windows were compared — a near one to
+   locate an extremum, a far one at 8° to decide whether it was worth naming —
+   and the second took the *range of the field* across the far window as the
+   depth. In a slack pattern those agree. In a strong gradient they do not agree
+   at all: eight degrees across a tight baroclinic zone spans 20 hPa whether or
+   not anything is enclosed, so any point that happened to be the lowest within
+   3° cleared a 4 hPa bar comfortably. On the 00Z +42 chart that put twenty
+   centres on the map, of which fourteen had a true prominence under 2 hPa and
+   four under 0.5 — a Saharan ridge labelled H in three places, three separate
+   Ls strung along one Atlantic trough, an L on the Alboran Sea. Measured
+   properly the same field and the same 4 hPa threshold give nine, and they are
+   the nine a surface analysis would carry.
 
-   So: a strict extremum over the near radius decides *where* a centre is, and
-   the far radius decides *whether* it is worth naming. The near test carries a
-   tolerance because a flat centre is full of ties, and a ">" against its own
-   plateau would reject the very features the far radius exists to catch.
-
-   The far window is only evaluated for points that already passed the near one —
-   a few dozen, not fifty thousand — so the larger radius costs nothing. */
-const CENTRE_R = 6;              // grid cells — 3°, where the centre is
-const CENTRE_R_FAR = 16;         // grid cells — 8°, whether it matters
-const CENTRE_FLAT = 0.05;        // hPa of tie tolerance on a flat centre
-const CENTRE_PROMINENCE = 4.0;   // hPa a centre must stand clear of the far ring
+   Prominence is computed for every basin at once by flooding the grid in
+   ascending order and merging basins as they meet: when two meet, the shallower
+   one is sealed off and the level they met at is its saddle. One pass, no
+   radius to choose, and nothing to tune per pattern — a broad flat anticyclone
+   and a tight cyclone are judged by the same rule, which is the thing the two
+   radii were trying and failing to do. It also costs less than what it replaces:
+   a sort and a union-find over 50 000 cells against a 13×13 window at each of
+   them. */
+/* 3 hPa, not the 4 the old constant named. 4 was chosen against a measure that
+   ran several times too generous, so it was never really a 4 hPa bar; against
+   true prominence it is a strict one. Counted over the whole 360 h range it
+   leaves 2 to 9 centres a chart and the quiet steps come out nearly bare — at
+   +240 h, two centres for the North Atlantic and Europe. 3 gives 7 to 12, which
+   keeps the secondary lows strung along a trough that a surface analysis does
+   label, and still drops everything that is not enclosed by a contour. */
+const CENTRE_PROMINENCE = 3.0;   // hPa of closed contour a centre must carry
 const CENTRE_MIN_PX = 80;        // two labels closer than this are one feature
+
+/* Prominence of every local minimum of F, by flood-and-merge.
+
+   Returns a Map from cell index to the depth of the closed contour around it.
+   Highs are the same function over the negated field, which is why this takes
+   a sign rather than being written twice. */
+function basinProminence(F, n, nx, sign) {
+  /* Ordered by a counting sort on hundredths of a hectopascal, not by a
+     comparison sort. This runs on every repaint of a playing loop, and
+     Array.prototype.sort over 50 000 cells means ~850 000 calls into a JS
+     comparator: measured in the browser that alone took the detector from
+     36 ms to 96 ms, which at 20 fps is the difference between keeping frame
+     rate and halving it. Bucketing is O(n) with no callback at all, and 0.01
+     hPa is four hundred times finer than the threshold it feeds.
+
+     Ascending in the sense that matters: for highs the field is read negated,
+     so "downhill" is towards higher pressure and the same merge logic holds. */
+  let lo = Infinity, hi = -Infinity, m = 0;
+  for (let i = 0; i < n; i++) {
+    if (Number.isNaN(F[i])) continue;
+    const k = sign * F[i];
+    if (k < lo) lo = k;
+    if (k > hi) hi = k;
+    m++;
+  }
+  if (!m) return new Float64Array(0);
+
+  const BUCKET = 100;                                    // per hPa
+  const nb = Math.max(1, Math.round((hi - lo) * BUCKET) + 1);
+  const counts = new Int32Array(nb + 1);
+  const bucketOf = (i) => {
+    const b = Math.round((sign * F[i] - lo) * BUCKET);
+    return b < 0 ? 0 : b >= nb ? nb - 1 : b;
+  };
+  for (let i = 0; i < n; i++) if (!Number.isNaN(F[i])) counts[bucketOf(i) + 1]++;
+  for (let b = 0; b < nb; b++) counts[b + 1] += counts[b];
+  const sub = new Int32Array(m);
+  for (let i = 0; i < n; i++) if (!Number.isNaN(F[i])) sub[counts[bucketOf(i)]++] = i;
+
+  const parent = new Int32Array(n).fill(-1);
+  const basinMin = new Int32Array(n).fill(-1);
+  const done = new Uint8Array(n);
+  /* Keyed by cell rather than a Map: 50 000 Map writes and an iterator to read
+     them back cost more than the flood itself. 0 doubles as "not a basin
+     minimum", which is sound because the threshold this feeds is 4 hPa. */
+  const prom = new Float64Array(n);
+
+  const find = (a) => {
+    while (parent[a] !== a) { parent[a] = parent[parent[a]]; a = parent[a]; }
+    return a;
+  };
+  // "Deeper" is whichever basin's minimum the flood reached first.
+  const deeper = (a, b) => (sign * (F[basinMin[a]] - F[basinMin[b]]) <= 0 ? a : b);
+
+  for (let k = 0; k < m; k++) {
+    const i = sub[k];
+    const r = (i / nx) | 0, c = i - r * nx;
+    parent[i] = i; basinMin[i] = i; done[i] = 1;
+
+    let root = -1;
+    for (let d = 0; d < 4; d++) {
+      const rr = r + (d === 0 ? -1 : d === 1 ? 1 : 0);
+      const cc = c + (d === 2 ? -1 : d === 3 ? 1 : 0);
+      if (rr < 0 || cc < 0 || cc >= nx || rr * nx + cc >= n) continue;
+      const j = rr * nx + cc;
+      if (!done[j]) continue;
+      const rj = find(j);
+      if (root === -1) { root = deeper(rj, find(i)); continue; }
+      root = deeper(root, rj);
+    }
+    if (root === -1) continue;
+
+    // Everything meeting here that is not the deepest basin is sealed off, and
+    // this cell is the saddle it had to climb to.
+    for (let d = 0; d < 5; d++) {
+      let j;
+      if (d === 4) j = i;
+      else {
+        const rr = r + (d === 0 ? -1 : d === 1 ? 1 : 0);
+        const cc = c + (d === 2 ? -1 : d === 3 ? 1 : 0);
+        if (rr < 0 || cc < 0 || cc >= nx || rr * nx + cc >= n) continue;
+        j = rr * nx + cc;
+        if (!done[j]) continue;
+      }
+      const rj = find(j);
+      if (rj === find(root)) continue;
+      prom[basinMin[rj]] = sign * (F[i] - F[basinMin[rj]]);
+      parent[rj] = find(root);
+    }
+    const rr2 = find(root);
+    if (sign * (F[basinMin[i]] - F[basinMin[rr2]]) < 0) basinMin[rr2] = basinMin[i];
+  }
+
+  /* Whatever never merged is the deepest basin on the grid; nothing encloses it,
+     so its prominence is its full depth below the highest point there is. */
+  const top = hi;
+  for (let k = 0; k < m; k++) {
+    const i = sub[k];
+    if (parent[i] === i && prom[basinMin[i]] === 0) {
+      prom[basinMin[i]] = top - sign * F[basinMin[i]];
+    }
+  }
+  return prom;
+}
+
+let centreCache = null;   // keyed on the frame, since a frame's centres are fixed
 
 function pressureCentres() {
   const F = CUR.msl;
   if (!F) return [];
 
-  // Min and max over a window, clamped at the grid edge rather than skipped:
-  // the payload is wider than the frame, so a centre visible on the map always
-  // has data around it, but not always the full radius of it.
-  const window = (r, c, rad) => {
-    let lo = Infinity, hi = -Infinity;
-    const r0 = Math.max(0, r - rad), r1 = Math.min(NY - 1, r + rad);
-    const c0 = Math.max(0, c - rad), c1 = Math.min(NX - 1, c + rad);
-    for (let rr = r0; rr <= r1; rr++) {
-      for (let cc = c0; cc <= c1; cc++) {
-        const w = F[rr * NX + cc];
-        if (Number.isNaN(w)) return null;
-        if (w < lo) lo = w;
-        if (w > hi) hi = w;
-      }
-    }
-    return [lo, hi];
-  };
+  /* Recomputed only when the field itself changes. drawCentres runs on every
+     repaint — a hover, a resize, a colourbar redraw — where the answer cannot
+     have moved, and the flood is cheap but not free.
+
+     Keyed on the blend state rather than on the frame number, because CUR is
+     interpolated: between two steps the field is a weighted mix and the centres
+     genuinely drift with it. Truncating to the frame would pin them to the last
+     whole step and let them jump when it ticked over. During playback w changes
+     every tick so this misses every time, which is correct — that is the case
+     where the answer really is different each repaint. */
+  const stamp = `${state.domain}:${state.ia}:${state.ib}:${state.w}:${NX}x${NY}`;
+  if (centreCache && centreCache.stamp === stamp) return centreCache.list;
+
+  const n = NX * NY;
+  const lowProm = basinProminence(F, n, NX, 1);
+  const highProm = basinProminence(F, n, NX, -1);
 
   const found = [];
-  for (let r = CENTRE_R; r < NY - CENTRE_R; r++) {
-    for (let c = CENTRE_R; c < NX - CENTRE_R; c++) {
-      const v = F[r * NX + c];
-      if (Number.isNaN(v)) continue;
-      const near = window(r, c, CENTRE_R);
-      if (!near) continue;
-      const isLow = v <= near[0] + CENTRE_FLAT;
-      const isHigh = v >= near[1] - CENTRE_FLAT;
-      if (!isLow && !isHigh) continue;
-
-      const far = window(r, c, CENTRE_R_FAR);
-      if (!far) continue;
-      const depth = isHigh ? v - far[0] : far[1] - v;
-      if (depth < CENTRE_PROMINENCE) continue;
-
+  const collect = (prom, high) => {
+    for (let i = 0; i < prom.length; i++) {
+      const p = prom[i];
+      if (p < CENTRE_PROMINENCE) continue;
+      const r = (i / NX) | 0, c = i - r * NX;
       const [x, y] = xy(D.lon0 + c * D.dx, D.lat0 + r * D.dy);
       if (x < 16 || x > W - 16 || y < 18 || y > H - 20) continue;
-      found.push({ x, y, v, high: isHigh && !isLow, depth });
+      found.push({ x, y, v: F[i], high, depth: p });
     }
-  }
+  };
+  collect(lowProm, false);
+  collect(highProm, true);
+
   /* Deepest first, then drop anything that would print on top of one already
      kept. Two extrema a few cells apart are one feature the grid happened to
      give two equal samples, and labelling it twice reads as two lows. */
@@ -3401,6 +3587,7 @@ function pressureCentres() {
     if (kept.some((k) => Math.hypot(k.x - f.x, k.y - f.y) < CENTRE_MIN_PX)) continue;
     kept.push(f);
   }
+  centreCache = { stamp, list: kept };
   return kept;
 }
 
