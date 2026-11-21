@@ -142,6 +142,13 @@ title: "Weather"
 
   body.busy { cursor: progress; }
 
+  /* Holds the map panel back while a deep link's own data is still in flight.
+     visibility, not hidden or display:none: resize() measures the section and
+     latches zeros if it ever reads a width of 0 — see the comment there — and
+     a hidden section measures exactly that. visibility:hidden keeps the box in
+     layout, so the measurement stays honest and nothing reflows when it goes. */
+  body.booting #view-map { visibility: hidden; }
+
   #theme { padding: 5px 8px; line-height: 0; border-radius: 5px; }
 
   /* ---------------------------------------------------------- meteogram -- */
@@ -9290,6 +9297,14 @@ function ndviShow(on) {
 /* ---------------------------------------------------------------- views -- */
 
 function showView(name) {
+  /* The boot hold is released here rather than at the end of applyHash because
+     applyHash mostly does not end where the reader lands: the branches that
+     need a download return a promise and the view appears a second later, from
+     inside it. Every one of those paths reaches this function, and reaches it
+     immediately before the drawAll that fills the panel — same task, so the
+     reveal and the first real frame paint together and there is no flash of an
+     empty stage between them. */
+  document.body.classList.remove('booting');
   if (state.view === 'sat' && name !== 'sat') satSetPlaying(false);
   state.view = name;
   // Radar has its own observed-data timestamp and source label inside the
@@ -9563,7 +9578,11 @@ function applyHash() {
     // Honoured only if this payload has a long section; a stale link must not
     // leave the range buttons pressed on a view that does not exist.
     state.mgRange = ext ? 'long' : 'short';
-    openMeteogram();
+    /* The one branch that can finish without reaching showView: openMeteogram
+       swallows a failed payload and stays put, which would leave the hold on
+       with nothing to release it and the map invisible underneath. It resolves
+       either way, so release it here too — a second remove is a no-op. */
+    openMeteogram().then(() => document.body.classList.remove('booting'));
     return;
   }
 
@@ -9623,6 +9642,18 @@ syncMeta();
 satInit();
 resize();
 syncTime();
+/* A deep link names where it wants to be, so the page should not spend the
+   download getting there parked on somewhere else. The three Europe levels are
+   lazy, so #500g_anom/europe/f022 painted the Central Med surface panel first
+   and swapped to the chart a second or two later — the link looked like it had
+   opened the wrong tab and then corrected itself.
+
+   Only for a link. A bare visit states no destination, and toLanding's comment
+   makes the opposite call for that case deliberately: the surface panel it
+   holds up is a real forecast rather than a placeholder, and it is better than
+   an empty stage precisely because nobody asked for anything else. Here they
+   did, so the interim frame is not a courtesy, it is a wrong answer. */
+if (BOOT_HASH) document.body.classList.add('booting');
 applyHash();
 buildTicks();   // after applyHash: the layer decides which clock the track shows
 syncTime();
