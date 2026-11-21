@@ -34,12 +34,11 @@ $content-measure: 36em;
    the right, and still stops well short of the ~130 characters the bare
    container would give.
 
-   Two values for one width, because em resolves against each element's own
-   font-size: .reflist sets 0.95em, .medialist does not. Both land at roughly
-   $archive-measure (~792px at the 18px desktop base), so a list lines up with
-   the headings beside it rather than overhanging them. */
-$list-measure: 46em;      // in .reflist's 0.95em context -> ~787px
-$list-measure-root: 44em; // at the full body size        -> ~792px
+   Resolved at the full body size — every list that uses it sets its own
+   font-size per line rather than on the wrapper — so it lands at roughly
+   $archive-measure (~792px at the 18px desktop base) and a list lines up
+   with the headings beside it rather than overhanging them. */
+$list-measure-root: 44em; // at the full body size -> ~792px
 
 
 /* Section headings
@@ -123,88 +122,104 @@ $list-measure-root: 44em; // at the full body size        -> ~792px
 
 /* Reference list
    ------------------------------------------------------------------------
-   Publications, set as a numbered bibliography. Each entry is three lines:
-   authors, then the title on its own line, then the venue. Review status is
-   plain words at the end of the venue line rather than a coloured pill.
+   Publications, grouped under a ruled year and set two columns wide: the
+   month in a narrow gutter, the citation beside it. The month is what the
+   gutter is for — a dated rail lets a reader see the run rate of the list
+   at a glance, which a running count cannot, and the year rule above does
+   the grouping work the old uppercase label was too quiet to do.
 
-   The numbering is not decoration — a publication list genuinely is
-   enumerable, and the numbers are what let a reader or a covering letter
-   refer to "no. 4". */
+   Each citation is three lines: the title first, then authors, then the
+   venue. Review status is plain words closing the venue line rather than a
+   coloured pill. */
 
 .reflist-wrap {
   margin: 0 0 1.6em;
 }
 
-/* The counter is reset per year group rather than once for the page, so each
-   year restarts at 1. The year label above the list is what the number is
-   read against, so a bare "3." is still unambiguous. */
-.reflist {
-  counter-reset: ref;
-  max-width: $list-measure;
+/* The year, as a divider rather than a label. The rule is the heavier border
+   token at 2px: enough to separate two groups on its own, and pitched just
+   under the serif `.section-head` rule so the two still read as different
+   levels. */
+.refyear {
+  max-width: $list-measure-root;
+  margin: 2.3em 0 0.7em;
+  padding-bottom: 0.25em;
+  border-bottom: 2px solid var(--global-dark-border-color);
+  font-family: $content-serif;
+  font-size: 1.25em;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--global-text-color);
+  font-variant-numeric: tabular-nums;
+}
+
+.refyear:first-of-type,
+.section-head + .refyear {
+  margin-top: 0;
+}
+
+.publist {
+  max-width: $list-measure-root;
   margin: 0;
   padding: 0;
   list-style: none;
+}
+
+/* Gutter wide enough for a three-letter month at its tracking, and no wider —
+   the citation is what the column is for. The vertical padding has to beat
+   the leading inside an entry, or three stacked lines read as six loose
+   ones. */
+.publication {
+  display: grid;
+  grid-template-columns: 4.2em 1fr;
+  gap: 0 1.3em;
+  padding: 0.7em 0;
+}
+
+/* The accent is load-bearing here: it is the only colour in the row, which is
+   what makes the rail scannable. Nudged down so the month sits on the
+   title's first line rather than above it — the two have different
+   font-sizes, so no shared line-height lines them up. */
+.pub-when {
+  padding-top: 0.3em;
+  font-family: $content-sans;
+  font-size: 0.8em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  line-height: 1.5;
+  color: var(--global-link-color);
+  font-variant-numeric: tabular-nums;
+}
+
+/* An `h3` for the outline, but sized as a list entry: the serif at 1.05em in
+   book weight, not the theme's heading scale, which would swamp the two
+   lines under it. */
+.pub-title {
+  margin: 0 0 0.2em;
   font-family: $content-serif;
-  font-size: 0.95em;
-  line-height: 1.6;
-
-  li {
-    position: relative;
-    counter-increment: ref;
-    /* Space between entries has to beat the leading inside one, or three
-       stacked lines read as six loose ones. */
-    margin: 0 0 1.5em;
-    padding-left: 2.8em;
-  }
-
-  li::before {
-    content: counter(ref) ".";
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 2.2em;
-    text-align: right;
-    color: var(--global-text-color-light);
-    font-variant-numeric: tabular-nums;
-  }
+  font-size: 1.05em;
+  font-weight: 400;
+  line-height: 1.4;
+  /* Plain text colour even when linked, so the list reads as a bibliography
+     rather than a column of blue. The accent and underline arrive on hover,
+     which is where the affordance is actually needed. */
+  color: var(--global-text-color);
 
   a {
+    color: inherit;
     text-decoration: none;
   }
 
   a:hover,
   a:focus-visible {
+    color: var(--global-link-color);
     text-decoration: underline;
   }
 }
 
-/* The three lines of an entry, each its own block: title, then authors, then
-   the source. The title leads, so it carries the serif at full size while the
-   two lines under it drop to the sans at 0.88em — the entry has one thing to
-   read first and two things to check afterwards. */
-.ref-title {
-  display: block;
-  margin: 0 0 0.25em;
-  font-size: 1.05em;
-  line-height: 1.45;
-  /* Plain text colour, so a title with nothing to link to does not look
-     like a dead link. The anchor inside takes the accent. */
-  color: var(--global-text-color);
-
-  a {
-    color: var(--global-link-color);
-  }
-}
-
-/* Review status, running straight on from the title in the same serif at the
-   same size — only the colour drops. It reads as part of the sentence the
-   title makes rather than as a tag stuck beside it. */
-.ref-status {
-  color: var(--global-text-color-light);
-}
-
-.ref-authors {
-  display: block;
+.pub-authors {
+  margin: 0;
   font-family: $content-sans;
   font-size: 0.88em;
   line-height: 1.5;
@@ -217,41 +232,16 @@ $list-measure-root: 44em; // at the full body size        -> ~792px
   }
 }
 
-.ref-source {
-  display: block;
+/* Italic carries the whole line, journal and volume and status together —
+   finer-grained markup inside it bought nothing a reader could see. */
+.pub-venue {
   margin: 0.15em 0 0;
   font-family: $content-sans;
   font-size: 0.88em;
-  line-height: 1.5;
-  font-variant-numeric: tabular-nums;
-  color: var(--global-text-color-light);
-}
-
-.ref-venue {
   font-style: italic;
-}
-
-/* "in review", "preprint", "PhD thesis" — plain words, not a badge. */
-.ref-note {
-  color: var(--global-text-color-light);
-}
-
-/* A quiet label, pitched well below the serif section head so the two read
-   as different levels rather than competing. */
-.refyear {
-  margin: 1.9em 0 0.9em;
-  font-family: $content-sans;
-  font-size: 0.72em;
-  font-weight: 700;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  line-height: 1.5;
   color: var(--global-text-color-light);
   font-variant-numeric: tabular-nums;
-}
-
-.refyear:first-of-type,
-.section-head + .refyear {
-  margin-top: 0;
 }
 
 
@@ -459,16 +449,19 @@ $list-measure-root: 44em; // at the full body size        -> ~792px
     font-size: 1.2em;
   }
 
-  /* Tuck the numbers in, but keep them out of the text block. */
-  .reflist li {
-    padding-left: 2em;
+  /* A 4em gutter plus a citation does not fit a phone, so the month stacks
+     above the title and the rail goes away. It was a scanning aid, not
+     structure — the entry still reads top to bottom without it. */
+  .publication {
+    grid-template-columns: 1fr;
+    gap: 0.1em 0;
   }
 
-  .reflist li::before {
-    width: 1.5em;
+  .pub-when {
+    padding-top: 0;
   }
 
   .refyear {
-    letter-spacing: 0.12em;
+    font-size: 1.15em;
   }
 }
