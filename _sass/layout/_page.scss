@@ -192,13 +192,13 @@
    Cover video
    ========================================================================== */
 
-/* A banner, not a hero: held to the text measure and about half its old
-   height, so the opening paragraph is on screen without scrolling. */
+/* Full width of the content column, short enough that the opening paragraph
+   is on screen without scrolling. */
 .page__cover {
   position: relative;
-  max-width: $archive-measure;
+  max-width: none;
   margin: 0 0 2.2em;
-  aspect-ratio: 3 / 1;
+  aspect-ratio: 4 / 1;
   overflow: hidden;
   border-radius: $border-radius;
   background-color: var(--global-border-color);
