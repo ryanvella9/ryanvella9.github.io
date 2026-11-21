@@ -1,8 +1,6 @@
 /* Body copy on the landing page. */
-/* 36em = $content-measure, which lives in a partial imported after this one. */
 .content-box {
   margin-bottom: 2em;
-  max-width: 36em;
 }
 
 .content-box > :first-child {

@@ -61,8 +61,8 @@ $container-max-width        : 1600px !default;
 /* Measure cap for body copy; the container above is far wider than prose. */
 $measure                    : 56rem !default;
 
-/* The same cap for the archive layout, which carries lists, not prose. */
-$archive-measure            : 44rem !default;
+/* The archive layout uses the same cap, so every page has one right edge. */
+$archive-measure            : $measure !default;
 
 /* ==========================================================================
    Grid

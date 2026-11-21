@@ -33,15 +33,16 @@
       @include full();
     }
 
-    /* Hold the reading column to $measure. float:none goes with it, since auto
-       margins do not centre a floated box. .page__cover is left out. */
+    /* Hold the column to $measure and run it flush left, matching .archive.
+       Centred, these sat 113px right of the cover at 1920, which is flush
+       left by default. */
     > header,
     > .page__content,
     > .page__meta,
     > .page__share {
       float: none;
       max-width: $measure;
-      margin-left: auto;
+      margin-left: 0;
       margin-right: auto;
     }
   }
@@ -182,11 +183,12 @@
    Cover video
    ========================================================================== */
 
-/* Full width of the content column, short enough that the opening paragraph
-   is on screen without scrolling. */
+/* Full width of the content column. $measure explicitly, because .page__cover
+   is excluded from the rule that caps the column's other children — without it
+   the banner overhung everything by 225px at 1920. */
 .page__cover {
   position: relative;
-  max-width: none;
+  max-width: $measure;
   margin: 0 0 2.2em;
   aspect-ratio: 4 / 1;
   overflow: hidden;
