@@ -142,12 +142,22 @@ title: "Weather"
 
   body.busy { cursor: progress; }
 
-  /* Holds the map panel back while a deep link's own data is still in flight.
-     visibility, not hidden or display:none: resize() measures the section and
-     latches zeros if it ever reads a width of 0 — see the comment there — and
-     a hidden section measures exactly that. visibility:hidden keeps the box in
-     layout, so the measurement stays honest and nothing reflows when it goes. */
-  body.booting #view-map { visibility: hidden; }
+  /* Holds the map panel back while the data it is supposed to be showing is
+     still in flight.
+
+     Not hidden or display:none: resize() measures this section and latches
+     zeros if it ever reads a width of 0 — see the comment there — and an
+     unrendered section measures exactly that. Both of the properties below
+     leave the box in layout, so the measurement stays honest and nothing
+     reflows when the hold goes.
+
+     opacity rather than visibility, which this did use: visibility is
+     inherited and a descendant can therefore set it back to visible and keep
+     painting through a hidden parent. drawColorbar does exactly that, with an
+     inline style on #cbar-box, so the colour bar stayed on screen over an
+     otherwise held panel. opacity has no such escape — it applies to the
+     subtree as a whole — and needs no !important to beat an inline style. */
+  body.booting #view-map { opacity: 0; pointer-events: none; }
 
   #theme { padding: 5px 8px; line-height: 0; border-radius: 5px; }
 
@@ -9642,18 +9652,21 @@ syncMeta();
 satInit();
 resize();
 syncTime();
-/* A deep link names where it wants to be, so the page should not spend the
-   download getting there parked on somewhere else. The three Europe levels are
-   lazy, so #500g_anom/europe/f022 painted the Central Med surface panel first
-   and swapped to the chart a second or two later — the link looked like it had
-   opened the wrong tab and then corrected itself.
+/* Nothing is shown in the map panel until it holds what it is meant to be
+   showing. The three Europe levels are lazy, so both of the ways onto a
+   synoptic chart used to paint the Central Med surface panel first and swap to
+   the chart several seconds later: #500g_anom/europe/f022 looked like a link
+   that had opened the wrong tab and corrected itself, and a bare visit, which
+   also lands on a synoptic chart, looked the same.
 
-   Only for a link. A bare visit states no destination, and toLanding's comment
-   makes the opposite call for that case deliberately: the surface panel it
-   holds up is a real forecast rather than a placeholder, and it is better than
-   an empty stage precisely because nobody asked for anything else. Here they
-   did, so the interim frame is not a courtesy, it is a wrong answer. */
-if (BOOT_HASH) document.body.classList.add('booting');
+   This applied to deep links only at first, on the reasoning in toLanding's
+   comment — that a bare visit names no destination, so the real forecast it
+   holds up beats an empty stage. Measured on the live page the interim panel
+   stood for nine and a half seconds, which is long enough to read as the page
+   rather than as a wait, and it was reported as the bug a second time. The
+   reader is told where they are going and gets there; they are not shown
+   somewhere else first. */
+document.body.classList.add('booting');
 applyHash();
 buildTicks();   // after applyHash: the layer decides which clock the track shows
 syncTime();
