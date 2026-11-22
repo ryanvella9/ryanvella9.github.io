@@ -18,24 +18,22 @@ $content-measure: 100%;
 $list-measure-root: 100%;
 
 
-/* Section headings. The rule restates what the theme gives `h2`, which the
-   archive layout drops. Uses the stronger border token: --global-border-color
-   is invisible on white. */
+/* Section headings: display serif, no rule. The size does the separating
+   that a border used to. */
 
 .section-head {
-  max-width: $list-measure-root; /* or the rule overhangs the text it heads */
-  margin: 2.2em 0 1em;
-  padding-bottom: 0.35em;
-  border-bottom: 1px solid var(--global-dark-border-color);
+  max-width: $list-measure-root;
+  margin: 1.6em 0 0.7em;
   font-family: $content-serif;
-  font-size: 1.5em;
+  font-size: clamp(1.75rem, 2.9vw, 2.45rem);
   font-weight: 400;
-  line-height: 1.25;
-  color: var(--global-text-color);
+  line-height: 1.1;
+  letter-spacing: -0.012em;
+  color: var(--global-ink-color);
 }
 
 .section-head:first-child {
-  margin-top: 0.6em;
+  margin-top: 0;
 }
 
 

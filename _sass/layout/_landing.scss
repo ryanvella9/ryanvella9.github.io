@@ -14,3 +14,135 @@
 .content-box p {
   line-height: 1.65;
 }
+
+
+/* Editorial hero
+   ------------------------------------------------------------------------
+   A small letterspaced label, a display line, then one sentence. */
+
+.hero {
+  margin: 0 0 2.6em;
+}
+
+.eyebrow {
+  margin: 0 0 1.1em;
+  font-family: $sans-serif;
+  font-size: 0.78em;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--global-ink-color);
+}
+
+/* clamp() so the line scales with the column instead of stepping at one
+   breakpoint; 1.02 leading because display sizes need far less than text. */
+.display {
+  margin: 0 0 0.5em;
+  font-family: $serif;
+  font-size: clamp(2.8rem, 6.2vw, 5rem);
+  font-weight: 400;
+  line-height: 1.02;
+  letter-spacing: -0.015em;
+  color: var(--global-ink-color);
+}
+
+.standfirst {
+  max-width: 30em;
+  margin: 0;
+  font-size: 1.22em;
+  line-height: 1.55;
+  color: var(--global-text-color);
+}
+
+
+/* Text-and-media bands
+   ------------------------------------------------------------------------
+   Text left, a figure or aside right. This is what fills the column width
+   without stretching a paragraph past a readable measure. */
+
+.band {
+  display: grid;
+  grid-template-columns: 1.9fr 1fr;
+  gap: 2.8em;
+  align-items: start;
+  margin: 0 0 3.4em;
+}
+
+.band--wide {
+  grid-template-columns: 1fr;
+}
+
+.band-text > :first-child {
+  margin-top: 0;
+}
+
+.band-text p {
+  line-height: 1.65;
+}
+
+/* The rule above the figure echoes the one under a section head, so the two
+   columns start on the same line. */
+.band-media {
+  margin: 0;
+  padding-top: 0.9em;
+  border-top: 1px solid var(--global-dark-border-color);
+
+  img,
+  video {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: $border-radius;
+  }
+}
+
+/* Both source photos are portrait (400x600, 1344x2000). At full column width
+   that runs 600px+ tall and leaves the text column half empty beside it, so
+   images are cropped to a landscape box; the headshot stays square. */
+.band-media img {
+  aspect-ratio: 3 / 2;
+  object-fit: cover;
+}
+
+.band-media--portrait img {
+  aspect-ratio: 1 / 1;
+  object-position: center 22%;
+}
+
+.band-media figcaption {
+  margin-top: 0.6em;
+  font-family: $sans-serif;
+  font-size: 0.86em;
+  line-height: 1.5;
+  color: var(--global-text-color-light);
+}
+
+/* Contact rail under the portrait: one link a line, no icons. */
+.band-contact {
+  margin: 1.1em 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.94em;
+
+  li {
+    margin: 0 0 0.35em;
+  }
+
+  .label {
+    display: inline-block;
+    min-width: 5.6em;
+    color: var(--global-text-color-light);
+  }
+}
+
+
+@media screen and (max-width: 760px) {
+  .band {
+    grid-template-columns: 1fr;
+    gap: 1.8em;
+  }
+
+  .standfirst {
+    font-size: 1.1em;
+  }
+}
