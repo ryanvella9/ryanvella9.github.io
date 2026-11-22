@@ -27,7 +27,7 @@
   &__inner-wrap {
     @include container;
     @include clearfix;
-    padding: 0.85em 1em;
+    padding: 0.5em 1em;
     font-family: $sans-serif-narrow;
 
     @include breakpoint($x-large) {
@@ -60,17 +60,8 @@
   list-style-type: none;
   white-space: nowrap;
 
-  /* The wordmark: the display serif, so the bar speaks the same language as
-     the page under it. */
   &--lg {
-    padding-right: 2.4em;
-
-    a {
-      font-family: $serif;
-      font-size: 1.28em;
-      font-weight: 500;
-      letter-spacing: -0.01em;
-      color: var(--global-ink-color);
-    }
+    padding-right: 2em;
+    font-weight: 700;
   }
 }
